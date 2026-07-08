@@ -44,7 +44,7 @@ def get_power_factor_from_11bit_register(raw_power_factor_bits):
         decoded_value -= 0x800
     return decoded_value / (2**10)
 
-def get_calibration_from_JSON():
+def get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER):
     """Load calibration settings from disk.
 
     Reads the JSON calibration file if it exists and returns a dictionary
@@ -154,7 +154,7 @@ def read_measurement_values(bus, calibration):
         "estimated_power": estimated_power,
     }
 
-def calibrate(bus, calibration):
+def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
     """Perform interactive calibration for voltage and current scaling.
 
     This function prompts the user to capture the zero-offset values for
