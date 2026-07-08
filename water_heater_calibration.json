@@ -1,0 +1,9 @@
+{
+  "vrms_scale": 0.009701910013585871,
+  "irms_scale": 0.0016265597147950089,
+  "vrms_offset": 1397,
+  "irms_offset": 16,
+  "last_cal_time": "2026-07-07T18:56:08",
+  "line_vrms_used": 121.4,
+  "clamp_irms_used": 7.3
+}
