@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+from smbus2 import SMBus
+import time, json, os
+from datetime import datetime
+
+# -----------------------------
+# User setup (your confirmed)
+# -----------------------------
+#SENSOR_ADDRESS = 0x60
+#I2C_BUS = 1
+
+# 32-bit little-endian registers
+REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(s16)
+REG_POWER_REGISTER = 0x21 # [15:0]=PACTIVE(s16), [31:16]=PIMAG(u16)
+REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPP(u16), [26:16]=PF(11b signed), bit27 posangle, bit28 pospf
+
+# Folder/file locations
+OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
+# 1. Define the folder path
+#OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
+
+# 2. Create the folder automatically if it doesn't exist
+#os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+CALIBRATION_FILE_PATH = os.path.join(OUTPUT_FOLDER, "water_heater_calibration.json")
+
+# Noise floors (tune if needed)
+# These prevent "ghost" readings when VINP/inputs float (chip powered but mains/load removed)
+NOISE_FLOOR_VRMS_CODES = 300    # raw codes near baseline treated as 0V
+NOISE_FLOOR_IRMS_CODES = 80     # raw codes near baseline treated as 0A
+NOISE_FLOOR_V_VOLTS    = 5.0    # Vrms below this -> show 0.0
+NOISE_FLOOR_I_AMPS     = 0.20   # Irms below this -> show 0.0
+
+# Power sign handling:
+# If you want consumed power always positive, keep POWER_ABS=True
+POWER_ABS = True
+
+
+# -----------------------------
+# Helpers
+# -----------------------------
+from helper_power_functions import (
+    get_integer_from_u16,
+    get_integer_from_s16,
+    get_32_bit_little_endian,
+    get_power_factor_from_11bit_register,
+    get_calibration_from_JSON,
+    set_calibration,
+    read_measurement_values,
+    calibrate,
+)
+
+from hardware_map import (
+        SENSOR_ADDRESS,
+        I2C_BUS,
+)
+
+
+def main():
+    """Run the main logging loop for the ACS37800 sensor.
+
+    This function sets up the output folder and CSV file, optionally performs
+    calibration, then enters a loop reading measurements every second and
+    writing them to both stdout and the CSV log file.
+    """
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    calibration = get_calibration_from_JSON()
+
+    csv_name = datetime.now().strftime("power_data_%Y_%m_%d_%H%M%S.csv")
+    csv_path = os.path.join(OUTPUT_FOLDER, csv_name)
+
+    with SMBus(I2C_BUS) as bus, open(csv_path, "w") as f:
+        f.write("time,vrms,irms,p_est,pf,vrms_raw,irms_raw,pactive_raw,pimag_raw,papparent_raw\n")
+        print(f"Logging to: {csv_path}")
+        print("Commands:")
+        print("  c  -> full calibration (recommended)")
+        print("  Enter -> start using saved calibration\n")
+        cmd = input("> ").strip().lower()
+        if cmd == "c":
+            calibrate(bus, calibration)
+
+        calibration = get_calibration_from_JSON()
+
+        try:
+            runtime_hours = int(input("Run for how many hours? ").strip())
+            runtime_minutes = int(input("Run for how many minutes? ").strip())
+        except ValueError:
+            print("Invalid input. Using default runtime of 1 hour.")
+            runtime_hours = 1
+            runtime_minutes = 0
+
+        run_duration_seconds = runtime_hours * 3600 + runtime_minutes * 60
+        start_time = datetime.now()
+        elapsed_seconds = 0
+
+        try:
+            while elapsed_seconds < run_duration_seconds:
+                t = datetime.now().isoformat(timespec="seconds")
+                measurement = read_measurement_values(bus, calibration)
+
+                if measurement is None:
+                    print(f"{t}  I2C READ ERROR")
+                    time.sleep(1)
+                    continue
+
+                voltage_rms = measurement["voltage_rms"]
+                current_rms = measurement["current_rms"]
+                estimated_power = measurement["estimated_power"]
+                power_factor = measurement["power_factor"]
+
+                voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.2f}"
+                current_rms_text = "None" if current_rms is None else f"{current_rms:.2f}"
+                estimated_power_text = "None" if estimated_power is None else f"{estimated_power:.1f}"
+
+                print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={estimated_power_text} W  PF={power_factor:+.3f}  "
+                      f"(raw vr={measurement['voltage_rms_raw']} ir={measurement['current_rms_raw']})")
+
+                f.write(f"{t},{voltage_rms if voltage_rms is not None else ''},{current_rms if current_rms is not None else ''},"
+                        f"{estimated_power if estimated_power is not None else ''},{power_factor},"
+                        f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['active_power_raw']},"
+                        f"{measurement['reactive_power_raw']},{measurement['apparent_power_raw']}\n")
+                f.flush()
+
+                elapsed_seconds = (datetime.now() - start_time).total_seconds()
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print(f"\nStopped by user (Ctrl+C). Data saved to: {csv_path}")
+            return
+
+        print(f"Completed run after {runtime_hours} hour(s) and {runtime_minutes} minute(s).")
+
+
+if __name__ == "__main__":
+    main()
