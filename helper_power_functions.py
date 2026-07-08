@@ -2,6 +2,18 @@
 from smbus2 import SMBus
 import time, json, os
 from datetime import datetime
+from hardware_map import (
+        I2C_BUS,
+        SENSOR_ADDRESS,
+        REG_VRMS_REGISTER,
+        REG_POWER_REGISTER,
+        REG_POWER_FACTOR_REGISTER,
+        NOISE_FLOOR_VRMS_CODES,
+        NOISE_FLOOR_IRMS_CODES,
+        NOISE_FLOOR_V_VOLTS,
+        NOISE_FLOOR_I_AMPS,
+        POWER_ABS,
+)
 
 # These are helper functions specific to capturing and caclulating power elements
 

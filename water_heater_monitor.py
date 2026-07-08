@@ -3,16 +3,6 @@ from smbus2 import SMBus
 import time, json, os
 from datetime import datetime
 
-# -----------------------------
-# User setup (your confirmed)
-# -----------------------------
-#SENSOR_ADDRESS = 0x60
-#I2C_BUS = 1
-
-# 32-bit little-endian registers
-REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(s16)
-REG_POWER_REGISTER = 0x21 # [15:0]=PACTIVE(s16), [31:16]=PIMAG(u16)
-REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPP(u16), [26:16]=PF(11b signed), bit27 posangle, bit28 pospf
 
 # Folder/file locations
 OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
@@ -22,17 +12,6 @@ OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
 # 2. Create the folder automatically if it doesn't exist
 #os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 CALIBRATION_FILE_PATH = os.path.join(OUTPUT_FOLDER, "water_heater_calibration.json")
-
-# Noise floors (tune if needed)
-# These prevent "ghost" readings when VINP/inputs float (chip powered but mains/load removed)
-NOISE_FLOOR_VRMS_CODES = 300    # raw codes near baseline treated as 0V
-NOISE_FLOOR_IRMS_CODES = 80     # raw codes near baseline treated as 0A
-NOISE_FLOOR_V_VOLTS    = 5.0    # Vrms below this -> show 0.0
-NOISE_FLOOR_I_AMPS     = 0.20   # Irms below this -> show 0.0
-
-# Power sign handling:
-# If you want consumed power always positive, keep POWER_ABS=True
-POWER_ABS = True
 
 
 # -----------------------------
@@ -63,7 +42,7 @@ def main():
     writing them to both stdout and the CSV log file.
     """
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    calibration = get_calibration_from_JSON()
+    #calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
 
     csv_name = datetime.now().strftime("power_data_%Y_%m_%d_%H%M%S.csv")
     csv_path = os.path.join(OUTPUT_FOLDER, csv_name)
@@ -76,9 +55,9 @@ def main():
         print("  Enter -> start using saved calibration\n")
         cmd = input("> ").strip().lower()
         if cmd == "c":
-            calibrate(bus, calibration)
+            calibrate(bus, calibration, CALIBRATION_FILE_PATH)
 
-        calibration = get_calibration_from_JSON()
+        calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
 
         try:
             runtime_hours = int(input("Run for how many hours? ").strip())

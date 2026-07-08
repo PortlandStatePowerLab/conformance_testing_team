@@ -25,4 +25,18 @@ I2C_BUS = 1
 #Sensor address
 SENSOR_ADDRESS = 0x60
 
+# 32-bit little-endian registers
+REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(s16)
+REG_POWER_REGISTER = 0x21 # [15:0]=PACTIVE(s16), [31:16]=PIMAG(u16)
+REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPP(u16), [26:16]=PF(11b signed), bit27 posangle, bit28 pospf
 
+# Noise floors (tune if needed)
+# These prevent "ghost" readings when VINP/inputs float (chip powered but mains/load removed)
+NOISE_FLOOR_VRMS_CODES = 300    # raw codes near baseline treated as 0V
+NOISE_FLOOR_IRMS_CODES = 80     # raw codes near baseline treated as 0A
+NOISE_FLOOR_V_VOLTS    = 5.0    # Vrms below this -> show 0.0
+NOISE_FLOOR_I_AMPS     = 0.20   # Irms below this -> show 0.0
+
+# Power sign handling:
+# If you want consumed power always positive, keep POWER_ABS=True
+POWER_ABS = True
