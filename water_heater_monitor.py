@@ -3,17 +3,6 @@ from smbus2 import SMBus
 import time, json, os
 from datetime import datetime
 
-
-# Folder/file locations
-OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
-# 1. Define the folder path
-#OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
-
-# 2. Create the folder automatically if it doesn't exist
-#os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-CALIBRATION_FILE_PATH = os.path.join(OUTPUT_FOLDER, "water_heater_calibration.json")
-
-
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -29,10 +18,12 @@ from helper_power_functions import (
 )
 
 from hardware_map import (
-        SENSOR_ADDRESS,
         I2C_BUS,
 )
 
+# Folder/file locations
+OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
+CALIBRATION_FILE_PATH = os.path.join(OUTPUT_FOLDER, "water_heater_calibration.json")
 
 def main():
     """Run the main logging loop for the ACS37800 sensor.
