@@ -72,45 +72,79 @@ def get_power_factor_from_11bit_register(raw_power_factor_bits):
         decoded_value -= 0x800
     return decoded_value / (2**10)
 
-def get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER):
-    """Load calibration settings from disk.
-
-    Reads the JSON calibration file if it exists and returns a dictionary
-    containing scale and offset values needed to convert raw sensor codes
-    into engineering units.
-    """
-    calibration = {
+def _get_default_calibration():
+    return {
         # scales convert (raw - offset) -> engineering units
         "vrms_scale": None,     # V per code
         "irms_scale": None,     # A per code
         # offsets are captured raw baselines
         "vrms_offset": 0,       # VRMS_raw at 0V (mains/transformer off but chip powered)
         "irms_offset": 0,       # IRMS_raw at 0A (voltage present but no load)
+        # human-readable engineering offsets
+        "vrms_offset_volts": 0.0,
+        "irms_offset_amps": 0.0,
         # saved metadata
         "last_cal_time": None,
         "line_vrms_used": None,
         "clamp_irms_used": None
     }
+
+
+def get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER):
+    """Load calibration settings for the current Pi from disk.
+
+    Reads a host-keyed JSON calibration file if it exists and returns the
+    calibration dictionary for the current hostname. If the file is in the
+    legacy single-profile format, it will still be read for compatibility.
+    """
+    calibration = _get_default_calibration()
+    host_name = socket.gethostname()
+
     if not os.path.exists(CALIBRATION_FILE_PATH):
         return calibration
 
     try:
         with open(CALIBRATION_FILE_PATH, "r", encoding="utf-8") as f:
-            calibration.update(json.load(f))
+            loaded_data = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         print(f"Warning: could not load calibration file {CALIBRATION_FILE_PATH}: {exc}")
+        return calibration
+
+    if isinstance(loaded_data, dict):
+        if all(key in loaded_data for key in ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")):
+            return loaded_data
+        if host_name in loaded_data and isinstance(loaded_data[host_name], dict):
+            return loaded_data[host_name]
 
     return calibration
 
-def set_calibration(calibration):
-    """Persist calibration settings to disk.
 
-    Writes the current calibration dictionary to the configured JSON file
-    so future runs can reuse the measured scale and offset values.
+def set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=None):
+    """Persist calibration settings to disk for the current Pi.
+
+    Writes the current calibration dictionary into a host-keyed JSON object so
+    each Pi can keep its own calibration profile.
     """
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    host_name = hostname or socket.gethostname()
+
+    existing_profiles = {}
+    if os.path.exists(CALIBRATION_FILE_PATH):
+        try:
+            with open(CALIBRATION_FILE_PATH, "r", encoding="utf-8") as f:
+                loaded_data = json.load(f)
+            if isinstance(loaded_data, dict):
+                if all(key in loaded_data for key in ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")):
+                    existing_profiles = {}
+                else:
+                    existing_profiles = {k: v for k, v in loaded_data.items() if isinstance(v, dict)}
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"Warning: could not load existing calibration file {CALIBRATION_FILE_PATH}: {exc}")
+
+    existing_profiles[host_name] = calibration
+
     with open(CALIBRATION_FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(calibration, f, indent=2)
+        json.dump(existing_profiles, f, indent=2)
         f.write("\n")
 
 def read_measurement_values(bus, calibration):
@@ -182,7 +216,7 @@ def read_measurement_values(bus, calibration):
         "estimated_power": estimated_power,
     }
 
-def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
+def calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=None):
     """Perform interactive calibration for voltage and current scaling.
 
     This function prompts the user to capture the zero-offset values for
@@ -204,6 +238,10 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
         print("I2C read failed. Check wiring/address.")
         return
     calibration["vrms_offset"] = int(values["voltage_rms_raw"])
+    if calibration.get("vrms_scale") is not None:
+        calibration["vrms_offset_volts"] = float(calibration["vrms_offset"]) * float(calibration["vrms_scale"])
+    else:
+        calibration["vrms_offset_volts"] = 0.0
     print(f"Captured VRMS offset = {calibration['vrms_offset']} raw codes")
 
     # B) Capture IRMS offset at 0A with voltage present
@@ -214,6 +252,10 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
         print("I2C read failed. Check wiring/address.")
         return
     calibration["irms_offset"] = int(values["current_rms_raw"])
+    if calibration.get("irms_scale") is not None:
+        calibration["irms_offset_amps"] = float(calibration["irms_offset"]) * float(calibration["irms_scale"])
+    else:
+        calibration["irms_offset_amps"] = 0.0
     print(f"Captured IRMS offset = {calibration['irms_offset']} raw codes")
 
     # Voltage scale
@@ -231,6 +273,7 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
         return
     calibration["vrms_scale"] = true_line_voltage / voltage_difference
     calibration["line_vrms_used"] = true_line_voltage
+    calibration["vrms_offset_volts"] = float(calibration["vrms_offset"]) * float(calibration["vrms_scale"])
     print(f"VRMS_raw={raw_voltage_rms} => vrms_scale={calibration['vrms_scale']:.10f} V/code")
 
     # Current scale
@@ -248,6 +291,7 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
         return
     calibration["irms_scale"] = true_load_current / current_difference
     calibration["clamp_irms_used"] = true_load_current
+    calibration["irms_offset_amps"] = float(calibration["irms_offset"]) * float(calibration["irms_scale"])
     print(f"IRMS_raw={raw_current_rms} => irms_scale={calibration['irms_scale']:.10f} A/code")
 
     calibration["last_cal_time"] = datetime.now().isoformat(timespec="seconds")
@@ -260,6 +304,6 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH):
             print("Calibration was not saved.")
             return
 
-    set_calibration(calibration)
+    set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=hostname)
     print(f"\nSaved calibration to: {CALIBRATION_FILE_PATH}\n")
 

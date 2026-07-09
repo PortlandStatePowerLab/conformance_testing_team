@@ -36,7 +36,7 @@ def main():
     writing them to both stdout and the CSV log file.
     """
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    #calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
+    calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
 
     csv_name = datetime.now().strftime("power_data_%Y_%m_%d_%H%M%S.csv")
     csv_path = os.path.join(OUTPUT_FOLDER, csv_name)
@@ -49,7 +49,7 @@ def main():
         print("  Enter -> start using saved calibration\n")
         cmd = input("> ").strip().lower()
         if cmd == "c":
-            calibrate(bus, calibration, CALIBRATION_FILE_PATH)
+            calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
 
         calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
 
