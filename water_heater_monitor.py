@@ -6,7 +6,7 @@ from datetime import datetime
 # -----------------------------
 # Helpers
 # -----------------------------
-from helper_power_functions import (
+from helpers.helper_power_functions import (
     get_integer_from_u16,
     get_integer_from_s16,
     get_32_bit_little_endian,
@@ -15,11 +15,14 @@ from helper_power_functions import (
     set_calibration,
     read_measurement_values,
     calibrate,
+    get_pi_number,
 )
 
-from hardware_map import (
+from helpers.hardware_map import (
         I2C_BUS,
 )
+
+pi_number = get_pi_number()
 
 # Folder/file locations
 OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")

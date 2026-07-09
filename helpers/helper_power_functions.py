@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 from smbus2 import SMBus
-import time, json, os
+import time, json, os, re, socket
 from datetime import datetime
-from hardware_map import (
+
+from helpers.hardware_map import (
         I2C_BUS,
         SENSOR_ADDRESS,
         REG_VRMS_REGISTER,
@@ -16,6 +17,21 @@ from hardware_map import (
 )
 
 # These are helper functions specific to capturing and caclulating power elements
+
+def get_pi_number():
+    # Get the current hostname safely
+    hostname = socket.gethostname()  # e.g., "WH-station12"
+
+    # Match one or more digits strictly at the end of the string
+    result = re.search(r'\d+$', hostname)
+
+    if result:
+        # Extract the full string match and convert to an integer
+        #station_number = int(station_match.group())
+        print(f"Verified station number: {result}")
+        return result.group()        
+    else:
+        print("ERROR: Could not find a station number at the end of the hostname.")
 
 def get_integer_from_u16(x):
     """Convert an integer to an unsigned 16-bit value.
