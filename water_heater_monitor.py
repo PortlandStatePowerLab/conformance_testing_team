@@ -10,6 +10,7 @@ from helpers.helper_power_functions import (
     get_integer_from_u16,
     get_integer_from_s16,
     get_32_bit_little_endian,
+    get_power_data,
     get_power_factor_from_11bit_register,
     get_calibration_from_JSON,
     set_calibration,
@@ -100,7 +101,7 @@ def main():
             return
 
         print(f"Completed run after {runtime_hours} hour(s) and {runtime_minutes} minute(s).")
-
+    print(f"Power data: {get_power_data(bus, calibration)}")
 
 if __name__ == "__main__":
     main()

@@ -27,8 +27,9 @@ SENSOR_ADDRESS = 0x60
 
 # 32-bit little-endian registers
 REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(s16)
-REG_POWER_REGISTER = 0x21 # [15:0]=PACTIVE(s16), [31:16]=PIMAG(u16)
-REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPP(u16), [26:16]=PF(11b signed), bit27 posangle, bit28 pospf
+REG_POWER_REGISTER = 0x21 # [15:0]=PACTIVE(s16) <-- real power, [31:16]=PIMAG(u16) <-- reactive power
+REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPPARRENT(u16) <-- apparent power, [26:16]=PF(11b signed) <-- power factor, 
+                                 # bit27 posangle <-- leading(0)/lagging(1), bit28 pospf <-- positive(consuming)/negative(generating) power factor
 
 # Noise floors (tune if needed)
 # These prevent "ghost" readings when VINP/inputs float (chip powered but mains/load removed)

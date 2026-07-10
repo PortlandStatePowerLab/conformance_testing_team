@@ -89,7 +89,6 @@ def _get_default_calibration():
         "clamp_irms_used": None
     }
 
-
 def get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER):
     """Load calibration settings for the current Pi from disk.
 
@@ -307,3 +306,9 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=N
     set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=hostname)
     print(f"\nSaved calibration to: {CALIBRATION_FILE_PATH}\n")
 
+def get_power_data(bus, calibration):
+    """Read the current power data from the ACS37800 sensor.
+
+    Returns a dictionary containing both raw codes and converted values.
+    """
+    return read_measurement_values(bus, calibration)
