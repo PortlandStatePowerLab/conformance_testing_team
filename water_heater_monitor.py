@@ -65,7 +65,8 @@ def main():
         run_duration_seconds = runtime_hours * 3600 + runtime_minutes * 60
         start_time = datetime.now()
         elapsed_seconds = 0
-
+        print(f"Power data: {get_power_data(bus, calibration)}")
+        
         try:
             while elapsed_seconds < run_duration_seconds:
                 t = datetime.now().isoformat(timespec="seconds")
@@ -84,7 +85,7 @@ def main():
                 voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.2f}"
                 current_rms_text = "None" if current_rms is None else f"{current_rms:.2f}"
                 estimated_power_text = "None" if estimated_power is None else f"{estimated_power:.1f}"
-
+                
                 print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={estimated_power_text} W  PF={power_factor:+.3f}  "
                       f"(raw vr={measurement['voltage_rms_raw']} ir={measurement['current_rms_raw']})")
 
@@ -101,7 +102,6 @@ def main():
             return
 
         print(f"Completed run after {runtime_hours} hour(s) and {runtime_minutes} minute(s).")
-    print(f"Power data: {get_power_data(bus, calibration)}")
 
 if __name__ == "__main__":
     main()
