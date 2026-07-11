@@ -72,6 +72,52 @@ def get_power_factor_from_11bit_register(raw_power_factor_bits):
         decoded_value -= 0x800
     return decoded_value / (2**10)
 
+def get_raw_register_data(bus):
+    """Extract all 8 raw sensor values from the ACS37800 registers.
+
+    Reads the three 32-bit registers and unpacks all available fields:
+    - VRMS (bits 15:0 of 0x20) - unsigned voltage
+    - IRMS (bits 31:16 of 0x20) - signed current
+    - PACTIVE (bits 15:0 of 0x21) - signed real power
+    - PIMAG (bits 31:16 of 0x21) - unsigned reactive power
+    - PAPPARENT (bits 15:0 of 0x22) - unsigned apparent power
+    - PFACTOR (bits 26:16 of 0x22) - 11-bit signed, decoded to ~[-1.0, +1.0] power factor
+    - POSANGLE (bit 27 of 0x22) - 1=leading, 0=lagging angle for current relative to voltage
+    - POSPP (bit 28 of 0x22) - 1=power generated, 0=power consumed
+
+    Returns a dictionary with all raw values, or None if I2C read fails.
+    """
+    raw_rms_register = get_32_bit_little_endian(bus, REG_VRMS_REGISTER)
+    raw_power_register = get_32_bit_little_endian(bus, REG_POWER_REGISTER)
+    raw_power_factor_register = get_32_bit_little_endian(bus, REG_POWER_FACTOR_REGISTER)
+
+    if (raw_rms_register is None) or (raw_power_register is None) or (raw_power_factor_register is None):
+        return None
+
+    # Extract all 8 fields from the three registers
+    vrms_raw = get_integer_from_u16(raw_rms_register)
+    irms_raw = get_integer_from_s16(raw_rms_register >> 16)
+
+    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    pimag_raw = get_integer_from_u16(raw_power_register >> 16)
+
+    papparent_raw = get_integer_from_u16(raw_power_factor_register)
+    pf_11bit = (raw_power_factor_register >> 16) & 0x7FF
+    pf_decoded = get_power_factor_from_11bit_register(pf_11bit)
+    posangle = (raw_power_factor_register >> 27) & 0x1
+    pospp = (raw_power_factor_register >> 28) & 0x1
+
+    return {
+        "vrms_raw": vrms_raw,
+        "irms_raw": irms_raw,
+        "pactive_raw": pactive_raw,
+        "pimag_raw": pimag_raw,
+        "papparent_raw": papparent_raw,
+        "power_factor": pf_decoded,
+        "posangle": posangle,  # 1=leading, 0=lagging
+        "pospp": pospp,  # 1=generated, 0=consumed
+    }
+
 def _get_default_calibration():
     return {
         # scales convert (raw - offset) -> engineering units
@@ -182,7 +228,8 @@ def read_measurement_values(bus, calibration):
     raw_rms_register = get_32_bit_little_endian(bus, REG_VRMS_REGISTER)
     raw_power_register = get_32_bit_little_endian(bus, REG_POWER_REGISTER)
     raw_power_factor_register = get_32_bit_little_endian(bus, REG_POWER_FACTOR_REGISTER)
-    print(f"Raw RMS Register: {raw_rms_register}, Raw Power Register: {raw_power_register}, Raw Power Factor Register: {raw_power_factor_register}")
+    #print(f"Raw RMS Register: {raw_rms_register}, Raw Power Register: {raw_power_register}, Raw Power Factor Register: {raw_power_factor_register}")
+    print(f"Raw register data: {get_raw_register_data(bus)}")
     if (raw_rms_register is None) or (raw_power_register is None) or (raw_power_factor_register is None):
         return None
 
