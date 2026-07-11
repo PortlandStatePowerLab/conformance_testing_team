@@ -147,10 +147,35 @@ def set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=
         f.write("\n")
 
 def read_measurement_values(bus, calibration):
-    """Read raw sensor registers and convert them into engineering values.
+    """Read raw sensor registers.
 
     Fetches the three ACS37800 registers needed for voltage, current,
     power, and power factor. Applies raw-domain offset clamping and scaling
+    using the loaded calibration data. Returns a dictionary containing both
+    raw codes and converted values.
+    """
+    raw_rms_register = get_32_bit_little_endian(bus, REG_VRMS_REGISTER)
+    raw_power_register = get_32_bit_little_endian(bus, REG_POWER_REGISTER)
+    raw_power_factor_register = get_32_bit_little_endian(bus, REG_POWER_FACTOR_REGISTER)
+
+    if (raw_rms_register is None) or (raw_power_register is None) or (raw_power_factor_register is None):
+        return None
+
+    vrms_raw = get_integer_from_u16(raw_rms_register)
+    irms_raw = get_integer_from_s16(raw_rms_register >> 16)
+
+    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    pimag_raw = get_integer_from_u16(raw_power_register >> 16)
+
+    papparent_raw = get_integer_from_u16(raw_power_factor_register)
+    pf_11bit = (raw_power_factor_register >> 16) & 0x7FF
+    pf = get_power_factor_from_11bit_register(pf_11bit)
+
+def read_measurement_values(bus, calibration):
+    """Read raw sensor registers and convert them into engineering values.
+
+    Fetches the three ACS37800 registers needed for voltage, current,
+    real power, reactive power, apparent power, power factor. It also collects the angle for current and if the power factor is consuming or generating. Applies raw-domain offset clamping and scaling
     using the loaded calibration data. Returns a dictionary containing both
     raw codes and converted values.
     """
