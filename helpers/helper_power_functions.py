@@ -146,7 +146,7 @@ def set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=
         json.dump(existing_profiles, f, indent=2)
         f.write("\n")
 
-def read_measurement_values(bus, calibration):
+def read_measurement_values2(bus, calibration):
     """Read raw sensor registers.
 
     Fetches the three ACS37800 registers needed for voltage, current,
@@ -182,7 +182,7 @@ def read_measurement_values(bus, calibration):
     raw_rms_register = get_32_bit_little_endian(bus, REG_VRMS_REGISTER)
     raw_power_register = get_32_bit_little_endian(bus, REG_POWER_REGISTER)
     raw_power_factor_register = get_32_bit_little_endian(bus, REG_POWER_FACTOR_REGISTER)
-
+    print(f"Raw RMS Register: {raw_rms_register}, Raw Power Register: {raw_power_register}, Raw Power Factor Register: {raw_power_factor_register}")
     if (raw_rms_register is None) or (raw_power_register is None) or (raw_power_factor_register is None):
         return None
 

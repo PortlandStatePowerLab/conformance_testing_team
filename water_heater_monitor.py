@@ -65,8 +65,8 @@ def main():
         run_duration_seconds = runtime_hours * 3600 + runtime_minutes * 60
         start_time = datetime.now()
         elapsed_seconds = 0
-        print(f"Power data: {get_power_data(bus, calibration)}")
-        
+        #print(f"Power data: {get_power_data(bus, calibration)}")
+
         try:
             while elapsed_seconds < run_duration_seconds:
                 t = datetime.now().isoformat(timespec="seconds")
