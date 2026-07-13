@@ -20,7 +20,6 @@ from diagnostics.helpers_diagnostics.helper_power_diagnostics import (
     read_live_snapshot,
     print_live_snapshot,
     read_instantaneous_burst,
-    print_instantaneous_burst,
     parse_args,
 )
 
