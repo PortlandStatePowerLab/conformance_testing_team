@@ -5,7 +5,7 @@ from datetime import datetime
 
 from helpers.hardware_map import (
         I2C_BUS,
-        SENSOR_ADDRESS,
+        ACS37800_I2C_ADDR,
         REG_VRMS_REGISTER,
         REG_POWER_REGISTER,
         REG_POWER_FACTOR_REGISTER,
@@ -56,7 +56,7 @@ def get_32_bit_little_endian(bus, reg):
     Returns the combined 32-bit value or None if the I2C transaction fails.
     """
     try:
-        b = bus.read_i2c_block_data(SENSOR_ADDRESS, reg, 4)
+        b = bus.read_i2c_block_data(ACS37800_I2C_ADDR, reg, 4)
     except Exception:
         return None
     return b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24)
@@ -72,7 +72,7 @@ def get_power_factor_from_11bit_register(raw_power_factor_bits):
         decoded_value -= 0x800
     return decoded_value / (2**10)
 
-def get_raw_register_data(bus):
+def get_raw_power_register_data(bus):
     """Extract all 8 raw sensor values from the ACS37800 registers.
 
     Reads the three 32-bit registers and unpacks all available fields:
@@ -82,8 +82,8 @@ def get_raw_register_data(bus):
     - PIMAG (bits 31:16 of 0x21) - unsigned reactive power
     - PAPPARENT (bits 15:0 of 0x22) - unsigned apparent power
     - PFACTOR (bits 26:16 of 0x22) - 11-bit signed, decoded to ~[-1.0, +1.0] power factor
-    - POSANGLE (bit 27 of 0x22) - 1=leading, 0=lagging angle for current relative to voltage
-    - POSPP (bit 28 of 0x22) - 1=power generated, 0=power consumed
+    - POSANGLE (bit 27 of 0x22) - 0=current leading, 1=current lagging angle
+    - POSPP (bit 28 of 0x22) - 0=power generated, 1=power consumed
 
     Returns a dictionary with all raw values, or None if I2C read fails.
     """
@@ -116,6 +116,26 @@ def get_raw_register_data(bus):
         "power_factor": pf_decoded,
         "posangle": posangle,  # 1=leading, 0=lagging
         "pospp": pospp,  # 1=generated, 0=consumed
+    }
+
+def get_power_chip_calibration(bus):
+    """Read the ACS37800 chip's internal calibration registers.
+
+    Returns a dictionary containing the raw calibration values for voltage and
+    current scaling, or None if I2C read fails.
+    """
+    raw_calibration_register = get_32_bit_little_endian(bus, 0x0B)  # Initial SNS_FINE register - calibration register address (bits 18:9)
+    raw_calibration_register2 = get_32_bit_little_endian(bus, 0x1B)  # Initial SNS_FINE register - calibration register address (bits 18:9)
+
+    if raw_calibration_register is None or raw_calibration_register2 is None:
+        return None
+
+    vrms_scale_raw = get_integer_from_u16(raw_calibration_register)
+    irms_scale_raw = get_integer_from_s16(raw_calibration_register >> 16)
+
+    return {
+        "vrms_scale_raw": vrms_scale_raw,
+        "irms_scale_raw": irms_scale_raw,
     }
 
 def _get_default_calibration():

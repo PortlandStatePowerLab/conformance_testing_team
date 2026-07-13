@@ -14,16 +14,13 @@ CH_AMBIENT = 4
 VALVE_PIN = 17
 
 # The Pi reaches the MAX1238 over I2C through the TXS0104E level shifter.
-# ACS37800 is on the PCB and communicates over Pi-side I2C.
+# ACS37800 is the power chip on the PCB and communicates over Pi-side I2C.
 ACS37800_I2C_ADDR = 0x60
 ACS_DIO0_GPIO = 18
 ACS_DIO1_GPIO = 26
 
 # I2C Address
 I2C_BUS = 1
-
-#Sensor address
-SENSOR_ADDRESS = 0x60
 
 # 32-bit little-endian registers
 REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(s16)
@@ -41,3 +38,34 @@ NOISE_FLOOR_I_AMPS     = 0.20   # Irms below this -> show 0.0
 # Power sign handling:
 # If you want consumed power always positive, keep POWER_ABS=True
 POWER_ABS = True
+
+# ACS37800_REGISTERS for reference (not used in code, but useful for debugging)
+EEPROM_REGISTERS = {
+    0x0B: "EEPROM_CURRENT_TRIM_AVERAGING",
+    0x0C: "EEPROM_VOLTAGE_OFFSET_AVERAGING",
+    0x0D: "EEPROM_PHASE_DELAY_OVERCURRENT",
+    0x0E: "EEPROM_VOLTAGE_EVENTS_ZERO_CROSSING",
+    0x0F: "EEPROM_RMS_WINDOW_DIO_I2C",
+}
+
+SHADOW_REGISTERS = {
+    0x1B: "SHADOW_CURRENT_TRIM_AVERAGING",
+    0x1C: "SHADOW_VOLTAGE_OFFSET_AVERAGING",
+    0x1D: "SHADOW_PHASE_DELAY_OVERCURRENT",
+    0x1E: "SHADOW_VOLTAGE_EVENTS_ZERO_CROSSING",
+    0x1F: "SHADOW_RMS_WINDOW_DIO_I2C",
+}
+
+LIVE_REGISTERS = {
+    0x20: "VRMS_IRMS",
+    0x21: "PACTIVE_PIMAG",
+    0x22: "PAPPARENT_PFACTOR_FLAGS",
+    0x25: "NUMPTSOUT",
+    0x26: "RMS_AVERAGE_STAGE_1",
+    0x27: "RMS_AVERAGE_STAGE_2",
+    0x28: "PACTIVE_AVERAGE_STAGE_1",
+    0x29: "PACTIVE_AVERAGE_STAGE_2",
+    0x2A: "VCODES_ICODES",
+    0x2C: "PINSTANT",
+    0x2D: "STATUS_FLAGS",
+}
