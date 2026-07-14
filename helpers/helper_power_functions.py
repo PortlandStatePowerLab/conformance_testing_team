@@ -291,7 +291,7 @@ def read_measurement_values(bus, calibration):
         "estimated_power": estimated_power,
     }
 
-def calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=None):
+def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     """Perform interactive calibration for voltage and current scaling.
 
     This function prompts the user to capture the zero-offset values for
@@ -371,7 +371,7 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=N
 
     calibration["last_cal_time"] = datetime.now().isoformat(timespec="seconds")
 
-    if os.path.exists(os.path.join(CALIBRATION_FILE_PATH, f"{hostname or socket.gethostname()}.json")):
+    if os.path.exists(os.path.join(CALIBRATION_DIR, f"{hostname or socket.gethostname()}.json")):
         overwrite = input(
             f"Calibration file already exists. Overwrite it? (y/N): "
         ).strip().lower()
@@ -379,9 +379,9 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=N
             print("Calibration was not saved.")
             return
 
-    set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=hostname)
+    set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=hostname)
     host_name = hostname or socket.gethostname()
-    print(f"\nSaved calibration to: {os.path.join(CALIBRATION_FILE_PATH, f'{host_name}.json')}\n")
+    print(f"\nSaved calibration to: {os.path.join(CALIBRATION_DIR, f'{host_name}.json')}\n")
 
 def get_power_data(bus, calibration):
     """Read the current power data from the ACS37800 sensor.

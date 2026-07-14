@@ -27,7 +27,7 @@ pi_number = get_pi_number()
 
 # Folder/file locations
 OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
-CALIBRATION_FILE_PATH = os.path.join(OUTPUT_FOLDER, "water_heater_calibration.json")
+CALIBRATION_DIR = os.path.join(OUTPUT_FOLDER, "calibration")
 
 def main():
     """Run the main logging loop for the ACS37800 sensor.
@@ -37,7 +37,7 @@ def main():
     writing them to both stdout and the CSV log file.
     """
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
+    calibration = get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER)
 
     csv_name = datetime.now().strftime("power_data_%Y_%m_%d_%H%M%S.csv")
     csv_path = os.path.join(OUTPUT_FOLDER, csv_name)
@@ -50,9 +50,9 @@ def main():
         print("  Enter -> start using saved calibration\n")
         cmd = input("> ").strip().lower()
         if cmd == "c":
-            calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
+            calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER)
 
-        calibration = get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER)
+        calibration = get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER)
 
         try:
             runtime_hours = int(input("Run for how many hours? ").strip())
