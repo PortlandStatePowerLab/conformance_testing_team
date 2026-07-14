@@ -155,61 +155,45 @@ def _get_default_calibration():
         "clamp_irms_used": None
     }
 
-def get_calibration_from_JSON(CALIBRATION_FILE_PATH, OUTPUT_FOLDER):
+def get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER):
     """Load calibration settings for the current Pi from disk.
 
-    Reads a host-keyed JSON calibration file if it exists and returns the
-    calibration dictionary for the current hostname. If the file is in the
-    legacy single-profile format, it will still be read for compatibility.
+    Reads the per-host calibration file from the calibration directory.
+    Each Pi has its own file named <hostname>.json.
     """
     calibration = _get_default_calibration()
     host_name = socket.gethostname()
+    calibration_file = os.path.join(CALIBRATION_DIR, f"{host_name}.json")
 
-    if not os.path.exists(CALIBRATION_FILE_PATH):
+    if not os.path.exists(calibration_file):
         return calibration
 
     try:
-        with open(CALIBRATION_FILE_PATH, "r", encoding="utf-8") as f:
+        with open(calibration_file, "r", encoding="utf-8") as f:
             loaded_data = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"Warning: could not load calibration file {CALIBRATION_FILE_PATH}: {exc}")
+        print(f"Warning: could not load calibration file {calibration_file}: {exc}")
         return calibration
 
-    if isinstance(loaded_data, dict):
-        if all(key in loaded_data for key in ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")):
-            return loaded_data
-        if host_name in loaded_data and isinstance(loaded_data[host_name], dict):
-            return loaded_data[host_name]
+    # Expect the file to contain the calibration dict directly
+    if isinstance(loaded_data, dict) and all(key in loaded_data for key in ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")):
+        return loaded_data
 
     return calibration
 
 
-def set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=None):
+def set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     """Persist calibration settings to disk for the current Pi.
 
-    Writes the current calibration dictionary into a host-keyed JSON object so
-    each Pi can keep its own calibration profile.
+    Writes the calibration dictionary to a per-host file in the calibration
+    directory. Each Pi maintains its own <hostname>.json file.
     """
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    os.makedirs(CALIBRATION_DIR, exist_ok=True)
     host_name = hostname or socket.gethostname()
+    calibration_file = os.path.join(CALIBRATION_DIR, f"{host_name}.json")
 
-    existing_profiles = {}
-    if os.path.exists(CALIBRATION_FILE_PATH):
-        try:
-            with open(CALIBRATION_FILE_PATH, "r", encoding="utf-8") as f:
-                loaded_data = json.load(f)
-            if isinstance(loaded_data, dict):
-                if all(key in loaded_data for key in ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")):
-                    existing_profiles = {}
-                else:
-                    existing_profiles = {k: v for k, v in loaded_data.items() if isinstance(v, dict)}
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"Warning: could not load existing calibration file {CALIBRATION_FILE_PATH}: {exc}")
-
-    existing_profiles[host_name] = calibration
-
-    with open(CALIBRATION_FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(existing_profiles, f, indent=2)
+    with open(calibration_file, "w", encoding="utf-8") as f:
+        json.dump(calibration, f, indent=2)
         f.write("\n")
 
 def read_measurement_values2(bus, calibration):
@@ -387,16 +371,17 @@ def calibrate(bus, calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=N
 
     calibration["last_cal_time"] = datetime.now().isoformat(timespec="seconds")
 
-    if os.path.exists(CALIBRATION_FILE_PATH):
+    if os.path.exists(os.path.join(CALIBRATION_FILE_PATH, f"{hostname or socket.gethostname()}.json")):
         overwrite = input(
-            f"Calibration file already exists at {CALIBRATION_FILE_PATH}. Overwrite it? (y/N): "
+            f"Calibration file already exists. Overwrite it? (y/N): "
         ).strip().lower()
         if overwrite not in {"y", "yes"}:
             print("Calibration was not saved.")
             return
 
     set_calibration(calibration, CALIBRATION_FILE_PATH, OUTPUT_FOLDER, hostname=hostname)
-    print(f"\nSaved calibration to: {CALIBRATION_FILE_PATH}\n")
+    host_name = hostname or socket.gethostname()
+    print(f"\nSaved calibration to: {os.path.join(CALIBRATION_FILE_PATH, f'{host_name}.json')}\n")
 
 def get_power_data(bus, calibration):
     """Read the current power data from the ACS37800 sensor.
