@@ -1,0 +1,4020 @@
+{
+  "diagnostic_program": "acs37800_power_chip_diagnostic.py",
+  "read_only": true,
+  "hostname": "WH-station1",
+  "started_at": "2026-07-13T16:14:47",
+  "i2c_bus": 1,
+  "i2c_device_path": "/dev/i2c-1",
+  "acs37800_i2c_address_hex": "0x60",
+  "settings": {
+    "live_snapshot_count": 10,
+    "live_snapshot_interval_seconds": 0.5,
+    "instantaneous_burst_count": 100,
+    "instantaneous_burst_delay_seconds": 0.0
+  },
+  "configuration": {
+    "eeprom": {
+      "0x0B": {
+        "address": "0x0B",
+        "name": "EEPROM_CURRENT_TRIM_AVERAGING",
+        "raw_hex": "0x0024FA11",
+        "raw_unsigned": 2423313,
+        "bytes_little_endian": [
+          17,
+          250,
+          36,
+          0
+        ],
+        "decoded": {
+          "QVO_FINE": {
+            "bits": "8:0",
+            "raw": 17,
+            "signed": 17,
+            "description": "Current-channel fine offset trim"
+          },
+          "SNS_FINE": {
+            "bits": "18:9",
+            "raw": 637,
+            "signed": -387,
+            "description": "Current-channel fine gain trim"
+          },
+          "CRS_SNS": {
+            "bits": "21:19",
+            "raw": 4,
+            "gain_multiplier": 4.0,
+            "description": "Current-channel coarse analog gain selection"
+          },
+          "IAVGSELEN": {
+            "bits": "22",
+            "value": 0,
+            "meaning": "0 = VRMS averaging"
+          },
+          "PAVGSELEN": {
+            "bits": "23",
+            "value": 0,
+            "meaning": "0 = VRMS averaging path"
+          },
+          "ECC": {
+            "bits": "27:26",
+            "value": 0,
+            "meaning": "No error"
+          },
+          "EEPROM_BITS_31_28": {
+            "bits": "31:28",
+            "value": 0,
+            "meaning": "Datasheet: no meaning"
+          }
+        }
+      },
+      "0x0C": {
+        "address": "0x0C",
+        "name": "EEPROM_VOLTAGE_OFFSET_AVERAGING",
+        "raw_hex": "0x00000000",
+        "raw_unsigned": 0,
+        "bytes_little_endian": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "decoded": {
+          "RMS_AVG_1": {
+            "bits": "6:0",
+            "value": 0
+          },
+          "RMS_AVG_2": {
+            "bits": "16:7",
+            "value": 0
+          },
+          "VCHAN_OFFSET_CODE": {
+            "bits": "24:17",
+            "raw": 0,
+            "signed": 0
+          },
+          "ECC": {
+            "bits": "27:26",
+            "value": 0,
+            "meaning": "No error"
+          },
+          "EEPROM_BITS_31_28": {
+            "bits": "31:28",
+            "value": 0,
+            "meaning": "Datasheet: no meaning"
+          }
+        }
+      },
+      "0x0D": {
+        "address": "0x0D",
+        "name": "EEPROM_PHASE_DELAY_OVERCURRENT",
+        "raw_hex": "0x0008C000",
+        "raw_unsigned": 573440,
+        "bytes_little_endian": [
+          0,
+          192,
+          8,
+          0
+        ],
+        "decoded": {
+          "ICHAN_DEL_EN": {
+            "bits": "7",
+            "value": 0,
+            "meaning": "0 = delay voltage channel"
+          },
+          "CHAN_DEL_SEL": {
+            "bits": "11:9",
+            "value": 0,
+            "description": "Phase-delay selection; datasheet range 0 to 219 us"
+          },
+          "FAULT": {
+            "bits": "20:13",
+            "value": 70,
+            "description": "Overcurrent threshold code"
+          },
+          "FLTDLY": {
+            "bits": "23:21",
+            "value": 0,
+            "delay_us": 0.0
+          },
+          "ECC": {
+            "bits": "27:26",
+            "value": 0,
+            "meaning": "No error"
+          },
+          "EEPROM_BITS_31_28": {
+            "bits": "31:28",
+            "value": 0,
+            "meaning": "Datasheet: no meaning"
+          }
+        }
+      },
+      "0x0E": {
+        "address": "0x0E",
+        "name": "EEPROM_VOLTAGE_EVENTS_ZERO_CROSSING",
+        "raw_hex": "0x00082000",
+        "raw_unsigned": 532480,
+        "bytes_little_endian": [
+          0,
+          32,
+          8,
+          0
+        ],
+        "decoded": {
+          "VEVENT_CYCS": {
+            "bits": "5:0",
+            "raw": 0,
+            "effective_cycles": 1
+          },
+          "OVERVREG": {
+            "bits": "13:8",
+            "value": 32
+          },
+          "UNDERVREG": {
+            "bits": "19:14",
+            "value": 32
+          },
+          "DELAYCNT_SEL": {
+            "bits": "20",
+            "value": 0,
+            "pulse_width_us": 32
+          },
+          "HALFCYCLE_EN": {
+            "bits": "21",
+            "value": 0
+          },
+          "SQUAREWAVE_EN": {
+            "bits": "22",
+            "value": 0
+          },
+          "ZEROCROSSCHANSEL": {
+            "bits": "23",
+            "value": 0,
+            "meaning": "0 = voltage"
+          },
+          "ZEROCROSSEDGESEL": {
+            "bits": "24",
+            "value": 0,
+            "meaning": "0 = falling"
+          },
+          "ECC": {
+            "bits": "27:26",
+            "value": 0,
+            "meaning": "No error"
+          },
+          "EEPROM_BITS_31_28": {
+            "bits": "31:28",
+            "value": 0,
+            "meaning": "Datasheet: no meaning"
+          }
+        }
+      },
+      "0x0F": {
+        "address": "0x0F",
+        "name": "EEPROM_RMS_WINDOW_DIO_I2C",
+        "raw_hex": "0x000001FF",
+        "raw_unsigned": 511,
+        "bytes_little_endian": [
+          255,
+          1,
+          0,
+          0
+        ],
+        "decoded": {
+          "I2C_SLV_ADDR": {
+            "bits": "8:2",
+            "value": 127,
+            "hex": "0x7F"
+          },
+          "I2C_DIS_SLV_ADDR": {
+            "bits": "9",
+            "value": 0
+          },
+          "DIO_0_SEL": {
+            "bits": "11:10",
+            "value": 0
+          },
+          "DIO_1_SEL": {
+            "bits": "13:12",
+            "value": 0
+          },
+          "N": {
+            "bits": "23:14",
+            "value": 0
+          },
+          "BYPASS_N_EN": {
+            "bits": "24",
+            "value": 0,
+            "meaning": "0 = voltage-zero-crossing window"
+          },
+          "ECC": {
+            "bits": "27:26",
+            "value": 0,
+            "meaning": "No error"
+          },
+          "EEPROM_BITS_31_28": {
+            "bits": "31:28",
+            "value": 0,
+            "meaning": "Datasheet: no meaning"
+          }
+        }
+      }
+    },
+    "shadow": {
+      "0x1B": {
+        "address": "0x1B",
+        "name": "SHADOW_CURRENT_TRIM_AVERAGING",
+        "raw_hex": "0x001CFA11",
+        "raw_unsigned": 1899025,
+        "bytes_little_endian": [
+          17,
+          250,
+          28,
+          0
+        ],
+        "decoded": {
+          "QVO_FINE": {
+            "bits": "8:0",
+            "raw": 17,
+            "signed": 17,
+            "description": "Current-channel fine offset trim"
+          },
+          "SNS_FINE": {
+            "bits": "18:9",
+            "raw": 637,
+            "signed": -387,
+            "description": "Current-channel fine gain trim"
+          },
+          "CRS_SNS": {
+            "bits": "21:19",
+            "raw": 3,
+            "gain_multiplier": 3.5,
+            "description": "Current-channel coarse analog gain selection"
+          },
+          "IAVGSELEN": {
+            "bits": "22",
+            "value": 0,
+            "meaning": "0 = VRMS averaging"
+          },
+          "PAVGSELEN": {
+            "bits": "23",
+            "value": 0,
+            "meaning": "0 = VRMS averaging path"
+          }
+        }
+      },
+      "0x1C": {
+        "address": "0x1C",
+        "name": "SHADOW_VOLTAGE_OFFSET_AVERAGING",
+        "raw_hex": "0x00000000",
+        "raw_unsigned": 0,
+        "bytes_little_endian": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "decoded": {
+          "RMS_AVG_1": {
+            "bits": "6:0",
+            "value": 0
+          },
+          "RMS_AVG_2": {
+            "bits": "16:7",
+            "value": 0
+          },
+          "VCHAN_OFFSET_CODE": {
+            "bits": "24:17",
+            "raw": 0,
+            "signed": 0
+          }
+        }
+      },
+      "0x1D": {
+        "address": "0x1D",
+        "name": "SHADOW_PHASE_DELAY_OVERCURRENT",
+        "raw_hex": "0x0008C000",
+        "raw_unsigned": 573440,
+        "bytes_little_endian": [
+          0,
+          192,
+          8,
+          0
+        ],
+        "decoded": {
+          "ICHAN_DEL_EN": {
+            "bits": "7",
+            "value": 0,
+            "meaning": "0 = delay voltage channel"
+          },
+          "CHAN_DEL_SEL": {
+            "bits": "11:9",
+            "value": 0,
+            "description": "Phase-delay selection; datasheet range 0 to 219 us"
+          },
+          "FAULT": {
+            "bits": "20:13",
+            "value": 70,
+            "description": "Overcurrent threshold code"
+          },
+          "FLTDLY": {
+            "bits": "23:21",
+            "value": 0,
+            "delay_us": 0.0
+          }
+        }
+      },
+      "0x1E": {
+        "address": "0x1E",
+        "name": "SHADOW_VOLTAGE_EVENTS_ZERO_CROSSING",
+        "raw_hex": "0x00082000",
+        "raw_unsigned": 532480,
+        "bytes_little_endian": [
+          0,
+          32,
+          8,
+          0
+        ],
+        "decoded": {
+          "VEVENT_CYCS": {
+            "bits": "5:0",
+            "raw": 0,
+            "effective_cycles": 1
+          },
+          "OVERVREG": {
+            "bits": "13:8",
+            "value": 32
+          },
+          "UNDERVREG": {
+            "bits": "19:14",
+            "value": 32
+          },
+          "DELAYCNT_SEL": {
+            "bits": "20",
+            "value": 0,
+            "pulse_width_us": 32
+          },
+          "HALFCYCLE_EN": {
+            "bits": "21",
+            "value": 0
+          },
+          "SQUAREWAVE_EN": {
+            "bits": "22",
+            "value": 0
+          },
+          "ZEROCROSSCHANSEL": {
+            "bits": "23",
+            "value": 0,
+            "meaning": "0 = voltage"
+          },
+          "ZEROCROSSEDGESEL": {
+            "bits": "24",
+            "value": 0,
+            "meaning": "0 = falling"
+          }
+        }
+      },
+      "0x1F": {
+        "address": "0x1F",
+        "name": "SHADOW_RMS_WINDOW_DIO_I2C",
+        "raw_hex": "0x000001FF",
+        "raw_unsigned": 511,
+        "bytes_little_endian": [
+          255,
+          1,
+          0,
+          0
+        ],
+        "decoded": {
+          "I2C_SLV_ADDR": {
+            "bits": "8:2",
+            "value": 127,
+            "hex": "0x7F"
+          },
+          "I2C_DIS_SLV_ADDR": {
+            "bits": "9",
+            "value": 0
+          },
+          "DIO_0_SEL": {
+            "bits": "11:10",
+            "value": 0
+          },
+          "DIO_1_SEL": {
+            "bits": "13:12",
+            "value": 0
+          },
+          "N": {
+            "bits": "23:14",
+            "value": 0
+          },
+          "BYPASS_N_EN": {
+            "bits": "24",
+            "value": 0,
+            "meaning": "0 = voltage-zero-crossing window"
+          }
+        }
+      }
+    },
+    "eeprom_shadow_comparison": {
+      "0x0B_vs_0x1B": {
+        "eeprom_configuration_hex": "0x024FA11",
+        "shadow_configuration_hex": "0x01CFA11",
+        "configuration_bits_25_0_match": false
+      },
+      "0x0C_vs_0x1C": {
+        "eeprom_configuration_hex": "0x0000000",
+        "shadow_configuration_hex": "0x0000000",
+        "configuration_bits_25_0_match": true
+      },
+      "0x0D_vs_0x1D": {
+        "eeprom_configuration_hex": "0x008C000",
+        "shadow_configuration_hex": "0x008C000",
+        "configuration_bits_25_0_match": true
+      },
+      "0x0E_vs_0x1E": {
+        "eeprom_configuration_hex": "0x0082000",
+        "shadow_configuration_hex": "0x0082000",
+        "configuration_bits_25_0_match": true
+      },
+      "0x0F_vs_0x1F": {
+        "eeprom_configuration_hex": "0x00001FF",
+        "shadow_configuration_hex": "0x00001FF",
+        "configuration_bits_25_0_match": true
+      }
+    }
+  },
+  "live_samples": [
+    {
+      "timestamp": "2026-07-13T16:14:47.766",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x09686BB6",
+          "raw_unsigned": 157838262,
+          "bytes_little_endian": [
+            182,
+            107,
+            104,
+            9
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27574,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2408,
+              "field_hex": "0x0968",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01BD01C7",
+          "raw_unsigned": 29163975,
+          "bytes_little_endian": [
+            199,
+            1,
+            189,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 455,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 445,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x139703F5",
+          "raw_unsigned": 328664053,
+          "bytes_little_endian": [
+            245,
+            3,
+            151,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1013
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 919,
+              "decoded": 0.8974609375
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020D",
+          "raw_unsigned": 525,
+          "bytes_little_endian": [
+            13,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 525
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006B98",
+          "raw_unsigned": 27544,
+          "bytes_little_endian": [
+            152,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27544
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BBA",
+          "raw_unsigned": 27578,
+          "bytes_little_endian": [
+            186,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27578
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0x05E020E0",
+          "raw_unsigned": 98574560,
+          "bytes_little_endian": [
+            224,
+            32,
+            224,
+            5
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": 8416,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": 1504,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x00000064",
+          "raw_unsigned": 100,
+          "bytes_little_endian": [
+            100,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": 100,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:48.275",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x096D6BB0",
+          "raw_unsigned": 158165936,
+          "bytes_little_endian": [
+            176,
+            107,
+            109,
+            9
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27568,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2413,
+              "field_hex": "0x096D",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01C101C7",
+          "raw_unsigned": 29426119,
+          "bytes_little_endian": [
+            199,
+            1,
+            193,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 455,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 449,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x139603F7",
+          "raw_unsigned": 328598519,
+          "bytes_little_endian": [
+            247,
+            3,
+            150,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1015
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 918,
+              "decoded": 0.896484375
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020D",
+          "raw_unsigned": 525,
+          "bytes_little_endian": [
+            13,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 525
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006B92",
+          "raw_unsigned": 27538,
+          "bytes_little_endian": [
+            146,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27538
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BC6",
+          "raw_unsigned": 27590,
+          "bytes_little_endian": [
+            198,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27590
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0xFAF4EBEE",
+          "raw_unsigned": 4210355182,
+          "bytes_little_endian": [
+            238,
+            235,
+            244,
+            250
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": -5138,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": -1292,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x0000FFFA",
+          "raw_unsigned": 65530,
+          "bytes_little_endian": [
+            250,
+            255,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": -6,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:48.784",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x096C6BC8",
+          "raw_unsigned": 158100424,
+          "bytes_little_endian": [
+            200,
+            107,
+            108,
+            9
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27592,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2412,
+              "field_hex": "0x096C",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01C301C6",
+          "raw_unsigned": 29557190,
+          "bytes_little_endian": [
+            198,
+            1,
+            195,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 454,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 451,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x139503F7",
+          "raw_unsigned": 328532983,
+          "bytes_little_endian": [
+            247,
+            3,
+            149,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1015
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 917,
+              "decoded": 0.8955078125
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020D",
+          "raw_unsigned": 525,
+          "bytes_little_endian": [
+            13,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 525
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BA2",
+          "raw_unsigned": 27554,
+          "bytes_little_endian": [
+            162,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27554
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BBD",
+          "raw_unsigned": 27581,
+          "bytes_little_endian": [
+            189,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27581
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0x038208CE",
+          "raw_unsigned": 58853582,
+          "bytes_little_endian": [
+            206,
+            8,
+            130,
+            3
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": 2254,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": 898,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x0000FFE5",
+          "raw_unsigned": 65509,
+          "bytes_little_endian": [
+            229,
+            255,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": -27,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:49.293",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x096F6BA3",
+          "raw_unsigned": 158296995,
+          "bytes_little_endian": [
+            163,
+            107,
+            111,
+            9
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27555,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2415,
+              "field_hex": "0x096F",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01BD01C8",
+          "raw_unsigned": 29163976,
+          "bytes_little_endian": [
+            200,
+            1,
+            189,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 456,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 445,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x139803F7",
+          "raw_unsigned": 328729591,
+          "bytes_little_endian": [
+            247,
+            3,
+            152,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1015
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 920,
+              "decoded": 0.8984375
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020E",
+          "raw_unsigned": 526,
+          "bytes_little_endian": [
+            14,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 526
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BBF",
+          "raw_unsigned": 27583,
+          "bytes_little_endian": [
+            191,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27583
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BAA",
+          "raw_unsigned": 27562,
+          "bytes_little_endian": [
+            170,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27562
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0xFD08011C",
+          "raw_unsigned": 4245160220,
+          "bytes_little_endian": [
+            28,
+            1,
+            8,
+            253
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": 284,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": -760,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x0000FFB9",
+          "raw_unsigned": 65465,
+          "bytes_little_endian": [
+            185,
+            255,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": -71,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:49.802",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x09686B97",
+          "raw_unsigned": 157838231,
+          "bytes_little_endian": [
+            151,
+            107,
+            104,
+            9
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27543,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2408,
+              "field_hex": "0x0968",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01C001C5",
+          "raw_unsigned": 29360581,
+          "bytes_little_endian": [
+            197,
+            1,
+            192,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 453,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 448,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x139503F4",
+          "raw_unsigned": 328532980,
+          "bytes_little_endian": [
+            244,
+            3,
+            149,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1012
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 917,
+              "decoded": 0.8955078125
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020E",
+          "raw_unsigned": 526,
+          "bytes_little_endian": [
+            14,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 526
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BAF",
+          "raw_unsigned": 27567,
+          "bytes_little_endian": [
+            175,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27567
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006B9D",
+          "raw_unsigned": 27549,
+          "bytes_little_endian": [
+            157,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27549
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0x022AF8B6",
+          "raw_unsigned": 36370614,
+          "bytes_little_endian": [
+            182,
+            248,
+            42,
+            2
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": -1866,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": 554,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x0000FFD6",
+          "raw_unsigned": 65494,
+          "bytes_little_endian": [
+            214,
+            255,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": -42,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:50.310",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x09E56B9C",
+          "raw_unsigned": 166030236,
+          "bytes_little_endian": [
+            156,
+            107,
+            229,
+            9
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27548,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2533,
+              "field_hex": "0x09E5",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01C001E2",
+          "raw_unsigned": 29360610,
+          "bytes_little_endian": [
+            226,
+            1,
+            192,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 482,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 448,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x13A00428",
+          "raw_unsigned": 329253928,
+          "bytes_little_endian": [
+            40,
+            4,
+            160,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1064
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 928,
+              "decoded": 0.90625
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020E",
+          "raw_unsigned": 526,
+          "bytes_little_endian": [
+            14,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 526
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BAA",
+          "raw_unsigned": 27562,
+          "bytes_little_endian": [
+            170,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27562
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006B93",
+          "raw_unsigned": 27539,
+          "bytes_little_endian": [
+            147,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27539
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0xFDDA0E0F",
+          "raw_unsigned": 4258926095,
+          "bytes_little_endian": [
+            15,
+            14,
+            218,
+            253
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": 3599,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": -550,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x00000015",
+          "raw_unsigned": 21,
+          "bytes_little_endian": [
+            21,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": 21,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:50.819",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x0A6D6B9A",
+          "raw_unsigned": 174943130,
+          "bytes_little_endian": [
+            154,
+            107,
+            109,
+            10
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27546,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2669,
+              "field_hex": "0x0A6D",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01BF0202",
+          "raw_unsigned": 29295106,
+          "bytes_little_endian": [
+            2,
+            2,
+            191,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 514,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 447,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x13AB0461",
+          "raw_unsigned": 329974881,
+          "bytes_little_endian": [
+            97,
+            4,
+            171,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1121
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 939,
+              "decoded": 0.9169921875
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020E",
+          "raw_unsigned": 526,
+          "bytes_little_endian": [
+            14,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 526
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BB3",
+          "raw_unsigned": 27571,
+          "bytes_little_endian": [
+            179,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27571
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BB4",
+          "raw_unsigned": 27572,
+          "bytes_little_endian": [
+            180,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27572
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0x0146E69D",
+          "raw_unsigned": 21423773,
+          "bytes_little_endian": [
+            157,
+            230,
+            70,
+            1
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": -6499,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": 326,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x000000C3",
+          "raw_unsigned": 195,
+          "bytes_little_endian": [
+            195,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": 195,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:51.328",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x0AB56BBF",
+          "raw_unsigned": 179661759,
+          "bytes_little_endian": [
+            191,
+            107,
+            181,
+            10
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27583,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2741,
+              "field_hex": "0x0AB5",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01CA0211",
+          "raw_unsigned": 30016017,
+          "bytes_little_endian": [
+            17,
+            2,
+            202,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 529,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 458,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x13AB0481",
+          "raw_unsigned": 329974913,
+          "bytes_little_endian": [
+            129,
+            4,
+            171,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1153
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 939,
+              "decoded": 0.9169921875
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020D",
+          "raw_unsigned": 525,
+          "bytes_little_endian": [
+            13,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 525
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BC1",
+          "raw_unsigned": 27585,
+          "bytes_little_endian": [
+            193,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27585
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006B9B",
+          "raw_unsigned": 27547,
+          "bytes_little_endian": [
+            155,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27547
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0xFF7A20BA",
+          "raw_unsigned": 4286193850,
+          "bytes_little_endian": [
+            186,
+            32,
+            122,
+            255
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": 8378,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": -134,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x000000E9",
+          "raw_unsigned": 233,
+          "bytes_little_endian": [
+            233,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": 233,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:51.837",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x0ADF6BA7",
+          "raw_unsigned": 182414247,
+          "bytes_little_endian": [
+            167,
+            107,
+            223,
+            10
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27559,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2783,
+              "field_hex": "0x0ADF",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01D40218",
+          "raw_unsigned": 30671384,
+          "bytes_little_endian": [
+            24,
+            2,
+            212,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 536,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 468,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x13AA0492",
+          "raw_unsigned": 329909394,
+          "bytes_little_endian": [
+            146,
+            4,
+            170,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1170
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 938,
+              "decoded": 0.916015625
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020D",
+          "raw_unsigned": 525,
+          "bytes_little_endian": [
+            13,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 525
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006B96",
+          "raw_unsigned": 27542,
+          "bytes_little_endian": [
+            150,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27542
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BB7",
+          "raw_unsigned": 27575,
+          "bytes_little_endian": [
+            183,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27575
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0xFEA4DAF9",
+          "raw_unsigned": 4272216825,
+          "bytes_little_endian": [
+            249,
+            218,
+            164,
+            254
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": -9479,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": -348,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x00000174",
+          "raw_unsigned": 372,
+          "bytes_little_endian": [
+            116,
+            1,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": 372,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-13T16:14:52.346",
+      "registers": {
+        "0x20": {
+          "address": "0x20",
+          "name": "VRMS_IRMS",
+          "raw_hex": "0x0AED6B9A",
+          "raw_unsigned": 183331738,
+          "bytes_little_endian": [
+            154,
+            107,
+            237,
+            10
+          ],
+          "decoded": {
+            "VRMS": {
+              "bits": "15:0",
+              "raw": 27546,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            },
+            "IRMS": {
+              "bits": "31:16",
+              "raw": 2797,
+              "field_hex": "0x0AED",
+              "type": "signed 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x21": {
+          "address": "0x21",
+          "name": "PACTIVE_PIMAG",
+          "raw_hex": "0x01BE021F",
+          "raw_unsigned": 29229599,
+          "bytes_little_endian": [
+            31,
+            2,
+            190,
+            1
+          ],
+          "decoded": {
+            "PACTIVE": {
+              "bits": "15:0",
+              "raw": 543,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "PIMAG": {
+              "bits": "31:16",
+              "raw": 446,
+              "type": "unsigned 16-bit, 16 fractional bits"
+            }
+          }
+        },
+        "0x22": {
+          "address": "0x22",
+          "name": "PAPPARENT_PFACTOR_FLAGS",
+          "raw_hex": "0x13B30497",
+          "raw_unsigned": 330499223,
+          "bytes_little_endian": [
+            151,
+            4,
+            179,
+            19
+          ],
+          "decoded": {
+            "PAPPARENT": {
+              "bits": "15:0",
+              "raw": 1175
+            },
+            "PFACTOR": {
+              "bits": "26:16",
+              "raw_11bit": 947,
+              "decoded": 0.9248046875
+            },
+            "POSANGLE": {
+              "bits": "27",
+              "value": 0,
+              "meaning": "0 = current leading"
+            },
+            "POSPF": {
+              "bits": "28",
+              "value": 1,
+              "meaning": "1 = power consumed"
+            }
+          }
+        },
+        "0x25": {
+          "address": "0x25",
+          "name": "NUMPTSOUT",
+          "raw_hex": "0x0000020E",
+          "raw_unsigned": 526,
+          "bytes_little_endian": [
+            14,
+            2,
+            0,
+            0
+          ],
+          "decoded": {
+            "NUMPTSOUT": {
+              "bits": "9:0",
+              "value": 526
+            }
+          }
+        },
+        "0x26": {
+          "address": "0x26",
+          "name": "RMS_AVERAGE_STAGE_1",
+          "raw_hex": "0x00006BBD",
+          "raw_unsigned": 27581,
+          "bytes_little_endian": [
+            189,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONESEC": {
+              "bits": "15:0",
+              "raw": 27581
+            },
+            "IRMSAVGONESEC": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x27": {
+          "address": "0x27",
+          "name": "RMS_AVERAGE_STAGE_2",
+          "raw_hex": "0x00006BA6",
+          "raw_unsigned": 27558,
+          "bytes_little_endian": [
+            166,
+            107,
+            0,
+            0
+          ],
+          "decoded": {
+            "VRMSAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 27558
+            },
+            "IRMSAVGONEMIN": {
+              "bits": "31:16",
+              "raw": 0
+            }
+          }
+        },
+        "0x28": {
+          "address": "0x28",
+          "name": "PACTIVE_AVERAGE_STAGE_1",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONESEC": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x29": {
+          "address": "0x29",
+          "name": "PACTIVE_AVERAGE_STAGE_2",
+          "raw_hex": "0x00000000",
+          "raw_unsigned": 0,
+          "bytes_little_endian": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "PACTAVGONEMIN": {
+              "bits": "15:0",
+              "raw": 0
+            }
+          }
+        },
+        "0x2A": {
+          "address": "0x2A",
+          "name": "VCODES_ICODES",
+          "raw_hex": "0x02A82E12",
+          "raw_unsigned": 44576274,
+          "bytes_little_endian": [
+            18,
+            46,
+            168,
+            2
+          ],
+          "decoded": {
+            "VCODES": {
+              "bits": "15:0",
+              "raw": 11794,
+              "type": "signed 16-bit, 15 fractional bits"
+            },
+            "ICODES": {
+              "bits": "31:16",
+              "raw": 680,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2C": {
+          "address": "0x2C",
+          "name": "PINSTANT",
+          "raw_hex": "0x000001FE",
+          "raw_unsigned": 510,
+          "bytes_little_endian": [
+            254,
+            1,
+            0,
+            0
+          ],
+          "decoded": {
+            "PINSTANT": {
+              "bits": "15:0",
+              "raw": 510,
+              "type": "signed 16-bit, 15 fractional bits"
+            }
+          }
+        },
+        "0x2D": {
+          "address": "0x2D",
+          "name": "STATUS_FLAGS",
+          "raw_hex": "0x00000010",
+          "raw_unsigned": 16,
+          "bytes_little_endian": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "decoded": {
+            "ZEROCROSSOUT": {
+              "bits": "0",
+              "value": 0
+            },
+            "FAULTOUT": {
+              "bits": "1",
+              "value": 0
+            },
+            "FAULTLATCHED": {
+              "bits": "2",
+              "value": 0,
+              "note": "This script does not clear it"
+            },
+            "OVERVOLTAGE": {
+              "bits": "3",
+              "value": 0
+            },
+            "UNDERVOLTAGE": {
+              "bits": "4",
+              "value": 1
+            }
+          }
+        }
+      }
+    }
+  ],
+  "instantaneous_burst": [
+    {
+      "index": 0,
+      "timestamp": "2026-07-13T16:14:52.348",
+      "VCODES": 19328,
+      "ICODES": 1748,
+      "PINSTANT": 881,
+      "raw_0x2A_hex": "0x06D44B80",
+      "raw_0x2C_hex": "0x00000371"
+    },
+    {
+      "index": 1,
+      "timestamp": "2026-07-13T16:14:52.349",
+      "VCODES": 16543,
+      "ICODES": 1644,
+      "PINSTANT": 676,
+      "raw_0x2A_hex": "0x066C409F",
+      "raw_0x2C_hex": "0x000002A4"
+    },
+    {
+      "index": 2,
+      "timestamp": "2026-07-13T16:14:52.351",
+      "VCODES": 6760,
+      "ICODES": 1332,
+      "PINSTANT": 36,
+      "raw_0x2A_hex": "0x05341A68",
+      "raw_0x2C_hex": "0x00000024"
+    },
+    {
+      "index": 3,
+      "timestamp": "2026-07-13T16:14:52.352",
+      "VCODES": -2718,
+      "ICODES": 454,
+      "PINSTANT": -2,
+      "raw_0x2A_hex": "0x01C6F562",
+      "raw_0x2C_hex": "0x0000FFFE"
+    },
+    {
+      "index": 4,
+      "timestamp": "2026-07-13T16:14:52.354",
+      "VCODES": -12288,
+      "ICODES": -708,
+      "PINSTANT": 578,
+      "raw_0x2A_hex": "0xFD3CD000",
+      "raw_0x2C_hex": "0x00000242"
+    },
+    {
+      "index": 5,
+      "timestamp": "2026-07-13T16:14:52.355",
+      "VCODES": -18597,
+      "ICODES": -1542,
+      "PINSTANT": 1145,
+      "raw_0x2A_hex": "0xF9FAB75B",
+      "raw_0x2C_hex": "0x00000479"
+    },
+    {
+      "index": 6,
+      "timestamp": "2026-07-13T16:14:52.356",
+      "VCODES": -19106,
+      "ICODES": -1996,
+      "PINSTANT": 992,
+      "raw_0x2A_hex": "0xF834B55E",
+      "raw_0x2C_hex": "0x000003E0"
+    },
+    {
+      "index": 7,
+      "timestamp": "2026-07-13T16:14:52.358",
+      "VCODES": -14484,
+      "ICODES": -2188,
+      "PINSTANT": 495,
+      "raw_0x2A_hex": "0xF774C76C",
+      "raw_0x2C_hex": "0x000001EF"
+    },
+    {
+      "index": 8,
+      "timestamp": "2026-07-13T16:14:52.359",
+      "VCODES": -4088,
+      "ICODES": -1098,
+      "PINSTANT": -12,
+      "raw_0x2A_hex": "0xFBB6F008",
+      "raw_0x2C_hex": "0x0000FFF4"
+    },
+    {
+      "index": 9,
+      "timestamp": "2026-07-13T16:14:52.361",
+      "VCODES": 5367,
+      "ICODES": -254,
+      "PINSTANT": 151,
+      "raw_0x2A_hex": "0xFF0214F7",
+      "raw_0x2C_hex": "0x00000097"
+    },
+    {
+      "index": 10,
+      "timestamp": "2026-07-13T16:14:52.362",
+      "VCODES": 14436,
+      "ICODES": 918,
+      "PINSTANT": 690,
+      "raw_0x2A_hex": "0x03963864",
+      "raw_0x2C_hex": "0x000002B2"
+    },
+    {
+      "index": 11,
+      "timestamp": "2026-07-13T16:14:52.364",
+      "VCODES": 19046,
+      "ICODES": 1488,
+      "PINSTANT": 1021,
+      "raw_0x2A_hex": "0x05D04A66",
+      "raw_0x2C_hex": "0x000003FD"
+    },
+    {
+      "index": 12,
+      "timestamp": "2026-07-13T16:14:52.365",
+      "VCODES": 18344,
+      "ICODES": 1576,
+      "PINSTANT": 825,
+      "raw_0x2A_hex": "0x062847A8",
+      "raw_0x2C_hex": "0x00000339"
+    },
+    {
+      "index": 13,
+      "timestamp": "2026-07-13T16:14:52.367",
+      "VCODES": 11325,
+      "ICODES": 1830,
+      "PINSTANT": 261,
+      "raw_0x2A_hex": "0x07262C3D",
+      "raw_0x2C_hex": "0x00000105"
+    },
+    {
+      "index": 14,
+      "timestamp": "2026-07-13T16:14:52.368",
+      "VCODES": 1303,
+      "ICODES": 852,
+      "PINSTANT": -38,
+      "raw_0x2A_hex": "0x03540517",
+      "raw_0x2C_hex": "0x0000FFDA"
+    },
+    {
+      "index": 15,
+      "timestamp": "2026-07-13T16:14:52.370",
+      "VCODES": -8250,
+      "ICODES": 54,
+      "PINSTANT": 286,
+      "raw_0x2A_hex": "0x0036DFC6",
+      "raw_0x2C_hex": "0x0000011E"
+    },
+    {
+      "index": 16,
+      "timestamp": "2026-07-13T16:14:52.371",
+      "VCODES": -16334,
+      "ICODES": -1154,
+      "PINSTANT": 872,
+      "raw_0x2A_hex": "0xFB7EC032",
+      "raw_0x2C_hex": "0x00000368"
+    },
+    {
+      "index": 17,
+      "timestamp": "2026-07-13T16:14:52.372",
+      "VCODES": -19328,
+      "ICODES": -1916,
+      "PINSTANT": 1125,
+      "raw_0x2A_hex": "0xF884B480",
+      "raw_0x2C_hex": "0x00000465"
+    },
+    {
+      "index": 18,
+      "timestamp": "2026-07-13T16:14:52.374",
+      "VCODES": -17454,
+      "ICODES": -1844,
+      "PINSTANT": 980,
+      "raw_0x2A_hex": "0xF8CCBBD2",
+      "raw_0x2C_hex": "0x000003D4"
+    },
+    {
+      "index": 19,
+      "timestamp": "2026-07-13T16:14:52.375",
+      "VCODES": -9080,
+      "ICODES": -1824,
+      "PINSTANT": 150,
+      "raw_0x2A_hex": "0xF8E0DC88",
+      "raw_0x2C_hex": "0x00000096"
+    },
+    {
+      "index": 20,
+      "timestamp": "2026-07-13T16:14:52.377",
+      "VCODES": 880,
+      "ICODES": -498,
+      "PINSTANT": -41,
+      "raw_0x2A_hex": "0xFE0E0370",
+      "raw_0x2C_hex": "0x0000FFD7"
+    },
+    {
+      "index": 21,
+      "timestamp": "2026-07-13T16:14:52.378",
+      "VCODES": 10492,
+      "ICODES": 454,
+      "PINSTANT": 386,
+      "raw_0x2A_hex": "0x01C628FC",
+      "raw_0x2C_hex": "0x00000182"
+    },
+    {
+      "index": 22,
+      "timestamp": "2026-07-13T16:14:52.380",
+      "VCODES": 17668,
+      "ICODES": 1290,
+      "PINSTANT": 867,
+      "raw_0x2A_hex": "0x050A4504",
+      "raw_0x2C_hex": "0x00000363"
+    },
+    {
+      "index": 23,
+      "timestamp": "2026-07-13T16:14:52.381",
+      "VCODES": 19305,
+      "ICODES": 1768,
+      "PINSTANT": 884,
+      "raw_0x2A_hex": "0x06E84B69",
+      "raw_0x2C_hex": "0x00000374"
+    },
+    {
+      "index": 24,
+      "timestamp": "2026-07-13T16:14:52.383",
+      "VCODES": 16425,
+      "ICODES": 1644,
+      "PINSTANT": 677,
+      "raw_0x2A_hex": "0x066C4029",
+      "raw_0x2C_hex": "0x000002A5"
+    },
+    {
+      "index": 25,
+      "timestamp": "2026-07-13T16:14:52.384",
+      "VCODES": 6764,
+      "ICODES": 1340,
+      "PINSTANT": 38,
+      "raw_0x2A_hex": "0x053C1A6C",
+      "raw_0x2C_hex": "0x00000026"
+    },
+    {
+      "index": 26,
+      "timestamp": "2026-07-13T16:14:52.385",
+      "VCODES": -2680,
+      "ICODES": 492,
+      "PINSTANT": -14,
+      "raw_0x2A_hex": "0x01ECF588",
+      "raw_0x2C_hex": "0x0000FFF2"
+    },
+    {
+      "index": 27,
+      "timestamp": "2026-07-13T16:14:52.387",
+      "VCODES": -12277,
+      "ICODES": -698,
+      "PINSTANT": 559,
+      "raw_0x2A_hex": "0xFD46D00B",
+      "raw_0x2C_hex": "0x0000022F"
+    },
+    {
+      "index": 28,
+      "timestamp": "2026-07-13T16:14:52.388",
+      "VCODES": -18514,
+      "ICODES": -1540,
+      "PINSTANT": 1136,
+      "raw_0x2A_hex": "0xF9FCB7AE",
+      "raw_0x2C_hex": "0x00000470"
+    },
+    {
+      "index": 29,
+      "timestamp": "2026-07-13T16:14:52.390",
+      "VCODES": -19099,
+      "ICODES": -1926,
+      "PINSTANT": 985,
+      "raw_0x2A_hex": "0xF87AB565",
+      "raw_0x2C_hex": "0x000003D9"
+    },
+    {
+      "index": 30,
+      "timestamp": "2026-07-13T16:14:52.391",
+      "VCODES": -14731,
+      "ICODES": -2210,
+      "PINSTANT": 513,
+      "raw_0x2A_hex": "0xF75EC675",
+      "raw_0x2C_hex": "0x00000201"
+    },
+    {
+      "index": 31,
+      "timestamp": "2026-07-13T16:14:52.393",
+      "VCODES": -4145,
+      "ICODES": -1166,
+      "PINSTANT": -14,
+      "raw_0x2A_hex": "0xFB72EFCF",
+      "raw_0x2C_hex": "0x0000FFF2"
+    },
+    {
+      "index": 32,
+      "timestamp": "2026-07-13T16:14:52.394",
+      "VCODES": 5026,
+      "ICODES": -296,
+      "PINSTANT": 140,
+      "raw_0x2A_hex": "0xFED813A2",
+      "raw_0x2C_hex": "0x0000008C"
+    },
+    {
+      "index": 33,
+      "timestamp": "2026-07-13T16:14:52.396",
+      "VCODES": 14242,
+      "ICODES": 904,
+      "PINSTANT": 689,
+      "raw_0x2A_hex": "0x038837A2",
+      "raw_0x2C_hex": "0x000002B1"
+    },
+    {
+      "index": 34,
+      "timestamp": "2026-07-13T16:14:52.397",
+      "VCODES": 19040,
+      "ICODES": 1492,
+      "PINSTANT": 1048,
+      "raw_0x2A_hex": "0x05D44A60",
+      "raw_0x2C_hex": "0x00000418"
+    },
+    {
+      "index": 35,
+      "timestamp": "2026-07-13T16:14:52.399",
+      "VCODES": 18425,
+      "ICODES": 1616,
+      "PINSTANT": 809,
+      "raw_0x2A_hex": "0x065047F9",
+      "raw_0x2C_hex": "0x00000329"
+    },
+    {
+      "index": 36,
+      "timestamp": "2026-07-13T16:14:52.400",
+      "VCODES": 11631,
+      "ICODES": 1832,
+      "PINSTANT": 286,
+      "raw_0x2A_hex": "0x07282D6F",
+      "raw_0x2C_hex": "0x0000011E"
+    },
+    {
+      "index": 37,
+      "timestamp": "2026-07-13T16:14:52.401",
+      "VCODES": 1357,
+      "ICODES": 840,
+      "PINSTANT": -38,
+      "raw_0x2A_hex": "0x0348054D",
+      "raw_0x2C_hex": "0x0000FFDA"
+    },
+    {
+      "index": 38,
+      "timestamp": "2026-07-13T16:14:52.403",
+      "VCODES": -8006,
+      "ICODES": 96,
+      "PINSTANT": 259,
+      "raw_0x2A_hex": "0x0060E0BA",
+      "raw_0x2C_hex": "0x00000103"
+    },
+    {
+      "index": 39,
+      "timestamp": "2026-07-13T16:14:52.404",
+      "VCODES": -16309,
+      "ICODES": -1130,
+      "PINSTANT": 833,
+      "raw_0x2A_hex": "0xFB96C04B",
+      "raw_0x2C_hex": "0x00000341"
+    },
+    {
+      "index": 40,
+      "timestamp": "2026-07-13T16:14:52.406",
+      "VCODES": -19287,
+      "ICODES": -1900,
+      "PINSTANT": 1130,
+      "raw_0x2A_hex": "0xF894B4A9",
+      "raw_0x2C_hex": "0x0000046A"
+    },
+    {
+      "index": 41,
+      "timestamp": "2026-07-13T16:14:52.407",
+      "VCODES": -17537,
+      "ICODES": -1806,
+      "PINSTANT": 981,
+      "raw_0x2A_hex": "0xF8F2BB7F",
+      "raw_0x2C_hex": "0x000003D5"
+    },
+    {
+      "index": 42,
+      "timestamp": "2026-07-13T16:14:52.409",
+      "VCODES": -9159,
+      "ICODES": -1832,
+      "PINSTANT": 172,
+      "raw_0x2A_hex": "0xF8D8DC39",
+      "raw_0x2C_hex": "0x000000AC"
+    },
+    {
+      "index": 43,
+      "timestamp": "2026-07-13T16:14:52.410",
+      "VCODES": 672,
+      "ICODES": -524,
+      "PINSTANT": -45,
+      "raw_0x2A_hex": "0xFDF402A0",
+      "raw_0x2C_hex": "0x0000FFD3"
+    },
+    {
+      "index": 44,
+      "timestamp": "2026-07-13T16:14:52.412",
+      "VCODES": 10228,
+      "ICODES": 414,
+      "PINSTANT": 367,
+      "raw_0x2A_hex": "0x019E27F4",
+      "raw_0x2C_hex": "0x0000016F"
+    },
+    {
+      "index": 45,
+      "timestamp": "2026-07-13T16:14:52.413",
+      "VCODES": 17534,
+      "ICODES": 1290,
+      "PINSTANT": 877,
+      "raw_0x2A_hex": "0x050A447E",
+      "raw_0x2C_hex": "0x0000036D"
+    },
+    {
+      "index": 46,
+      "timestamp": "2026-07-13T16:14:52.414",
+      "VCODES": 19339,
+      "ICODES": 1744,
+      "PINSTANT": 953,
+      "raw_0x2A_hex": "0x06D04B8B",
+      "raw_0x2C_hex": "0x000003B9"
+    },
+    {
+      "index": 47,
+      "timestamp": "2026-07-13T16:14:52.416",
+      "VCODES": 16601,
+      "ICODES": 1598,
+      "PINSTANT": 661,
+      "raw_0x2A_hex": "0x063E40D9",
+      "raw_0x2C_hex": "0x00000295"
+    },
+    {
+      "index": 48,
+      "timestamp": "2026-07-13T16:14:52.417",
+      "VCODES": 7048,
+      "ICODES": 1280,
+      "PINSTANT": 47,
+      "raw_0x2A_hex": "0x05001B88",
+      "raw_0x2C_hex": "0x0000002F"
+    },
+    {
+      "index": 49,
+      "timestamp": "2026-07-13T16:14:52.419",
+      "VCODES": -2454,
+      "ICODES": 454,
+      "PINSTANT": -30,
+      "raw_0x2A_hex": "0x01C6F66A",
+      "raw_0x2C_hex": "0x0000FFE2"
+    },
+    {
+      "index": 50,
+      "timestamp": "2026-07-13T16:14:52.420",
+      "VCODES": -11889,
+      "ICODES": -692,
+      "PINSTANT": 545,
+      "raw_0x2A_hex": "0xFD4CD18F",
+      "raw_0x2C_hex": "0x00000221"
+    },
+    {
+      "index": 51,
+      "timestamp": "2026-07-13T16:14:52.422",
+      "VCODES": -18420,
+      "ICODES": -1426,
+      "PINSTANT": 1091,
+      "raw_0x2A_hex": "0xFA6EB80C",
+      "raw_0x2C_hex": "0x00000443"
+    },
+    {
+      "index": 52,
+      "timestamp": "2026-07-13T16:14:52.423",
+      "VCODES": -19161,
+      "ICODES": -2042,
+      "PINSTANT": 998,
+      "raw_0x2A_hex": "0xF806B527",
+      "raw_0x2C_hex": "0x000003E6"
+    },
+    {
+      "index": 53,
+      "timestamp": "2026-07-13T16:14:52.425",
+      "VCODES": -15047,
+      "ICODES": -2172,
+      "PINSTANT": 538,
+      "raw_0x2A_hex": "0xF784C539",
+      "raw_0x2C_hex": "0x0000021A"
+    },
+    {
+      "index": 54,
+      "timestamp": "2026-07-13T16:14:52.426",
+      "VCODES": -4733,
+      "ICODES": -1256,
+      "PINSTANT": -8,
+      "raw_0x2A_hex": "0xFB18ED83",
+      "raw_0x2C_hex": "0x0000FFF8"
+    },
+    {
+      "index": 55,
+      "timestamp": "2026-07-13T16:14:52.427",
+      "VCODES": 4690,
+      "ICODES": -294,
+      "PINSTANT": 122,
+      "raw_0x2A_hex": "0xFEDA1252",
+      "raw_0x2C_hex": "0x0000007A"
+    },
+    {
+      "index": 56,
+      "timestamp": "2026-07-13T16:14:52.429",
+      "VCODES": 13793,
+      "ICODES": 920,
+      "PINSTANT": 683,
+      "raw_0x2A_hex": "0x039835E1",
+      "raw_0x2C_hex": "0x000002AB"
+    },
+    {
+      "index": 57,
+      "timestamp": "2026-07-13T16:14:52.430",
+      "VCODES": 18970,
+      "ICODES": 1550,
+      "PINSTANT": 1090,
+      "raw_0x2A_hex": "0x060E4A1A",
+      "raw_0x2C_hex": "0x00000442"
+    },
+    {
+      "index": 58,
+      "timestamp": "2026-07-13T16:14:52.432",
+      "VCODES": 18553,
+      "ICODES": 1738,
+      "PINSTANT": 854,
+      "raw_0x2A_hex": "0x06CA4879",
+      "raw_0x2C_hex": "0x00000356"
+    },
+    {
+      "index": 59,
+      "timestamp": "2026-07-13T16:14:52.433",
+      "VCODES": 12273,
+      "ICODES": 1804,
+      "PINSTANT": 287,
+      "raw_0x2A_hex": "0x070C2FF1",
+      "raw_0x2C_hex": "0x0000011F"
+    },
+    {
+      "index": 60,
+      "timestamp": "2026-07-13T16:14:52.435",
+      "VCODES": 1905,
+      "ICODES": 882,
+      "PINSTANT": -34,
+      "raw_0x2A_hex": "0x03720771",
+      "raw_0x2C_hex": "0x0000FFDE"
+    },
+    {
+      "index": 61,
+      "timestamp": "2026-07-13T16:14:52.436",
+      "VCODES": -7690,
+      "ICODES": 168,
+      "PINSTANT": 249,
+      "raw_0x2A_hex": "0x00A8E1F6",
+      "raw_0x2C_hex": "0x000000F9"
+    },
+    {
+      "index": 62,
+      "timestamp": "2026-07-13T16:14:52.438",
+      "VCODES": -15938,
+      "ICODES": -1072,
+      "PINSTANT": 818,
+      "raw_0x2A_hex": "0xFBD0C1BE",
+      "raw_0x2C_hex": "0x00000332"
+    },
+    {
+      "index": 63,
+      "timestamp": "2026-07-13T16:14:52.439",
+      "VCODES": -19316,
+      "ICODES": -1864,
+      "PINSTANT": 1138,
+      "raw_0x2A_hex": "0xF8B8B48C",
+      "raw_0x2C_hex": "0x00000472"
+    },
+    {
+      "index": 64,
+      "timestamp": "2026-07-13T16:14:52.440",
+      "VCODES": -17758,
+      "ICODES": -1864,
+      "PINSTANT": 1000,
+      "raw_0x2A_hex": "0xF8B8BAA2",
+      "raw_0x2C_hex": "0x000003E8"
+    },
+    {
+      "index": 65,
+      "timestamp": "2026-07-13T16:14:52.442",
+      "VCODES": -9612,
+      "ICODES": -1912,
+      "PINSTANT": 199,
+      "raw_0x2A_hex": "0xF888DA74",
+      "raw_0x2C_hex": "0x000000C7"
+    },
+    {
+      "index": 66,
+      "timestamp": "2026-07-13T16:14:52.443",
+      "VCODES": 512,
+      "ICODES": -594,
+      "PINSTANT": -42,
+      "raw_0x2A_hex": "0xFDAE0200",
+      "raw_0x2C_hex": "0x0000FFD6"
+    },
+    {
+      "index": 67,
+      "timestamp": "2026-07-13T16:14:52.445",
+      "VCODES": 9870,
+      "ICODES": 388,
+      "PINSTANT": 367,
+      "raw_0x2A_hex": "0x0184268E",
+      "raw_0x2C_hex": "0x0000016F"
+    },
+    {
+      "index": 68,
+      "timestamp": "2026-07-13T16:14:52.446",
+      "VCODES": 17456,
+      "ICODES": 1268,
+      "PINSTANT": 873,
+      "raw_0x2A_hex": "0x04F44430",
+      "raw_0x2C_hex": "0x00000369"
+    },
+    {
+      "index": 69,
+      "timestamp": "2026-07-13T16:14:52.448",
+      "VCODES": 19357,
+      "ICODES": 1804,
+      "PINSTANT": 981,
+      "raw_0x2A_hex": "0x070C4B9D",
+      "raw_0x2C_hex": "0x000003D5"
+    },
+    {
+      "index": 70,
+      "timestamp": "2026-07-13T16:14:52.449",
+      "VCODES": 16805,
+      "ICODES": 1664,
+      "PINSTANT": 690,
+      "raw_0x2A_hex": "0x068041A5",
+      "raw_0x2C_hex": "0x000002B2"
+    },
+    {
+      "index": 71,
+      "timestamp": "2026-07-13T16:14:52.451",
+      "VCODES": 7247,
+      "ICODES": 1310,
+      "PINSTANT": 64,
+      "raw_0x2A_hex": "0x051E1C4F",
+      "raw_0x2C_hex": "0x00000040"
+    },
+    {
+      "index": 72,
+      "timestamp": "2026-07-13T16:14:52.452",
+      "VCODES": -2089,
+      "ICODES": 472,
+      "PINSTANT": -48,
+      "raw_0x2A_hex": "0x01D8F7D7",
+      "raw_0x2C_hex": "0x0000FFD0"
+    },
+    {
+      "index": 73,
+      "timestamp": "2026-07-13T16:14:52.454",
+      "VCODES": -11774,
+      "ICODES": -672,
+      "PINSTANT": 507,
+      "raw_0x2A_hex": "0xFD60D202",
+      "raw_0x2C_hex": "0x000001FB"
+    },
+    {
+      "index": 74,
+      "timestamp": "2026-07-13T16:14:52.455",
+      "VCODES": -18311,
+      "ICODES": -1436,
+      "PINSTANT": 1060,
+      "raw_0x2A_hex": "0xFA64B879",
+      "raw_0x2C_hex": "0x00000424"
+    },
+    {
+      "index": 75,
+      "timestamp": "2026-07-13T16:14:52.456",
+      "VCODES": -19218,
+      "ICODES": -1938,
+      "PINSTANT": 990,
+      "raw_0x2A_hex": "0xF86EB4EE",
+      "raw_0x2C_hex": "0x000003DE"
+    },
+    {
+      "index": 76,
+      "timestamp": "2026-07-13T16:14:52.458",
+      "VCODES": -15217,
+      "ICODES": -2194,
+      "PINSTANT": 599,
+      "raw_0x2A_hex": "0xF76EC48F",
+      "raw_0x2C_hex": "0x00000257"
+    },
+    {
+      "index": 77,
+      "timestamp": "2026-07-13T16:14:52.459",
+      "VCODES": -5145,
+      "ICODES": -1266,
+      "PINSTANT": -6,
+      "raw_0x2A_hex": "0xFB0EEBE7",
+      "raw_0x2C_hex": "0x0000FFFA"
+    },
+    {
+      "index": 78,
+      "timestamp": "2026-07-13T16:14:52.461",
+      "VCODES": 4265,
+      "ICODES": -336,
+      "PINSTANT": 80,
+      "raw_0x2A_hex": "0xFEB010A9",
+      "raw_0x2C_hex": "0x00000050"
+    },
+    {
+      "index": 79,
+      "timestamp": "2026-07-13T16:14:52.462",
+      "VCODES": 13672,
+      "ICODES": 830,
+      "PINSTANT": 659,
+      "raw_0x2A_hex": "0x033E3568",
+      "raw_0x2C_hex": "0x00000293"
+    },
+    {
+      "index": 80,
+      "timestamp": "2026-07-13T16:14:52.464",
+      "VCODES": 18936,
+      "ICODES": 1502,
+      "PINSTANT": 1069,
+      "raw_0x2A_hex": "0x05DE49F8",
+      "raw_0x2C_hex": "0x0000042D"
+    },
+    {
+      "index": 81,
+      "timestamp": "2026-07-13T16:14:52.465",
+      "VCODES": 18685,
+      "ICODES": 1742,
+      "PINSTANT": 821,
+      "raw_0x2A_hex": "0x06CE48FD",
+      "raw_0x2C_hex": "0x00000335"
+    },
+    {
+      "index": 82,
+      "timestamp": "2026-07-13T16:14:52.467",
+      "VCODES": 12693,
+      "ICODES": 1804,
+      "PINSTANT": 305,
+      "raw_0x2A_hex": "0x070C3195",
+      "raw_0x2C_hex": "0x00000131"
+    },
+    {
+      "index": 83,
+      "timestamp": "2026-07-13T16:14:52.468",
+      "VCODES": 2076,
+      "ICODES": 868,
+      "PINSTANT": -29,
+      "raw_0x2A_hex": "0x0364081C",
+      "raw_0x2C_hex": "0x0000FFE3"
+    },
+    {
+      "index": 84,
+      "timestamp": "2026-07-13T16:14:52.469",
+      "VCODES": -7504,
+      "ICODES": 126,
+      "PINSTANT": 227,
+      "raw_0x2A_hex": "0x007EE2B0",
+      "raw_0x2C_hex": "0x000000E3"
+    },
+    {
+      "index": 85,
+      "timestamp": "2026-07-13T16:14:52.471",
+      "VCODES": -15801,
+      "ICODES": -1076,
+      "PINSTANT": 804,
+      "raw_0x2A_hex": "0xFBCCC247",
+      "raw_0x2C_hex": "0x00000324"
+    },
+    {
+      "index": 86,
+      "timestamp": "2026-07-13T16:14:52.472",
+      "VCODES": -19270,
+      "ICODES": -1772,
+      "PINSTANT": 1095,
+      "raw_0x2A_hex": "0xF914B4BA",
+      "raw_0x2C_hex": "0x00000447"
+    },
+    {
+      "index": 87,
+      "timestamp": "2026-07-13T16:14:52.474",
+      "VCODES": -17717,
+      "ICODES": -1806,
+      "PINSTANT": 1014,
+      "raw_0x2A_hex": "0xF8F2BACB",
+      "raw_0x2C_hex": "0x000003F6"
+    },
+    {
+      "index": 88,
+      "timestamp": "2026-07-13T16:14:52.475",
+      "VCODES": -9747,
+      "ICODES": -1980,
+      "PINSTANT": 196,
+      "raw_0x2A_hex": "0xF844D9ED",
+      "raw_0x2C_hex": "0x000000C4"
+    },
+    {
+      "index": 89,
+      "timestamp": "2026-07-13T16:14:52.477",
+      "VCODES": 392,
+      "ICODES": -582,
+      "PINSTANT": -46,
+      "raw_0x2A_hex": "0xFDBA0188",
+      "raw_0x2C_hex": "0x0000FFD2"
+    },
+    {
+      "index": 90,
+      "timestamp": "2026-07-13T16:14:52.478",
+      "VCODES": 9896,
+      "ICODES": 360,
+      "PINSTANT": 356,
+      "raw_0x2A_hex": "0x016826A8",
+      "raw_0x2C_hex": "0x00000164"
+    },
+    {
+      "index": 91,
+      "timestamp": "2026-07-13T16:14:52.480",
+      "VCODES": 17454,
+      "ICODES": 1268,
+      "PINSTANT": 889,
+      "raw_0x2A_hex": "0x04F4442E",
+      "raw_0x2C_hex": "0x00000379"
+    },
+    {
+      "index": 92,
+      "timestamp": "2026-07-13T16:14:52.481",
+      "VCODES": 19353,
+      "ICODES": 1852,
+      "PINSTANT": 992,
+      "raw_0x2A_hex": "0x073C4B99",
+      "raw_0x2C_hex": "0x000003E0"
+    },
+    {
+      "index": 93,
+      "timestamp": "2026-07-13T16:14:52.483",
+      "VCODES": 16783,
+      "ICODES": 1666,
+      "PINSTANT": 696,
+      "raw_0x2A_hex": "0x0682418F",
+      "raw_0x2C_hex": "0x000002B8"
+    },
+    {
+      "index": 94,
+      "timestamp": "2026-07-13T16:14:52.484",
+      "VCODES": 7230,
+      "ICODES": 1264,
+      "PINSTANT": 58,
+      "raw_0x2A_hex": "0x04F01C3E",
+      "raw_0x2C_hex": "0x0000003A"
+    },
+    {
+      "index": 95,
+      "timestamp": "2026-07-13T16:14:52.485",
+      "VCODES": -2134,
+      "ICODES": 408,
+      "PINSTANT": -40,
+      "raw_0x2A_hex": "0x0198F7AA",
+      "raw_0x2C_hex": "0x0000FFD8"
+    },
+    {
+      "index": 96,
+      "timestamp": "2026-07-13T16:14:52.487",
+      "VCODES": -11757,
+      "ICODES": -620,
+      "PINSTANT": 515,
+      "raw_0x2A_hex": "0xFD94D213",
+      "raw_0x2C_hex": "0x00000203"
+    },
+    {
+      "index": 97,
+      "timestamp": "2026-07-13T16:14:52.488",
+      "VCODES": -18351,
+      "ICODES": -1412,
+      "PINSTANT": 1041,
+      "raw_0x2A_hex": "0xFA7CB851",
+      "raw_0x2C_hex": "0x00000411"
+    },
+    {
+      "index": 98,
+      "timestamp": "2026-07-13T16:14:52.490",
+      "VCODES": -19185,
+      "ICODES": -1858,
+      "PINSTANT": 957,
+      "raw_0x2A_hex": "0xF8BEB50F",
+      "raw_0x2C_hex": "0x000003BD"
+    },
+    {
+      "index": 99,
+      "timestamp": "2026-07-13T16:14:52.491",
+      "VCODES": -15205,
+      "ICODES": -2204,
+      "PINSTANT": 613,
+      "raw_0x2A_hex": "0xF764C49B",
+      "raw_0x2C_hex": "0x00000265"
+    }
+  ],
+  "finished_at": "2026-07-13T16:14:52",
+  "duration_seconds": 4.742789
+}

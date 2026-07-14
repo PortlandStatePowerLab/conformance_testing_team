@@ -1,24 +1,13 @@
 {
-  "WH-station3": {
-    "vrms_scale": 0.008780204629562442,
-    "irms_scale": 0.00164517563361494,
-    "vrms_offset": 121,
-    "irms_offset": 16,
-    "last_cal_time": "2026-07-08T18:37:14",
-    "line_vrms_used": 121.0,
-    "clamp_irms_used": 7.4,
-    "vrms_offset_volts": 1.0624047601770554,
-    "irms_offset_amps": 0.02632281013783904
-  },
-  "WH-station2": {
-    "vrms_scale": 0.008771225123242651,
-    "irms_scale": 0.001656639637283111,
-    "vrms_offset": 146,
-    "irms_offset": 0,
-    "vrms_offset_volts": 1.280598867993427,
-    "irms_offset_amps": 0.0,
-    "last_cal_time": "2026-07-08T19:21:14",
-    "line_vrms_used": 240.2,
-    "clamp_irms_used": 19.0
+  "WH-station1": {
+    "vrms_scale": 0.008684381075826312,
+    "irms_scale": -0.0005877493963654849,
+    "vrms_offset": 0,
+    "irms_offset": 90,
+    "vrms_offset_volts": 0.0,
+    "irms_offset_amps": -0.05289744567289364,
+    "last_cal_time": "2026-07-10T19:14:44",
+    "line_vrms_used": 241.2,
+    "clamp_irms_used": 18.5
   }
 }

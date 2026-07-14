@@ -249,7 +249,7 @@ def read_measurement_values(bus, calibration):
     raw_power_register = get_32_bit_little_endian(bus, REG_POWER_REGISTER)
     raw_power_factor_register = get_32_bit_little_endian(bus, REG_POWER_FACTOR_REGISTER)
     #print(f"Raw RMS Register: {raw_rms_register}, Raw Power Register: {raw_power_register}, Raw Power Factor Register: {raw_power_factor_register}")
-    print(f"Raw register data: {get_raw_register_data(bus)}")
+    print(f"Raw register data: {get_raw_power_register_data(bus)}")
     if (raw_rms_register is None) or (raw_power_register is None) or (raw_power_factor_register is None):
         return None
 
