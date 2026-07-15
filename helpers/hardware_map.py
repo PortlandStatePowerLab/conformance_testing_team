@@ -23,7 +23,7 @@ ACS_DIO1_GPIO = 26
 I2C_BUS = 1
 
 # 32-bit little-endian registers
-REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(s16)
+REG_VRMS_REGISTER = 0x20   # [15:0]=VRMS(u16), [31:16]=IRMS(u16) <-- datasheets says signed but it is wrong
 REG_POWER_REGISTER = 0x21 # [15:0]=PACTIVE(s16) <-- real power, [31:16]=PIMAG(u16) <-- reactive power
 REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPPARRENT(u16) <-- apparent power, [26:16]=PF(11b signed) <-- power factor, 
                                  # bit27 posangle <-- leading(0)/lagging(1), bit28 pospf <-- positive(consuming)/negative(generating) power factor
@@ -33,7 +33,7 @@ REG_POWER_FACTOR_REGISTER = 0x22 # [15:0]=PAPPARRENT(u16) <-- apparent power, [2
 NOISE_FLOOR_VRMS_CODES = 300    # raw codes near baseline treated as 0V
 NOISE_FLOOR_IRMS_CODES = 80     # raw codes near baseline treated as 0A
 NOISE_FLOOR_V_VOLTS    = 5.0    # Vrms below this -> show 0.0
-NOISE_FLOOR_I_AMPS     = 0.20   # Irms below this -> show 0.0
+NOISE_FLOOR_I_AMPS     = 0.02   # Irms below this -> show 0.0
 
 # Power sign handling:
 # If you want consumed power always positive, keep POWER_ABS=True

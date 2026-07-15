@@ -129,7 +129,7 @@ def read_measurement_values(bus, calibration):
         return None
 
     vrms_raw = get_integer_from_u16(raw_rms_register)
-    irms_raw = get_integer_from_s16(raw_rms_register >> 16)
+    irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
     pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)

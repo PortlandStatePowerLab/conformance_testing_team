@@ -77,7 +77,7 @@ def get_raw_power_register_data(bus):
 
     Reads the three 32-bit registers and unpacks all available fields:
     - VRMS (bits 15:0 of 0x20) - unsigned voltage
-    - IRMS (bits 31:16 of 0x20) - signed current
+    - IRMS (bits 31:16 of 0x20) - unsigned current <-- datasheets says signed but it is wrong
     - PACTIVE (bits 15:0 of 0x21) - signed real power
     - PIMAG (bits 31:16 of 0x21) - unsigned reactive power
     - PAPPARENT (bits 15:0 of 0x22) - unsigned apparent power
@@ -96,7 +96,7 @@ def get_raw_power_register_data(bus):
 
     # Extract all 8 fields from the three registers
     vrms_raw = get_integer_from_u16(raw_rms_register)
-    irms_raw = get_integer_from_s16(raw_rms_register >> 16)
+    irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
     pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
@@ -138,6 +138,34 @@ def get_power_chip_calibration(bus):
         "irms_scale_raw": irms_scale_raw,
     }
 
+def read_raw_measurement_values(bus):
+    """Read raw sensor registers without calibration, clamping, or scaling."""
+    raw_rms_register = get_32_bit_little_endian(bus, REG_VRMS_REGISTER)
+    raw_power_register = get_32_bit_little_endian(bus, REG_POWER_REGISTER)
+    raw_power_factor_register = get_32_bit_little_endian(bus, REG_POWER_FACTOR_REGISTER)
+
+    if (raw_rms_register is None) or (raw_power_register is None) or (raw_power_factor_register is None):
+        return None
+
+    vrms_raw = get_integer_from_u16(raw_rms_register)
+    irms_raw = get_integer_from_u16(raw_rms_register >> 16)
+
+    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    pimag_raw = get_integer_from_u16(raw_power_register >> 16)
+
+    papparent_raw = get_integer_from_u16(raw_power_factor_register)
+    pf_11bit = (raw_power_factor_register >> 16) & 0x7FF
+    pf = get_power_factor_from_11bit_register(pf_11bit)
+
+    return {
+        "voltage_rms_raw": vrms_raw,
+        "current_rms_raw": irms_raw,
+        "active_power_raw": pactive_raw,
+        "reactive_power_raw": pimag_raw,
+        "apparent_power_raw": papparent_raw,
+        "power_factor": pf,
+    }
+
 def _get_default_calibration():
     return {
         # scales convert (raw - offset) -> engineering units
@@ -145,7 +173,7 @@ def _get_default_calibration():
         "irms_scale": None,     # A per code
         # offsets are captured raw baselines
         "vrms_offset": 0,       # VRMS_raw at 0V (mains/transformer off but chip powered)
-        "irms_offset": 0,       # IRMS_raw at 0A (voltage present but no load)
+        "irms_offset": 0,       # IRMS_raw at 0A through sensor, not standby load
         # human-readable engineering offsets
         "vrms_offset_volts": 0.0,
         "irms_offset_amps": 0.0,
@@ -212,7 +240,7 @@ def read_measurement_values2(bus, calibration):
         return None
 
     vrms_raw = get_integer_from_u16(raw_rms_register)
-    irms_raw = get_integer_from_s16(raw_rms_register >> 16)
+    irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
     pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
@@ -238,7 +266,7 @@ def read_measurement_values(bus, calibration):
         return None
 
     vrms_raw = get_integer_from_u16(raw_rms_register)
-    irms_raw = get_integer_from_s16(raw_rms_register >> 16)
+    irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
     pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
@@ -298,17 +326,17 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     the sensor at 0V and 0A, then asks for known true values so it can
     compute the VRMS and IRMS scale factors.
     """
-    print("\n=== Calibration (Aligned to your setup) ===")
+    print("\n=== Calibration (system-noise offset) ===")
     print("NOTE: Your chip is powered by separate supply.")
     print("We will capture TWO baselines:")
     print("  A) VRMS offset at 0V (mains/transformer OFF, chip still powered)")
-    print("  B) IRMS offset at 0A (voltage present, heater OFF / no load)")
+    print("  B) IRMS offset at 0A through the sensor (no standby/fan/control-board current)")
     print("Then we capture two scales (240V and clamp current).\n")
 
     # A) Capture VRMS offset at 0V
     print("A) VRMS offset (0V): Turn OFF mains/transformer so VINP should be ~0V.")
     input("Press Enter to capture VRMS_raw offset (0V)...")
-    values = read_measurement_values(bus, calibration)
+    values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
         return
@@ -319,10 +347,12 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
         calibration["vrms_offset_volts"] = 0.0
     print(f"Captured VRMS offset = {calibration['vrms_offset']} raw codes")
 
-    # B) Capture IRMS offset at 0A with voltage present
-    print("\nB) IRMS offset (0A): Turn ON mains (voltage present), but ensure NO LOAD (heater OFF).")
-    input("Press Enter to capture IRMS_raw offset (0A)...")
-    values = read_measurement_values(bus, calibration)
+    # B) Capture IRMS offset from system/sensor noise only.
+    print("\nB) IRMS offset (0A through sensor): keep the chip powered, but make sure the")
+    print("   measured conductor has no WH standby, fan, control-board, element, or heat-pump current.")
+    print("   This offset is only for sensor/system noise; real standby current should remain measurable.")
+    input("Press Enter to capture IRMS_raw system-noise offset...")
+    values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
         return
@@ -337,7 +367,7 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     print("\nC) Voltage scale: keep mains ON (normal operation).")
     true_line_voltage = float(input("Enter the true line voltage in volts (for example, 240): ").strip())
     input("Press Enter to capture the voltage reading for scaling...")
-    values = read_measurement_values(bus, calibration)
+    values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
         return
@@ -355,7 +385,7 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     print("\nD) Current scale: turn ON heater so current flows. Use a clamp meter.")
     true_load_current = float(input("Enter the true load current in amps from the clamp meter (for example, 18.7): ").strip())
     input("Press Enter to capture the current reading under load...")
-    values = read_measurement_values(bus, calibration)
+    values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
         return

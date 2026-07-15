@@ -233,7 +233,7 @@ def decode_live_register(address: int, value: int) -> dict[str, Any]:
     if address == 0x20:
         return {
             "VRMS": {"bits": "15:0", "raw": get_integer_from_u16(value), "type": "unsigned 16-bit, 16 fractional bits"},
-            "IRMS": {"bits": "31:16", "raw": get_integer_from_s16(value >> 16), "field_hex": f"0x{((value >> 16) & 0xFFFF):04X}", "type": "signed 16-bit, 16 fractional bits"},
+            "IRMS": {"bits": "31:16", "raw": get_integer_from_u16(value >> 16), "field_hex": f"0x{((value >> 16) & 0xFFFF):04X}", "type": "signed 16-bit, 16 fractional bits"},
         }
     if address == 0x21:
         return {
@@ -255,12 +255,12 @@ def decode_live_register(address: int, value: int) -> dict[str, Any]:
     if address == 0x26:
         return {
             "VRMSAVGONESEC": {"bits": "15:0", "raw": get_integer_from_u16(value)},
-            "IRMSAVGONESEC": {"bits": "31:16", "raw": get_integer_from_s16(value >> 16)},
+            "IRMSAVGONESEC": {"bits": "31:16", "raw": get_integer_from_u16(value >> 16)},
         }
     if address == 0x27:
         return {
             "VRMSAVGONEMIN": {"bits": "15:0", "raw": get_integer_from_u16(value)},
-            "IRMSAVGONEMIN": {"bits": "31:16", "raw": get_integer_from_s16(value >> 16)},
+            "IRMSAVGONEMIN": {"bits": "31:16", "raw": get_integer_from_u16(value >> 16)},
         }
     if address == 0x28:
         return {"PACTAVGONESEC": {"bits": "15:0", "raw": get_integer_from_s16(value)}}
