@@ -98,7 +98,7 @@ def get_raw_power_register_data(bus):
     vrms_raw = get_integer_from_u16(raw_rms_register)
     irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
-    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    real_power_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
 
     papparent_raw = get_integer_from_u16(raw_power_factor_register)
@@ -110,7 +110,7 @@ def get_raw_power_register_data(bus):
     return {
         "vrms_raw": vrms_raw,
         "irms_raw": irms_raw,
-        "pactive_raw": pactive_raw,
+        "real_power_raw": real_power_raw,
         "pimag_raw": pimag_raw,
         "papparent_raw": papparent_raw,
         "power_factor": pf_decoded,
@@ -150,7 +150,7 @@ def read_raw_measurement_values(bus):
     vrms_raw = get_integer_from_u16(raw_rms_register)
     irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
-    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    real_power_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
 
     papparent_raw = get_integer_from_u16(raw_power_factor_register)
@@ -160,7 +160,7 @@ def read_raw_measurement_values(bus):
     return {
         "voltage_rms_raw": vrms_raw,
         "current_rms_raw": irms_raw,
-        "active_power_raw": pactive_raw,
+        "real_power_raw": real_power_raw,
         "reactive_power_raw": pimag_raw,
         "apparent_power_raw": papparent_raw,
         "power_factor": pf,
@@ -242,7 +242,7 @@ def read_measurement_values2(bus, calibration):
     vrms_raw = get_integer_from_u16(raw_rms_register)
     irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
-    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    real_power_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
 
     papparent_raw = get_integer_from_u16(raw_power_factor_register)
@@ -268,7 +268,7 @@ def read_measurement_values(bus, calibration):
     vrms_raw = get_integer_from_u16(raw_rms_register)
     irms_raw = get_integer_from_u16(raw_rms_register >> 16)
 
-    pactive_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
+    real_power_raw = get_integer_from_s16(get_integer_from_u16(raw_power_register))
     pimag_raw = get_integer_from_u16(raw_power_register >> 16)
 
     papparent_raw = get_integer_from_u16(raw_power_factor_register)
@@ -300,22 +300,37 @@ def read_measurement_values(bus, calibration):
     if irms is not None and abs(irms) < NOISE_FLOOR_I_AMPS:
         irms = 0.0
 
-    # Power estimate using PF from chip
+    # Convert the ACS37800 power-register outputs to line-power units.
+    # PACTIVE is signed Q15. PIMAG and PAPPARENT are unsigned Q16.
+    # The calibrated V/code and A/code values define the corresponding
+    # full-scale line voltage and current for the normalized chip outputs.
     real_power = None
-    if (vrms is not None) and (irms is not None):
-        real_power = vrms * irms * pf
+    reactive_power = None
+    apparent_power = None
+    if (calibration["vrms_scale"] is not None) and (calibration["irms_scale"] is not None):
+        voltage_full_scale = float(calibration["vrms_scale"]) * (2**16)
+        current_full_scale = float(calibration["irms_scale"]) * (2**16)
+        power_full_scale = voltage_full_scale * current_full_scale
+
+        real_power = (real_power_raw / float(2**15)) * power_full_scale
+        reactive_power = (pimag_raw / float(2**16)) * power_full_scale
+        apparent_power = (papparent_raw / float(2**16)) * power_full_scale
+
         if POWER_ABS:
             real_power = abs(real_power)
 
     return {
         "voltage_rms_raw": vrms_raw,
         "current_rms_raw": irms_raw,
-        "real_power_raw": pactive_raw,
+        "real_power_raw": real_power_raw,
         "reactive_power_raw": pimag_raw,
         "apparent_power_raw": papparent_raw,
         "power_factor": pf,
         "voltage_rms": vrms,
         "current_rms": irms,
+        "real_power": real_power,
+        "reactive_power": reactive_power,
+        "apparent_power": apparent_power,
     }
 
 def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):

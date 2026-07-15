@@ -43,7 +43,7 @@ def main():
     csv_path = os.path.join(OUTPUT_FOLDER, csv_name)
 
     with SMBus(I2C_BUS) as bus, open(csv_path, "w") as f:
-        f.write("time,vrms,irms,p_est,pf,vrms_raw,irms_raw,pactive_raw,pimag_raw,papparent_raw\n")
+        f.write("time,vrms,irms,real_power,reactive_power,apparent_power,pf,vrms_raw,irms_raw,real_power_raw,pimag_raw,papparent_raw\n")
         print(f"Logging to: {csv_path}")
         print("Commands:")
         print("  c  -> full calibration (recommended)")
@@ -95,7 +95,7 @@ def main():
 
                 f.write(f"{t},{voltage_rms if voltage_rms is not None else ''},{current_rms if current_rms is not None else ''},"
                         f"{real_power if real_power is not None else ''},{power_factor},"
-                        f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['active_power_raw']},"
+                        f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['real_power_raw']},"
                         f"{measurement['reactive_power_raw']},{measurement['apparent_power_raw']}\n")
                 f.flush()
 
