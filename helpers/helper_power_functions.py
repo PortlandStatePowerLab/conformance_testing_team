@@ -301,11 +301,11 @@ def read_measurement_values(bus, calibration):
         irms = 0.0
 
     # Power estimate using PF from chip
-    estimated_power = None
+    real_power = None
     if (vrms is not None) and (irms is not None):
-        estimated_power = vrms * irms * pf
+        real_power = vrms * irms * pf
         if POWER_ABS:
-            estimated_power = abs(estimated_power)
+            real_power = abs(real_power)
 
     return {
         "voltage_rms_raw": vrms_raw,
@@ -316,7 +316,7 @@ def read_measurement_values(bus, calibration):
         "power_factor": pf,
         "voltage_rms": vrms,
         "current_rms": irms,
-        "estimated_power": estimated_power,
+        "real_power": real_power,
     }
 
 def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):

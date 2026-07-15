@@ -86,11 +86,11 @@ def main():
 
                 voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.1f}"
                 current_rms_text = "None" if current_rms is None else f"{current_rms:.2f}"
-                estimated_power_text = "None" if real_power is None else f"{real_power:.1f}"
+                real_power_text = "None" if real_power is None else f"{real_power:.1f}"
                 reactive_power_text = "None" if reactive_power is None else f"{measurement['reactive_power']:.1f}"
                 apparent_power_text = "None" if apparent_power is None else f"{measurement['apparent_power']:.1f}"
 
-                print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={estimated_power_text} W  Q={reactive_power_text} VAR  S={apparent_power_text} VA  PF={power_factor:+.3f}  "
+                print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={real_power_text} W  Q={reactive_power_text} VAR  S={apparent_power_text} VA  PF={power_factor:+.3f}  "
                       f"(raw vr={measurement['voltage_rms_raw']} ir={measurement['current_rms_raw']})")
 
                 f.write(f"{t},{voltage_rms if voltage_rms is not None else ''},{current_rms if current_rms is not None else ''},"
