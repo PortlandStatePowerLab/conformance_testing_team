@@ -2,8 +2,8 @@
 """
 test_acs37800_shadow_gain.py
 
-Temporarily changes only the ACS37800 shadow-register CRS_SNS field
-from its current value to code 3. EEPROM is not modified.
+Restores only the ACS37800 shadow-register CRS_SNS field to its
+original code 4 (4x gain). EEPROM is not modified.
 
 The change is volatile and is restored when the ACS37800 loses power.
 
@@ -29,7 +29,7 @@ CUSTOMER_ACCESS_CODE = 0x4F70656E
 
 CRS_SNS_LSB = 19
 CRS_SNS_MASK = 0b111 << CRS_SNS_LSB
-TARGET_CRS_SNS = 3
+TARGET_CRS_SNS = 4  # Original EEPROM setting: code 4 = 4x gain
 
 
 def read_u32_le(bus, register):
@@ -90,7 +90,7 @@ def extract_crs_sns(value):
 
 
 def main():
-    print("ACS37800 temporary shadow-gain test")
+    print("ACS37800 shadow-gain restoration")
     print("EEPROM will not be modified.\n")
 
     with SMBus(I2C_BUS) as bus:
@@ -185,7 +185,7 @@ def main():
                 "Unexpected EEPROM change detected. Stop testing."
             )
 
-        print("\nTemporary gain change succeeded.")
+        print("\nOriginal gain setting restored in the shadow register.")
         print("Only shadow register 0x1B was changed.")
         print("Power-cycling the ACS37800 restores the EEPROM setting.")
         print("\nReading IRMS for 10 seconds:\n")
