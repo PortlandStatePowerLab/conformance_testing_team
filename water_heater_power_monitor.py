@@ -39,7 +39,7 @@ def main():
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     calibration = get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER)
 
-    csv_name = datetime.now().strftime("power_data_%Y_%m_%d_%H:%M:%S.csv")
+    csv_name = datetime.now().strftime("power_data_%Y_%m_%d_%Hh%Mm%Ss.csv")
     csv_path = os.path.join(OUTPUT_FOLDER, csv_name)
 
     with SMBus(I2C_BUS) as bus, open(csv_path, "w") as f:
