@@ -79,18 +79,22 @@ def main():
 
                 voltage_rms = measurement["voltage_rms"]
                 current_rms = measurement["current_rms"]
-                estimated_power = measurement["estimated_power"]
+                real_power = measurement["real_power"]
+                reactive_power = measurement["reactive_power"]
+                apparent_power = measurement["apparent_power"]
                 power_factor = measurement["power_factor"]
 
-                voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.2f}"
+                voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.1f}"
                 current_rms_text = "None" if current_rms is None else f"{current_rms:.2f}"
-                estimated_power_text = "None" if estimated_power is None else f"{estimated_power:.1f}"
-                
-                print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={estimated_power_text} W  PF={power_factor:+.3f}  "
+                estimated_power_text = "None" if real_power is None else f"{real_power:.1f}"
+                reactive_power_text = "None" if reactive_power is None else f"{measurement['reactive_power']:.1f}"
+                apparent_power_text = "None" if apparent_power is None else f"{measurement['apparent_power']:.1f}"
+
+                print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={estimated_power_text} W  Q={reactive_power_text} VAR  S={apparent_power_text} VA  PF={power_factor:+.3f}  "
                       f"(raw vr={measurement['voltage_rms_raw']} ir={measurement['current_rms_raw']})")
 
                 f.write(f"{t},{voltage_rms if voltage_rms is not None else ''},{current_rms if current_rms is not None else ''},"
-                        f"{estimated_power if estimated_power is not None else ''},{power_factor},"
+                        f"{real_power if real_power is not None else ''},{power_factor},"
                         f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['active_power_raw']},"
                         f"{measurement['reactive_power_raw']},{measurement['apparent_power_raw']}\n")
                 f.flush()

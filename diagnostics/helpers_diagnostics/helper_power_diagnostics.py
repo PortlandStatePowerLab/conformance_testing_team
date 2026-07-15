@@ -365,7 +365,7 @@ def print_live_snapshot(snapshot: dict[str, Any]) -> None:
     r20, r21, r22 = regs["0x20"]["decoded"], regs["0x21"]["decoded"], regs["0x22"]["decoded"]
     r25, r2d = regs["0x25"]["decoded"], regs["0x2D"]["decoded"]
     print(f"\n=== LIVE SNAPSHOT {snapshot['timestamp']} ===")
-    print(f"0x20 {regs['0x20']['raw_hex']}  VRMS={r20['VRMS']['raw']}  IRMS(signed)={r20['IRMS']['raw']} [field {r20['IRMS']['field_hex']}]")
+    print(f"0x20 {regs['0x20']['raw_hex']}  VRMS={r20['VRMS']['raw']}  IRMS={r20['IRMS']['raw']} [field {r20['IRMS']['field_hex']}]")
     print(f"0x21 {regs['0x21']['raw_hex']}  PACTIVE={r21['PACTIVE']['raw']}  PIMAG={r21['PIMAG']['raw']}")
     print(f"0x22 {regs['0x22']['raw_hex']}  PAPPARENT={r22['PAPPARENT']['raw']}  PF={r22['PFACTOR']['decoded']:+.6f}  POSANGLE={r22['POSANGLE']['value']}  POSPF={r22['POSPF']['value']}")
     print(f"0x25 {regs['0x25']['raw_hex']}  NUMPTSOUT={r25['NUMPTSOUT']['value']}")
