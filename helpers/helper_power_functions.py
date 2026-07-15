@@ -310,13 +310,12 @@ def read_measurement_values(bus, calibration):
     return {
         "voltage_rms_raw": vrms_raw,
         "current_rms_raw": irms_raw,
-        "active_power_raw": pactive_raw,
+        "real_power_raw": pactive_raw,
         "reactive_power_raw": pimag_raw,
         "apparent_power_raw": papparent_raw,
         "power_factor": pf,
         "voltage_rms": vrms,
         "current_rms": irms,
-        "real_power": real_power,
     }
 
 def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
