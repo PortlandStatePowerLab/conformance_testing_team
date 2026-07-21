@@ -66,8 +66,8 @@ def main():
         run_duration_seconds = runtime_hours * 3600 + runtime_minutes * 60
         start_time = datetime.now()
         elapsed_seconds = 0
-        previous_current_rms = None
-        has_previous_measurement = False
+        last_logged_current_rms = None
+        has_logged_measurement = False
         #print(f"Power data: {get_power_data(bus, calibration)}")
 
         try:
@@ -87,10 +87,12 @@ def main():
                 apparent_power = measurement["apparent_power"]
                 power_factor = measurement["power_factor"]
 
-                current_changed = (
-                    not has_previous_measurement
-                    or current_rms != previous_current_rms
-                )
+                if not has_logged_measurement:
+                    current_changed = True
+                elif current_rms is None or last_logged_current_rms is None:
+                    current_changed = current_rms != last_logged_current_rms
+                else:
+                    current_changed = abs(current_rms - last_logged_current_rms) > 0.01
 
                 if current_changed:
                     voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.1f}"
@@ -108,9 +110,8 @@ def main():
                             f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['real_power_raw']},"
                             f"{measurement['reactive_power_raw']},{measurement['apparent_power_raw']}\n")
                     f.flush()
-
-                previous_current_rms = current_rms
-                has_previous_measurement = True
+                    last_logged_current_rms = current_rms
+                    has_logged_measurement = True
 
                 elapsed_seconds = (datetime.now() - start_time).total_seconds()
                 time.sleep(1)
