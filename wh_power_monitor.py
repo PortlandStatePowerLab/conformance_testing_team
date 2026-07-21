@@ -92,7 +92,7 @@ def main():
                 elif current_rms is None or last_logged_current_rms is None:
                     current_changed = current_rms != last_logged_current_rms
                 else:
-                    current_changed = abs(current_rms - last_logged_current_rms) > 0.01
+                    current_changed = abs(current_rms - last_logged_current_rms) > 0.015
 
                 if current_changed:
                     voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.1f}"
