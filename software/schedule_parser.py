@@ -91,6 +91,8 @@ class GeneratedCtaEvent:
     action: str
     command_code: str
     duration_byte: int | None
+    requested_duration_seconds: int | None
+    represented_duration_seconds: int | None
     generated: bool
     prerequisite_for: str | None = None
 
@@ -290,6 +292,8 @@ def generate_cta_events(
                 action="outside_communication",
                 command_code="o",
                 duration_byte=None,
+                requested_duration_seconds=None,
+                represented_duration_seconds=None,
                 generated=True,
                 prerequisite_for=event.event_id,
             )
@@ -302,6 +306,16 @@ def generate_cta_events(
                 command_code=CTA_ACTION_CODES[event.action],
                 duration_byte=(
                     event.event_duration.byte_value if event.event_duration else None
+                ),
+                requested_duration_seconds=(
+                    event.event_duration.requested_seconds
+                    if event.event_duration
+                    else None
+                ),
+                represented_duration_seconds=(
+                    event.event_duration.represented_seconds
+                    if event.event_duration
+                    else None
                 ),
                 generated=False,
             )

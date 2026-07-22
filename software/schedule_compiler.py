@@ -25,6 +25,8 @@ PREVIEW_COLUMNS = (
     "action",
     "command_code",
     "duration_byte",
+    "requested_duration_seconds",
+    "represented_duration_seconds",
     "generated",
     "prerequisite_for",
 )
@@ -130,6 +132,16 @@ def compile_cta_schedule(
                 "command_code": event.command_code,
                 "duration_byte": (
                     "" if event.duration_byte is None else event.duration_byte
+                ),
+                "requested_duration_seconds": (
+                    ""
+                    if event.requested_duration_seconds is None
+                    else event.requested_duration_seconds
+                ),
+                "represented_duration_seconds": (
+                    ""
+                    if event.represented_duration_seconds is None
+                    else event.represented_duration_seconds
                 ),
                 "generated": str(event.generated).lower(),
                 "prerequisite_for": event.prerequisite_for or "",

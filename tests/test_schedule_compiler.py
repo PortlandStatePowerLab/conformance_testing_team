@@ -40,6 +40,8 @@ class ScheduleCompilerTests(unittest.TestCase):
             self.assertEqual(preview[0]["offset_seconds"], "-15")
             self.assertEqual(preview[0]["scheduled_utc"], "2026-07-22T18:59:45Z")
             self.assertEqual(preview[1]["duration_byte"], "255")
+            self.assertEqual(preview[1]["requested_duration_seconds"], "")
+            self.assertEqual(preview[1]["represented_duration_seconds"], "")
 
 
 if __name__ == "__main__":
