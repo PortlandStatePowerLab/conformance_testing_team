@@ -26,16 +26,15 @@ from helpers.hardware_map import (
 pi_number = get_pi_number()
 
 # Folder/file locations
-OUTPUT_FOLDER = os.path.join(os.path.expanduser("./"), "saved_data")
+OUTPUT_FOLDER = os.path.join(os.path.expanduser("../"), "saved_data")
 CALIBRATION_DIR = os.path.join(OUTPUT_FOLDER, "calibration")
 
 def main():
     """Run the main logging loop for the ACS37800 sensor.
 
     This function sets up the output folder and CSV file, optionally performs
-    calibration, then enters a loop reading measurements every second. The
-    first measurement and subsequent measurements with a changed current are
-    written to both stdout and the CSV log file.
+    calibration, then enters a loop reading measurements every second and
+    writing them to both stdout and the CSV log file.
     """
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     calibration = get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER)
@@ -66,8 +65,6 @@ def main():
         run_duration_seconds = runtime_hours * 3600 + runtime_minutes * 60
         start_time = datetime.now()
         elapsed_seconds = 0
-        last_logged_current_rms = None
-        has_logged_measurement = False
         #print(f"Power data: {get_power_data(bus, calibration)}")
 
         try:
@@ -87,31 +84,20 @@ def main():
                 apparent_power = measurement["apparent_power"]
                 power_factor = measurement["power_factor"]
 
-                if not has_logged_measurement:
-                    current_changed = True
-                elif current_rms is None or last_logged_current_rms is None:
-                    current_changed = current_rms != last_logged_current_rms
-                else:
-                    current_changed = abs(current_rms - last_logged_current_rms) > 0.015
+                voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.1f}"
+                current_rms_text = "None" if current_rms is None else f"{current_rms:.2f}"
+                real_power_text = "None" if real_power is None else f"{real_power:.1f}"
+                reactive_power_text = "None" if reactive_power is None else f"{measurement['reactive_power']:.1f}"
+                apparent_power_text = "None" if apparent_power is None else f"{measurement['apparent_power']:.1f}"
 
-                if current_changed:
-                    voltage_rms_text = "None" if voltage_rms is None else f"{voltage_rms:.1f}"
-                    current_rms_text = "None" if current_rms is None else f"{current_rms:.2f}"
-                    real_power_text = "None" if real_power is None else f"{real_power:.1f}"
-                    reactive_power_text = "None" if reactive_power is None else f"{reactive_power:.1f}"
-                    apparent_power_text = "None" if apparent_power is None else f"{apparent_power:.1f}"
+                print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={real_power_text} W  Q={reactive_power_text} VAR  S={apparent_power_text} VA  PF={power_factor:+.3f}  "
+                      f"(raw vr={measurement['voltage_rms_raw']} ir={measurement['current_rms_raw']})")
 
-                    print(f"{t}  Vrms={voltage_rms_text}  Irms={current_rms_text}  P={real_power_text} W  Q={reactive_power_text} VAR  S={apparent_power_text} VA  PF={power_factor:+.3f}  "
-                          f"(raw vr={measurement['voltage_rms_raw']} ir={measurement['current_rms_raw']})")
-
-                    f.write(f"{t},{voltage_rms if voltage_rms is not None else ''},{current_rms if current_rms is not None else ''},"
-                            f"{real_power if real_power is not None else ''},{reactive_power if reactive_power is not None else ''},"
-                            f"{apparent_power if apparent_power is not None else ''},{power_factor},"
-                            f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['real_power_raw']},"
-                            f"{measurement['reactive_power_raw']},{measurement['apparent_power_raw']}\n")
-                    f.flush()
-                    last_logged_current_rms = current_rms
-                    has_logged_measurement = True
+                f.write(f"{t},{voltage_rms if voltage_rms is not None else ''},{current_rms if current_rms is not None else ''},"
+                        f"{real_power if real_power is not None else ''},{power_factor},"
+                        f"{measurement['voltage_rms_raw']},{measurement['current_rms_raw']},{measurement['real_power_raw']},"
+                        f"{measurement['reactive_power_raw']},{measurement['apparent_power_raw']}\n")
+                f.flush()
 
                 elapsed_seconds = (datetime.now() - start_time).total_seconds()
                 time.sleep(1)
