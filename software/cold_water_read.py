@@ -2,7 +2,7 @@ import subprocess
 import json
 from pathlib import Path
 
-config_path = ("secrets/pi_config.json")
+config_path = ("../../secrets/pi_config.json")
 
 with open(config_path, "r") as f:
     config = json.load(f)
