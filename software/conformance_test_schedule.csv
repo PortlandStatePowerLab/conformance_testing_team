@@ -1,0 +1,9 @@
+enabled,event_id,time_after_start,phase,event_type,action,event_duration,target_volume_gal,expected_flow_gpm,notes
+true,cta_loadup_1,00:00:00,pre_event,cta,load_up,longer_than_representable,,,Initial Load Up
+true,cta_normal_1,01:30:00,event,cta,run_normal,unknown,,,Return unit to normal
+true,draw_1,02:00:00,event,water_draw,draw,,15,3.0,Water draw 1
+true,draw_2,02:30:00,event,water_draw,draw,,2,3.0,Water draw 2
+true,draw_3,03:40:00,event,water_draw,draw,,9,3.0,Water draw 3
+true,cta_loadup_2,04:40:00,recovery,cta,load_up,longer_than_representable,,,Recovery Load Up
+true,cta_normal_2,05:40:00,recovery,cta,run_normal,unknown,,,Return unit to normal
+true,test_end,06:00:00,recovery,test,end,,,,End recovery period
