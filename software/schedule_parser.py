@@ -23,17 +23,28 @@ SCHEDULE_COLUMNS = (
     "event_type",
     "action",
     "event_duration",
+    "advanced_duration_minutes",
+    "advanced_value",
+    "advanced_units",
+    "expected_operational_states",
     "target_volume_gal",
     "expected_flow_gpm",
     "notes",
 )
 
 CTA_ACTION_CODES = {
+    "advanced_load_up": "a",
     "load_up": "l",
     "run_normal": "e",
     "shed": "s",
     "critical_peak": "c",
     "grid_emergency": "g",
+}
+ADVANCED_UNIT_CODES = {
+    "1_wh": 0x00,
+    "10_wh": 0x01,
+    "100_wh": 0x02,
+    "1000_wh": 0x03,
 }
 EVENT_TYPES = {"cta", "water_draw", "test"}
 TRUE_VALUES = {"true", "yes", "1"}
@@ -70,6 +81,10 @@ class ScheduleEvent:
     event_type: str
     action: str
     event_duration: EncodedDuration | None
+    advanced_duration_minutes: int | None
+    advanced_value: int | None
+    advanced_units: int | None
+    expected_operational_states: tuple[int, ...]
     target_volume_gal: float | None
     expected_flow_gpm: float | None
     notes: str
@@ -91,6 +106,10 @@ class GeneratedCtaEvent:
     action: str
     command_code: str
     duration_byte: int | None
+    advanced_duration_minutes: int | None
+    advanced_value: int | None
+    advanced_units: int | None
+    expected_operational_states: tuple[int, ...]
     requested_duration_seconds: int | None
     represented_duration_seconds: int | None
     generated: bool
@@ -156,10 +175,36 @@ def _parse_positive_float(value: str, field_name: str) -> float:
     return parsed
 
 
+def _parse_bounded_integer(value: str, field_name: str, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value, 10)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a base-10 whole number") from exc
+    if not minimum <= parsed <= maximum:
+        raise ValueError(f"{field_name} must be between {minimum} and {maximum}")
+    return parsed
+
+
+def _parse_expected_states(value: str) -> tuple[int, ...]:
+    if not value.strip():
+        return ()
+    states = tuple(
+        _parse_bounded_integer(part.strip(), "operational state", 0, 255)
+        for part in value.split("|")
+    )
+    if len(set(states)) != len(states):
+        raise ValueError("expected_operational_states cannot contain duplicates")
+    return states
+
+
 def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     event_type = row["event_type"].strip().lower()
     action = row["action"].strip().lower()
     duration_text = row["event_duration"].strip()
+    advanced_duration_text = row["advanced_duration_minutes"].strip()
+    advanced_value_text = row["advanced_value"].strip()
+    advanced_units_text = row["advanced_units"].strip().lower()
+    expected_states_text = row["expected_operational_states"].strip()
     volume_text = row["target_volume_gal"].strip()
     flow_text = row["expected_flow_gpm"].strip()
 
@@ -167,22 +212,48 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         raise ValueError(f"event_type must be one of {sorted(EVENT_TYPES)}")
 
     duration = None
+    advanced_duration = None
+    advanced_value = None
+    advanced_units = None
+    expected_states: tuple[int, ...] = ()
     volume = None
     flow = None
 
     if event_type == "cta":
         if action not in CTA_ACTION_CODES:
             raise ValueError(f"unsupported CTA action '{action}'")
-        if not duration_text:
-            raise ValueError("CTA events require event_duration")
-        duration = encode_event_duration(duration_text)
+        expected_states = _parse_expected_states(expected_states_text)
+        if action == "advanced_load_up":
+            if duration_text:
+                raise ValueError("advanced_load_up uses advanced_duration_minutes, not event_duration")
+            if not advanced_duration_text or not advanced_value_text or not advanced_units_text:
+                raise ValueError(
+                    "advanced_load_up requires advanced_duration_minutes, advanced_value, and advanced_units"
+                )
+            advanced_duration = _parse_bounded_integer(
+                advanced_duration_text, "advanced_duration_minutes", 1, 0xFFFF
+            )
+            advanced_value = _parse_bounded_integer(
+                advanced_value_text, "advanced_value", 1, 0xFFFE
+            )
+            if advanced_units_text not in ADVANCED_UNIT_CODES:
+                raise ValueError(
+                    "advanced_units must be one of " + ", ".join(ADVANCED_UNIT_CODES)
+                )
+            advanced_units = ADVANCED_UNIT_CODES[advanced_units_text]
+        else:
+            if not duration_text:
+                raise ValueError("Basic DR CTA events require event_duration")
+            if advanced_duration_text or advanced_value_text or advanced_units_text:
+                raise ValueError("Basic DR CTA events cannot contain advanced load-up values")
+            duration = encode_event_duration(duration_text)
         if volume_text or flow_text:
             raise ValueError("CTA events cannot contain water-draw values")
     elif event_type == "water_draw":
         if action != "draw":
             raise ValueError("water_draw action must be 'draw'")
-        if duration_text:
-            raise ValueError("water draws cannot contain event_duration")
+        if duration_text or advanced_duration_text or advanced_value_text or advanced_units_text or expected_states_text:
+            raise ValueError("water draws cannot contain CTA argument or expectation values")
         if not volume_text or not flow_text:
             raise ValueError("water draws require target_volume_gal and expected_flow_gpm")
         volume = _parse_positive_float(volume_text, "target_volume_gal")
@@ -190,8 +261,8 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     else:
         if action != "end":
             raise ValueError("test action must be 'end'")
-        if duration_text or volume_text or flow_text:
-            raise ValueError("test end cannot contain duration or water-draw values")
+        if duration_text or advanced_duration_text or advanced_value_text or advanced_units_text or expected_states_text or volume_text or flow_text:
+            raise ValueError("test end cannot contain CTA or water-draw values")
 
     event_id = row["event_id"].strip()
     if not event_id:
@@ -205,6 +276,10 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         event_type=event_type,
         action=action,
         event_duration=duration,
+        advanced_duration_minutes=advanced_duration,
+        advanced_value=advanced_value,
+        advanced_units=advanced_units,
+        expected_operational_states=expected_states,
         target_volume_gal=volume,
         expected_flow_gpm=flow,
         notes=row["notes"].strip(),
@@ -292,6 +367,10 @@ def generate_cta_events(
                 action="outside_communication",
                 command_code="o",
                 duration_byte=None,
+                advanced_duration_minutes=None,
+                advanced_value=None,
+                advanced_units=None,
+                expected_operational_states=(),
                 requested_duration_seconds=None,
                 represented_duration_seconds=None,
                 generated=True,
@@ -307,6 +386,10 @@ def generate_cta_events(
                 duration_byte=(
                     event.event_duration.byte_value if event.event_duration else None
                 ),
+                advanced_duration_minutes=event.advanced_duration_minutes,
+                advanced_value=event.advanced_value,
+                advanced_units=event.advanced_units,
+                expected_operational_states=event.expected_operational_states,
                 requested_duration_seconds=(
                     event.event_duration.requested_seconds
                     if event.event_duration

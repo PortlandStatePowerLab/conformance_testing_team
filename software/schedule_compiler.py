@@ -17,7 +17,7 @@ except ImportError:
     from schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 
 
-MACHINE_COLUMNS = ("time", "command", "argument")
+MACHINE_COLUMNS = ("time", "command", "argument", "event_id", "value", "units")
 PREVIEW_COLUMNS = (
     "event_id",
     "scheduled_utc",
@@ -27,6 +27,10 @@ PREVIEW_COLUMNS = (
     "duration_byte",
     "requested_duration_seconds",
     "represented_duration_seconds",
+    "advanced_duration_minutes",
+    "advanced_value",
+    "advanced_units",
+    "expected_operational_states",
     "generated",
     "prerequisite_for",
 )
@@ -118,7 +122,14 @@ def compile_cta_schedule(
             {
                 "time": int(scheduled.timestamp()),
                 "command": event.command_code,
-                "argument": "" if event.duration_byte is None else event.duration_byte,
+                "argument": (
+                    event.advanced_duration_minutes
+                    if event.advanced_duration_minutes is not None
+                    else ("" if event.duration_byte is None else event.duration_byte)
+                ),
+                "event_id": event.event_id,
+                "value": "" if event.advanced_value is None else event.advanced_value,
+                "units": "" if event.advanced_units is None else event.advanced_units,
             }
         )
         preview_rows.append(
@@ -142,6 +153,20 @@ def compile_cta_schedule(
                     ""
                     if event.represented_duration_seconds is None
                     else event.represented_duration_seconds
+                ),
+                "advanced_duration_minutes": (
+                    ""
+                    if event.advanced_duration_minutes is None
+                    else event.advanced_duration_minutes
+                ),
+                "advanced_value": (
+                    "" if event.advanced_value is None else event.advanced_value
+                ),
+                "advanced_units": (
+                    "" if event.advanced_units is None else event.advanced_units
+                ),
+                "expected_operational_states": "|".join(
+                    str(state) for state in event.expected_operational_states
                 ),
                 "generated": str(event.generated).lower(),
                 "prerequisite_for": event.prerequisite_for or "",
