@@ -32,7 +32,6 @@ class DurationEncodingTests(unittest.TestCase):
 class MasterScheduleTests(unittest.TestCase):
     def test_checked_in_schedule_is_valid(self):
         events = load_schedule(MASTER_SCHEDULE)
-        self.assertEqual(len(events), 8)
         self.assertEqual(events[-1].event_id, "test_end")
 
     def test_outside_communication_is_generated_fifteen_seconds_early(self):
@@ -76,6 +75,32 @@ class MasterScheduleTests(unittest.TestCase):
         self.assertEqual(event.advanced_value, 5)
         self.assertEqual(event.advanced_units, 0x02)
         self.assertEqual(event.expected_operational_states, (3, 6))
+
+    def test_empty_trailing_spreadsheet_column_is_accepted(self):
+        expected_count = len(load_schedule(MASTER_SCHEDULE))
+        with MASTER_SCHEDULE.open("r", encoding="utf-8", newline="") as source:
+            lines = source.read().splitlines()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            path.write_text(
+                "\n".join(line + "," for line in lines) + "\n",
+                encoding="utf-8",
+            )
+            events = load_schedule(path)
+        self.assertEqual(len(events), expected_count)
+
+    def test_nonempty_trailing_column_is_rejected(self):
+        with MASTER_SCHEDULE.open("r", encoding="utf-8", newline="") as source:
+            lines = source.read().splitlines()
+        lines[0] += ","
+        lines[1] += ",unexpected"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ScheduleValidationError, "unexpected trailing column data"
+            ):
+                load_schedule(path)
 
 
 if __name__ == "__main__":

@@ -296,7 +296,10 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
     with schedule_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         actual_columns = tuple(reader.fieldnames or ())
-        if actual_columns != SCHEDULE_COLUMNS:
+        normalized_columns = list(actual_columns)
+        while normalized_columns and not normalized_columns[-1].strip():
+            normalized_columns.pop()
+        if tuple(normalized_columns) != SCHEDULE_COLUMNS:
             raise ScheduleValidationError(
                 [
                     "CSV columns must exactly match: " + ",".join(SCHEDULE_COLUMNS),
@@ -304,6 +307,22 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
                 ]
             )
         for row_number, row in enumerate(reader, start=2):
+            unexpected_values: list[str] = []
+            for column, value in row.items():
+                if column in SCHEDULE_COLUMNS:
+                    continue
+                if isinstance(value, list):
+                    unexpected_values.extend(
+                        item for item in value if item is not None and item.strip()
+                    )
+                elif value is not None and value.strip():
+                    unexpected_values.append(value)
+            if unexpected_values:
+                errors.append(
+                    f"row {row_number}: unexpected trailing column data: "
+                    + ", ".join(unexpected_values)
+                )
+                continue
             try:
                 events.append(_parse_row(row, row_number))
             except (TypeError, ValueError) as exc:

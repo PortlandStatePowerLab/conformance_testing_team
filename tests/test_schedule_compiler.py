@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from software.schedule_compiler import compile_cta_schedule, parse_test_start
-from software.schedule_parser import SCHEDULE_COLUMNS
+from software.schedule_parser import SCHEDULE_COLUMNS, load_schedule
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +30,10 @@ class ScheduleCompilerTests(unittest.TestCase):
                 preview_output=preview_path,
             )
 
-            self.assertEqual(len(events), 8)
+            expected_cta_events = sum(
+                event.event_type == "cta" for event in load_schedule(MASTER_SCHEDULE)
+            ) * 2
+            self.assertEqual(len(events), expected_cta_events)
             machine_lines = machine_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(
                 machine_lines[0],

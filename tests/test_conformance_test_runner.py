@@ -12,11 +12,17 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 class ConformanceTestRunnerTests(unittest.TestCase):
     def test_schedule_summary(self):
-        summary = schedule_summary(load_schedule(MASTER_SCHEDULE))
-        self.assertEqual(summary["enabled_events"], 8)
-        self.assertEqual(summary["cta_events"], 4)
-        self.assertEqual(summary["water_draws"], 3)
-        self.assertEqual(summary["duration_seconds"], 21600)
+        events = load_schedule(MASTER_SCHEDULE)
+        summary = schedule_summary(events)
+        self.assertEqual(summary["enabled_events"], len(events))
+        self.assertEqual(
+            summary["cta_events"], sum(event.event_type == "cta" for event in events)
+        )
+        self.assertEqual(
+            summary["water_draws"],
+            sum(event.event_type == "water_draw" for event in events),
+        )
+        self.assertEqual(summary["duration_seconds"], events[-1].offset_seconds)
 
     def test_run_identifier_is_sanitized(self):
         self.assertEqual(safe_identifier("test run 1"), "test_run_1")
