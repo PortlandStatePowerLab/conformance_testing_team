@@ -10,23 +10,11 @@ should run at a time.
 
 from __future__ import annotations
 
-import argparse
 import statistics
-import sys
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Protocol, Sequence
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from software.adc.max1238_builder import (
-    MAX1238_INTERNAL_REFERENCE_WAKEUP_S,
-    build_max1238,
-)
-from software.common.hardware_map import CH_AMBIENT, CH_COLD, CH_FLOW, CH_HOT
+from typing import Protocol
+from software.station.station_hardware_map import CH_AMBIENT, CH_COLD, CH_FLOW, CH_HOT
 
 # endregion Imports
 
@@ -246,94 +234,3 @@ def run_comparison(
         print()
 
 # endregion Acquisition and Reporting
-
-# region Entry Point
-
-
-def positive_integer(value: str) -> int:
-    """Parse a strictly positive integer for argparse."""
-    parsed_value = int(value)
-    if parsed_value <= 0:
-        raise argparse.ArgumentTypeError("must be a positive integer")
-    return parsed_value
-
-
-def nonnegative_float(value: str) -> float:
-    """Parse a finite nonnegative float for argparse."""
-    parsed_value = float(value)
-    if parsed_value < 0.0 or not parsed_value < float("inf"):
-        raise argparse.ArgumentTypeError("must be a nonnegative finite number")
-    return parsed_value
-
-
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse MAX1238 acquisition-comparison command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Compare MAX1238 grouped and single CH_FLOW reads without outputs."
-    )
-    parser.add_argument("--samples", type=positive_integer, default=DEFAULT_SAMPLES)
-    parser.add_argument("--delay-s", type=nonnegative_float, default=DEFAULT_DELAY_S)
-    parser.add_argument(
-        "--clock-mode",
-        choices=("internal", "external"),
-        default=DEFAULT_CLOCK_MODE,
-        help="MAX1238 conversion clock mode (default: internal)",
-    )
-    parser.add_argument(
-        "--watch", action="store_true", help="repeat batches until Ctrl-C"
-    )
-    return parser.parse_args(argv)
-
-
-def configure_clock_mode(adc: DiagnosticAdc, clock_mode: str) -> None:
-    """Reconfigure the built ADC explicitly while retaining safe setup fields."""
-    # Keep the Linux-only driver and smbus2 outside this module's import path.
-    from software.adc.max1238 import (
-        ClockType,
-        Polarity,
-        ReferenceVoltage,
-        ResetMode,
-    )
-
-    selected_clock = (
-        ClockType.Internal if clock_mode == "internal" else ClockType.External
-    )
-    adc.setup_adc(
-        referenceVoltage=ReferenceVoltage.InternalRef_AlwaysON_AnalogIn,
-        clock=selected_clock,
-        polarity=Polarity.Unipolar,
-        reset=ResetMode.NoAction,
-    )
-    time.sleep(MAX1238_INTERNAL_REFERENCE_WAKEUP_S)
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    """Build, own, run, and always close one read-only MAX1238 ADC.
-
-    This diagnostic performs only MAX1238 I2C reads. It does not configure GPIO,
-    actuate the valve, or access the ACS37800. Only one hardware-owning process
-    should run at a time.
-    """
-    args = parse_args(argv)
-    adc = build_max1238()
-    try:
-        configure_clock_mode(adc, args.clock_mode)
-        print(f"Selected clock mode: {args.clock_mode}")
-        print("Only one hardware-owning process should run at a time.")
-        run_comparison(
-            adc,
-            samples=args.samples,
-            delay_s=args.delay_s,
-            watch=args.watch,
-        )
-    except KeyboardInterrupt:
-        print("ADC acquisition comparison stopped.")
-    finally:
-        adc.close()
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-# endregion Entry Point

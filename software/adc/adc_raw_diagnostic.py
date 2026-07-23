@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Read and report MAX1238 ADC channels from the current WH1 channel map.
 
-This diagnostic constructs and configures the station ADC, reads each mapped
-sensor channel, and reports both the raw count and canonically converted input
-voltage. In watch mode it also reports elapsed runtime and per-channel raw-count
-ranges. It does not drive station outputs.
+This diagnostic reads an injected ADC, reports each mapped channel as raw counts
+and canonically converted input voltage, and can report watch-mode ranges. It
+does not construct hardware, parse a command line, or drive station outputs.
 """
 
 # region Imports
@@ -13,27 +12,15 @@ ranges. It does not drive station outputs.
 from __future__ import annotations
 
 # Standard-library helpers for command-line parsing, timing, timestamps, and root discovery.
-import argparse
-import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Sequence
 
-# Makes the project package importable when this diagnostic runs as a script.
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# Shared hardware-agnostic ADC read interface from ``adc_interface.py``.
+from software.adc.adc_interface import SensorAdc
 
-# Concrete station ADC construction and setup from ``max1238_builder.py``.
-from software.adc.max1238_builder import build_max1238
-
-# Shared hardware-agnostic ADC read interface from ``adc_interfaces.py``.
-from software.adc.adc_interfaces import SensorAdc
-
-# ADC configuration and channel assignments from ``hardware_map.py``.
-from software.common.hardware_map import (
+# ADC configuration and channel assignments from ``station_hardware_map.py``.
+from software.station.station_hardware_map import (
     ADC_PART,
     CH_AMBIENT,
     CH_COLD,
@@ -44,8 +31,8 @@ from software.common.hardware_map import (
     MAX1238_I2C_BUS,
 )
 
-# Nominal ADC configuration and canonical conversion from ``sensor_conversion.py``.
-from software.sensor_conversion import (
+# Nominal ADC configuration and canonical conversion from ``sensor_conversion_math.py``.
+from software.sensors.sensor_conversion_math import (
     NOMINAL_SENSOR_CONFIG,
     adc_counts_to_voltage,
 )
@@ -227,74 +214,3 @@ def run_adc_raw_check(
         time.sleep(interval_s)
 
 # endregion ADC Scan Operations
-
-# region Diagnostic Entry Point
-
-# Parses diagnostic command-line options.
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse read-adc-raw command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Read raw MAX1238 channels without driving outputs."
-    )
-    parser.add_argument(
-        "--bus",
-        type=int,
-        default=MAX1238_I2C_BUS,
-        help=f"I2C bus number, default {MAX1238_I2C_BUS}",
-    )
-    parser.add_argument(
-        "--address",
-        type=lambda value: int(value, 0),
-        default=MAX1238_I2C_ADDR,
-        help=f"MAX1238 I2C address, default 0x{MAX1238_I2C_ADDR:02X}",
-    )
-    parser.add_argument(
-        "--watch",
-        action="store_true",
-        help="read raw ADC channels continuously until Ctrl+C",
-    )
-    parser.add_argument(
-        "--interval-s",
-        type=float,
-        default=DEFAULT_WATCH_INTERVAL_S,
-        help=(
-            "seconds between raw ADC scans in watch mode, "
-            f"default {DEFAULT_WATCH_INTERVAL_S}"
-        ),
-    )
-    args = parser.parse_args(argv)
-
-    if args.interval_s <= 0.0:
-        parser.error("--interval-s must be greater than zero")
-
-    return args
-
-# Constructs the ADC and reports raw counts and converted voltages without
-# driving station outputs.
-def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(argv)
-    adc = build_max1238(
-        bus_num=args.bus,
-        address=args.address,
-    )
-
-    try:
-        run_adc_raw_check(
-            adc,
-            bus=args.bus,
-            address=args.address,
-            watch=args.watch,
-            interval_s=args.interval_s,
-        )
-    except KeyboardInterrupt:
-        print("ADC raw watch stopped.")
-    finally:
-        adc.close()
-
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-# endregion Diagnostic Entry Point
