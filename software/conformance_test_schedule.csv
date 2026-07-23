@@ -1,9 +1,10 @@
-enabled,event_id,time_after_start,phase,event_type,action,event_duration,advanced_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes
-true,cta_loadup_1,00:00:00,pre_event,cta,load_up,longer_than_representable,,,,3|6,,,Initial Load Up
-true,cta_normal_1,01:30:00,event,cta,run_normal,unknown,,,,0,,,Return unit to normal
-true,draw_1,02:00:00,event,water_draw,draw,,,,,,15,3.0,Water draw 1
-true,draw_2,02:30:00,event,water_draw,draw,,,,,,2,3.0,Water draw 2
-true,draw_3,03:40:00,event,water_draw,draw,,,,,,9,3.0,Water draw 3
-true,cta_loadup_2,04:40:00,recovery,cta,load_up,longer_than_representable,,,,3|6,,,Recovery Load Up
-true,cta_normal_2,05:40:00,recovery,cta,run_normal,unknown,,,,0,,,Return unit to normal
-true,test_end,06:00:00,recovery,test,end,,,,,,,,,End recovery period
+enabled,event_id,time_after_start,phase,event_type,action,event_duration,advanced_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes,
+TRUE,cta_loadup_1,0:00:00,pre_event,cta,load_up,longer_than_representable,,,,3|6,,,Initial Load Up,
+TRUE,cta_normal_1,0:07:00,event,cta,run_normal,unknown,,,,0,,,Return unit to normal,
+TRUE,cta_critical_peak_1,0:09:00,event,cta,critical_peak,longer_than_representable,,,,,,,Critical peak event,
+TRUE,cta_normal_2,0:15:00,recovery,cta,run_normal,unknown,,,,,,,Return unit to normal,
+TRUE,cta_shed_1,0:20:00,event,cta,shed,longer_than_representable,,,,3|6,,,Shed event,
+TRUE,cta_normal_3,0:25:00,recovery,cta,run_normal,unknown,,,,,,,Return unit to normal,
+TRUE,cta_grid_emergency_1,0:30:00,event,cta,grid_emergency,longer_than_representable,,,,,,,Grid emergency event,
+TRUE,cta_normal_4,0:35:00,recovery,cta,run_normal,unknown,,,,0,,,Return unit to normal,
+TRUE,test_end,0:40:00,recovery,test,end,,,,,,,,,End recovery period
