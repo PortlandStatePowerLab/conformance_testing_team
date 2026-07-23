@@ -2,6 +2,8 @@
 
 ADC_PART = "MAX1238EEE+"
 ADC_VREF = 4.096
+MAX1238_I2C_BUS = 1
+MAX1238_I2C_ADDR = 0x35
 
 # CHx values are MAX1238 analog input channels, not Raspberry Pi GPIO pins.
 CH_HOT = 0
