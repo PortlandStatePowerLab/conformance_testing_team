@@ -41,17 +41,17 @@ class ScheduleCompilerTests(unittest.TestCase):
             )
             self.assertEqual(
                 machine_lines[1],
-                "1784746785,o,,auto_outside_comm_for_cta_loadup_1,,",
+                "1784746785,o,,auto_outside_comm_for_load_up_1,,",
             )
-            self.assertEqual(machine_lines[2], "1784746800,l,15,cta_loadup_1,,")
+            self.assertEqual(machine_lines[2], "1784746800,l,13,load_up_1,,")
 
             with preview_path.open("r", encoding="utf-8", newline="") as handle:
                 preview = list(csv.DictReader(handle))
             self.assertEqual(preview[0]["offset_seconds"], "-15")
             self.assertEqual(preview[0]["scheduled_utc"], "2026-07-22T18:59:45Z")
-            self.assertEqual(preview[1]["duration_byte"], "15")
-            self.assertEqual(preview[1]["requested_duration_seconds"], "420")
-            self.assertEqual(preview[1]["represented_duration_seconds"], "450")
+            self.assertEqual(preview[1]["duration_byte"], "13")
+            self.assertEqual(preview[1]["requested_duration_seconds"], "300")
+            self.assertEqual(preview[1]["represented_duration_seconds"], "338")
 
     def test_advanced_load_up_is_compiled_with_all_three_arguments(self):
         rows = [

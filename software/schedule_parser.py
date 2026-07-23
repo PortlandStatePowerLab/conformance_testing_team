@@ -258,8 +258,8 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         if volume_text or flow_text:
             raise ValueError("CTA events cannot contain water-draw values")
     elif event_type == "water_draw":
-        if action != "draw":
-            raise ValueError("water_draw action must be 'draw'")
+        if action != "water_draw":
+            raise ValueError("water_draw action must be 'water_draw'")
         if duration_text or advanced_duration_text or advanced_value_text or advanced_units_text or expected_states_text:
             raise ValueError("water draws cannot contain CTA argument or expectation values")
         if not volume_text or not flow_text:

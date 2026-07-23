@@ -1,10 +1,10 @@
 enabled,event_id,time_after_start,phase,event_type,action,event_duration_minutes,advanced_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes
-TRUE,cta_loadup_1,0:00:00,pre_event,cta,load_up,7,,,,3|6,,,Initial Load Up
-TRUE,cta_normal_1,0:07:00,event,cta,run_normal,unknown,,,,0,,,Return unit to normal
-TRUE,cta_critical_peak_1,0:09:00,event,cta,critical_peak,6,,,,,,,Critical peak event
-TRUE,cta_normal_2,0:15:00,recovery,cta,run_normal,unknown,,,,,,,Return unit to normal
-TRUE,cta_shed_1,0:20:00,event,cta,shed,5,,,,3|6,,,Shed event
-TRUE,cta_normal_3,0:25:00,recovery,cta,run_normal,unknown,,,,,,,Return unit to normal
-TRUE,cta_grid_emergency_1,0:30:00,event,cta,grid_emergency,5,,,,,,,Grid emergency event
-TRUE,cta_normal_4,0:35:00,recovery,cta,run_normal,unknown,,,,0,,,Return unit to normal
-TRUE,test_end,0:40:00,recovery,test,end,,,,,,,,End recovery period
+TRUE,load_up_1,00:00:00,pre_event,cta,load_up,5,,,,3|6,,,Initial Load Up
+TRUE,run_normal_1,00:07:00,event,cta,run_normal,3,,,,0|1,,,Return unit to normal
+TRUE,critical_peak_1,00:12:00,event,cta,critical_peak,7,,,,2|4,,,Critical peak event
+TRUE,run_normal_2,00:22:00,recovery,cta,run_normal,unknown,,,,0|1,,,Return unit to normal
+TRUE,shed_1,00:25:00,event,cta,shed,5,,,,2|4,,,Shed event
+TRUE,run_normal_3,00:35:00,recovery,cta,run_normal,unknown,,,,0|1,,,Return unit to normal
+TRUE,grid_emergency_1,00:37:00,event,cta,grid_emergency,5,,,,2|4,,,Grid emergency event
+TRUE,run_normal_4,00:47:00,recovery,cta,run_normal,unknown,,,,0|1,,,Return unit to normal
+TRUE,test_end,00:52:00,recovery,test,end,,,,,,,,End recovery period

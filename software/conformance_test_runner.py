@@ -20,15 +20,18 @@ from typing import IO, Any
 try:
     from .schedule_compiler import compile_cta_schedule
     from .schedule_parser import ScheduleEvent, load_schedule
+    from .xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
     from schedule_compiler import compile_cta_schedule
     from schedule_parser import ScheduleEvent, load_schedule
+    from xlsx_schedule_importer import import_xlsx_schedule
 
 
 SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
 CONFORMANCE_REPOSITORY = SOFTWARE_DIRECTORY.parent
 ROOT_DIRECTORY = CONFORMANCE_REPOSITORY.parent
-DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule.csv"
+DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule_main.xlsx"
+DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule.csv"
 DEFAULT_RESULTS_ROOT = CONFORMANCE_REPOSITORY / "saved_data" / "conformance_runs"
 DEFAULT_CTA_DIRECTORY = ROOT_DIRECTORY / "cta_2045_controller" / "dcs" / "controller"
 DEFAULT_CTA_BINARY = (
@@ -211,6 +214,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--master-schedule", type=Path, default=DEFAULT_MASTER_SCHEDULE
     )
+    parser.add_argument(
+        "--canonical-schedule-output",
+        type=Path,
+        default=DEFAULT_CANONICAL_SCHEDULE,
+        help="CSV generated when --master-schedule is an XLSX workbook",
+    )
     parser.add_argument("--results-root", type=Path, default=DEFAULT_RESULTS_ROOT)
     parser.add_argument("--run-id", type=safe_identifier)
     parser.add_argument("--cta-controller-dir", type=Path, default=DEFAULT_CTA_DIRECTORY)
@@ -278,7 +287,25 @@ def _launch_water_draw(
     )
 
 
-def run_hardware_test(args: argparse.Namespace, events: list[ScheduleEvent]) -> Path:
+def prepare_master_schedule(
+    source: Path,
+    canonical_output: Path,
+) -> Path:
+    """Return a validated canonical CSV, importing XLSX when necessary."""
+    suffix = source.suffix.lower()
+    if suffix == ".xlsx":
+        return import_xlsx_schedule(source, canonical_output)
+    if suffix == ".csv":
+        load_schedule(source)
+        return source
+    raise ValueError("master schedule must be a .xlsx or .csv file")
+
+
+def run_hardware_test(
+    args: argparse.Namespace,
+    events: list[ScheduleEvent],
+    canonical_schedule: Path,
+) -> Path:
     if not sys.platform.startswith("linux"):
         raise RuntimeError("--run-hardware is supported only on the Linux test station")
     if not args.cta_binary.is_file():
@@ -287,7 +314,9 @@ def run_hardware_test(args: argparse.Namespace, events: list[ScheduleEvent]) -> 
         raise ValueError("prestart-seconds must be at least the 15-second CTA lead")
 
     run_directory = _create_run_directory(args.results_root, args.run_id)
-    shutil.copy2(args.master_schedule, run_directory / "master_schedule.csv")
+    if args.master_schedule.suffix.lower() == ".xlsx":
+        shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")
+    shutil.copy2(canonical_schedule, run_directory / "master_schedule.csv")
     start_monotonic = time.monotonic()
     logger = RunEventLogger(run_directory / "orchestrator_events.csv", start_monotonic)
     power: ManagedProcess | None = None
@@ -331,7 +360,7 @@ def run_hardware_test(args: argparse.Namespace, events: list[ScheduleEvent]) -> 
         if args.cta_schedule.exists():
             shutil.copy2(args.cta_schedule, run_directory / "cta_schedule_before_run.csv")
         compile_cta_schedule(
-            args.master_schedule,
+            canonical_schedule,
             test_start=test_start_utc,
             controller_output=args.cta_schedule,
             preview_output=run_directory / "cta_schedule_preview.csv",
@@ -502,13 +531,19 @@ def run_hardware_test(args: argparse.Namespace, events: list[ScheduleEvent]) -> 
 def main() -> int:
     args = build_parser().parse_args()
     try:
-        events = load_schedule(args.master_schedule)
+        canonical_schedule = prepare_master_schedule(
+            args.master_schedule,
+            args.canonical_schedule_output,
+        )
+        events = load_schedule(canonical_schedule)
         summary = schedule_summary(events)
         print("SCHEDULE_VALID " + json.dumps(summary, sort_keys=True))
+        if args.master_schedule.suffix.lower() == ".xlsx":
+            print(f"CANONICAL_SCHEDULE {canonical_schedule}")
         if not args.run_hardware:
             print("Validation only. Pass --run-hardware on the Pi to launch processes.")
             return 0
-        run_directory = run_hardware_test(args, events)
+        run_directory = run_hardware_test(args, events, canonical_schedule)
         print(f"CONFORMANCE_TEST_RESULTS {run_directory}")
         return 0
     except Exception as exc:
