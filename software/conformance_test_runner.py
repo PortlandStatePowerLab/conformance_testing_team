@@ -96,6 +96,111 @@ def schedule_summary(events: list[ScheduleEvent]) -> dict[str, Any]:
     }
 
 
+def clock_text(seconds: float) -> str:
+    """Format a nonnegative duration as HH:MM:SS."""
+    total_seconds = max(0, int(math.ceil(seconds)))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, remaining_seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}"
+
+
+def progress_text(
+    events: list[ScheduleEvent],
+    elapsed_seconds: float,
+    *,
+    status: str = "running",
+    bar_width: int = 20,
+) -> str:
+    """Build one human-readable progress line for a validated schedule."""
+    test_end = next(
+        event
+        for event in events
+        if event.event_type == "test" and event.action == "end"
+    )
+    duration = test_end.offset_seconds
+    effective_elapsed = min(max(elapsed_seconds, 0.0), float(duration))
+    percentage = 100.0 if duration == 0 else effective_elapsed / duration * 100.0
+    completed_cells = min(
+        bar_width,
+        max(0, int(percentage / 100.0 * bar_width)),
+    )
+    bar = "#" * completed_cells + "-" * (bar_width - completed_cells)
+
+    phase = events[0].phase or "unspecified"
+    for event in events:
+        if event.offset_seconds <= elapsed_seconds and event.phase:
+            phase = event.phase
+
+    next_event = next(
+        (event for event in events if event.offset_seconds > elapsed_seconds),
+        None,
+    )
+    if next_event is None:
+        next_text = "none"
+    else:
+        countdown = next_event.offset_seconds - elapsed_seconds
+        next_text = f"{next_event.event_id} in {clock_text(countdown)}"
+
+    fields = [
+        f"[{bar}] {percentage:5.1f}%",
+        f"elapsed {clock_text(effective_elapsed)}",
+        f"remaining {clock_text(duration - effective_elapsed)}",
+        f"phase {phase}",
+        f"next {next_text}",
+        f"status {status}",
+    ]
+    if elapsed_seconds < 0:
+        fields.insert(1, f"starts in {clock_text(-elapsed_seconds)}")
+    return " | ".join(fields)
+
+
+class ProgressReporter:
+    """Render live terminal progress without flooding redirected output."""
+
+    def __init__(
+        self,
+        events: list[ScheduleEvent],
+        *,
+        stream: IO[str] | None = None,
+    ) -> None:
+        self._events = events
+        self._stream = stream or sys.stdout
+        self._interactive = bool(self._stream.isatty())
+        self._minimum_interval = 1.0 if self._interactive else 60.0
+        self._last_update = float("-inf")
+        self._previous_width = 0
+        self._finished = False
+
+    def update(
+        self,
+        elapsed_seconds: float,
+        *,
+        status: str = "running",
+        force: bool = False,
+    ) -> None:
+        now = time.monotonic()
+        if not force and now - self._last_update < self._minimum_interval:
+            return
+        line = progress_text(self._events, elapsed_seconds, status=status)
+        if self._interactive:
+            padded = line.ljust(self._previous_width)
+            self._stream.write("\r" + padded)
+            self._previous_width = len(line)
+        else:
+            self._stream.write(line + "\n")
+        self._stream.flush()
+        self._last_update = now
+
+    def finish(self, elapsed_seconds: float, status: str) -> None:
+        if self._finished:
+            return
+        self.update(elapsed_seconds, status=status, force=True)
+        if self._interactive:
+            self._stream.write("\n")
+            self._stream.flush()
+        self._finished = True
+
+
 class RunEventLogger:
     def __init__(self, path: Path, start_monotonic: float) -> None:
         self._start_monotonic = start_monotonic
@@ -322,6 +427,8 @@ def run_hardware_test(
     power: ManagedProcess | None = None
     controller: ManagedProcess | None = None
     active_draw: ManagedProcess | None = None
+    progress: ProgressReporter | None = None
+    last_elapsed = -args.prestart_seconds
     outcome = "failed"
 
     try:
@@ -404,11 +511,14 @@ def run_hardware_test(
 
         draws = [event for event in events if event.event_type == "water_draw"]
         test_end = next(event for event in events if event.event_type == "test")
+        progress = ProgressReporter(events)
         next_draw_index = 0
         test_started_logged = False
 
         while True:
             elapsed = time.monotonic() - test_start_monotonic
+            last_elapsed = elapsed
+            progress.update(elapsed)
             if not test_started_logged and elapsed >= 0:
                 logger.record("test_started", "ok")
                 test_started_logged = True
@@ -481,6 +591,12 @@ def run_hardware_test(
         )
         raise
     finally:
+        if progress is not None:
+            progress.finish(
+                test_end.offset_seconds if outcome == "completed" else last_elapsed,
+                outcome,
+            )
+
         if active_draw is not None:
             stop_process(
                 active_draw,

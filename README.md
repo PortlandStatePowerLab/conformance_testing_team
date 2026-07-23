@@ -48,6 +48,11 @@ Each hardware run creates a unique directory under
 CTA schedules, controller event and commodity CSVs, power data, water-draw CSVs,
 orchestrator events, and process logs.
 
+During a hardware run, the terminal shows a live one-line progress display with
+percentage complete, elapsed and remaining time, current phase, next scheduled
+event, and final outcome. When standard output is redirected, progress is
+written once per minute instead of once per second.
+
 The runner monitors child processes and stops the test if a required process
 exits unexpectedly or a water draw fails. During shutdown it closes any active
 water draw, sends `z` to return the water heater to normal operation, and stops
