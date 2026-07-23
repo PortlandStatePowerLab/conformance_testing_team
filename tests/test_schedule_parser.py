@@ -4,12 +4,15 @@ import unittest
 from pathlib import Path
 
 from software.schedule_parser import (
-    LONG_DURATION,
     SCHEDULE_COLUMNS,
     ScheduleValidationError,
     encode_event_duration,
     generate_cta_events,
     load_schedule,
+)
+from software.cta_operational_states import (
+    EXPECTED_STATES_BY_ACTION,
+    operational_state_name,
 )
 
 
@@ -20,13 +23,29 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 class DurationEncodingTests(unittest.TestCase):
     def test_special_duration_values(self):
         self.assertEqual(encode_event_duration("unknown").byte_value, 0x00)
-        self.assertEqual(encode_event_duration(LONG_DURATION).byte_value, 0xFF)
 
     def test_finite_duration_rounds_up(self):
-        duration = encode_event_duration("01:30:00")
+        duration = encode_event_duration("90")
         self.assertEqual(duration.byte_value, 52)
         self.assertEqual(duration.requested_seconds, 5400)
         self.assertEqual(duration.represented_seconds, 5408)
+
+    def test_sixty_minutes_encodes_as_byte_43(self):
+        duration = encode_event_duration("60")
+        self.assertEqual(duration.byte_value, 43)
+        self.assertEqual(duration.requested_seconds, 3600)
+        self.assertEqual(duration.represented_seconds, 3698)
+
+    def test_duration_must_be_minutes_or_unknown(self):
+        for invalid in ("01:00:00", "longer_than_representable", "0", "2151"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "1 to 2150"):
+                    encode_event_duration(invalid)
+
+    def test_operational_state_mapping(self):
+        self.assertEqual(operational_state_name(4), "Idle Curtailed")
+        self.assertEqual(EXPECTED_STATES_BY_ACTION["run_normal"], (0, 1))
+        self.assertEqual(EXPECTED_STATES_BY_ACTION["shed"], (2, 4))
 
 
 class MasterScheduleTests(unittest.TestCase):
@@ -42,7 +61,7 @@ class MasterScheduleTests(unittest.TestCase):
         self.assertEqual(first.offset_seconds, -15)
         self.assertEqual(first.command_code, "o")
         load_up = next(event for event in generated if event.event_id == "cta_loadup_1")
-        self.assertEqual(load_up.duration_byte, 0xFF)
+        self.assertEqual(load_up.duration_byte, 15)
 
     def test_overlapping_draws_are_rejected(self):
         rows = [

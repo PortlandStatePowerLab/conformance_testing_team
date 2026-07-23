@@ -22,7 +22,7 @@ SCHEDULE_COLUMNS = (
     "phase",
     "event_type",
     "action",
-    "event_duration",
+    "event_duration_minutes",
     "advanced_duration_minutes",
     "advanced_value",
     "advanced_units",
@@ -50,10 +50,10 @@ EVENT_TYPES = {"cta", "water_draw", "test"}
 TRUE_VALUES = {"true", "yes", "1"}
 FALSE_VALUES = {"false", "no", "0"}
 UNKNOWN_DURATION = "unknown"
-LONG_DURATION = "longer_than_representable"
 OUTSIDE_COMMUNICATION_LEAD_SECONDS = 15
 MAX_FINITE_DURATION_BYTE = 0xFE
 MAX_FINITE_DURATION_SECONDS = 2 * MAX_FINITE_DURATION_BYTE**2
+MAX_EVENT_DURATION_MINUTES = 2150
 
 
 class ScheduleValidationError(ValueError):
@@ -128,22 +128,25 @@ def parse_elapsed_time(value: str) -> int:
 
 
 def encode_event_duration(value: str) -> EncodedDuration:
-    """Encode a human-readable CTA Basic DR duration into one byte."""
+    """Encode whole minutes or ``unknown`` into a CTA Basic DR duration byte."""
     normalized = value.strip().lower()
     if normalized == UNKNOWN_DURATION:
         return EncodedDuration(normalized, 0x00, None, None)
-    if normalized == LONG_DURATION:
-        return EncodedDuration(normalized, 0xFF, None, None)
 
-    requested_seconds = parse_elapsed_time(normalized)
-    if requested_seconds <= 0:
-        raise ValueError("finite event duration must be greater than zero")
-    if requested_seconds > MAX_FINITE_DURATION_SECONDS:
+    try:
+        requested_minutes = int(normalized, 10)
+    except ValueError as exc:
         raise ValueError(
-            f"finite duration exceeds {MAX_FINITE_DURATION_SECONDS} seconds; "
-            f"use '{LONG_DURATION}' if appropriate"
+            "event_duration_minutes must be a whole number from 1 to "
+            f"{MAX_EVENT_DURATION_MINUTES}, or '{UNKNOWN_DURATION}'"
+        ) from exc
+    if not 1 <= requested_minutes <= MAX_EVENT_DURATION_MINUTES:
+        raise ValueError(
+            "event_duration_minutes must be a whole number from 1 to "
+            f"{MAX_EVENT_DURATION_MINUTES}, or '{UNKNOWN_DURATION}'"
         )
 
+    requested_seconds = requested_minutes * 60
     byte_value = math.ceil(math.sqrt(requested_seconds / 2.0))
     if not 1 <= byte_value <= MAX_FINITE_DURATION_BYTE:
         raise ValueError("finite event duration cannot be represented")
@@ -200,7 +203,7 @@ def _parse_expected_states(value: str) -> tuple[int, ...]:
 def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     event_type = row["event_type"].strip().lower()
     action = row["action"].strip().lower()
-    duration_text = row["event_duration"].strip()
+    duration_text = row["event_duration_minutes"].strip()
     advanced_duration_text = row["advanced_duration_minutes"].strip()
     advanced_value_text = row["advanced_value"].strip()
     advanced_units_text = row["advanced_units"].strip().lower()
@@ -225,7 +228,10 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         expected_states = _parse_expected_states(expected_states_text)
         if action == "advanced_load_up":
             if duration_text:
-                raise ValueError("advanced_load_up uses advanced_duration_minutes, not event_duration")
+                raise ValueError(
+                    "advanced_load_up uses advanced_duration_minutes, not "
+                    "event_duration_minutes"
+                )
             if not advanced_duration_text or not advanced_value_text or not advanced_units_text:
                 raise ValueError(
                     "advanced_load_up requires advanced_duration_minutes, advanced_value, and advanced_units"
@@ -243,7 +249,9 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
             advanced_units = ADVANCED_UNIT_CODES[advanced_units_text]
         else:
             if not duration_text:
-                raise ValueError("Basic DR CTA events require event_duration")
+                raise ValueError(
+                    "Basic DR CTA events require event_duration_minutes"
+                )
             if advanced_duration_text or advanced_value_text or advanced_units_text:
                 raise ValueError("Basic DR CTA events cannot contain advanced load-up values")
             duration = encode_event_duration(duration_text)
