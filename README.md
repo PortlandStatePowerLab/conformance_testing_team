@@ -53,6 +53,14 @@ percentage complete, elapsed and remaining time, current phase, next scheduled
 event, and final outcome. When standard output is redirected, progress is
 written once per minute instead of once per second.
 
+Calculated power-monitor values are written with three digits after the decimal
+point. Raw register values are reserved for the diagnostic power-monitor tools
+and are not included in conformance-run `power.csv` files. This keeps shared
+results concise and within spreadsheet precision limits.
+The `timestamp_pacific` field uses the `America/Los_Angeles` timezone and
+includes `-07:00` during PDT or `-08:00` during PST; it does not use a trailing
+UTC `Z`.
+
 The runner monitors child processes and stops the test if a required process
 exits unexpectedly or a water draw fails. During shutdown it closes any active
 water draw, sends `z` to return the water heater to normal operation, and stops

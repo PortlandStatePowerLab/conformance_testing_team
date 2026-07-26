@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 MINIMUM_HEARTBEAT_SECONDS = 60.0
@@ -23,9 +24,10 @@ DEFAULT_CURRENT_CHANGE_AMPS = 0.015
 DEFAULT_POWER_CHANGE_WATTS = 25.0
 DEFAULT_VOLTAGE_CHANGE_VOLTS = 1.0
 DEFAULT_ON_CURRENT_AMPS = 0.1
+PACIFIC_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 CSV_COLUMNS = (
-    "timestamp_utc",
+    "timestamp_pacific",
     "monitor_elapsed_seconds",
     "status",
     "record_reason",
@@ -35,11 +37,6 @@ CSV_COLUMNS = (
     "reactive_power",
     "apparent_power",
     "power_factor",
-    "voltage_rms_raw",
-    "current_rms_raw",
-    "real_power_raw",
-    "reactive_power_raw",
-    "apparent_power_raw",
 )
 
 
@@ -49,6 +46,14 @@ def utc_timestamp() -> str:
         .isoformat(timespec="milliseconds")
         .replace("+00:00", "Z")
     )
+
+
+def pacific_timestamp(value: datetime | None = None) -> str:
+    """Return Pacific civil time with the applicable PDT/PST UTC offset."""
+    current = value or datetime.now(timezone.utc)
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("timestamp must include timezone information")
+    return current.astimezone(PACIFIC_TIMEZONE).isoformat(timespec="milliseconds")
 
 
 def finite_positive(value: str) -> float:
@@ -193,7 +198,7 @@ def _measurement_row(
     row = {column: "" for column in CSV_COLUMNS}
     row.update(
         {
-            "timestamp_utc": utc_timestamp(),
+            "timestamp_pacific": pacific_timestamp(),
             "monitor_elapsed_seconds": f"{elapsed_seconds:.3f}",
             "status": status,
             "record_reason": "|".join(reasons),
@@ -202,7 +207,10 @@ def _measurement_row(
     if measurement is not None:
         for column in CSV_COLUMNS[4:]:
             value = measurement.get(column)
-            row[column] = "" if value is None else value
+            if value is None:
+                row[column] = ""
+            else:
+                row[column] = f"{float(value):.3f}"
     return row
 
 
