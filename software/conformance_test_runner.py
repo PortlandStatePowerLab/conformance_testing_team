@@ -464,8 +464,6 @@ def run_hardware_test(
         test_start_utc = datetime.fromtimestamp(
             math.ceil(proposed_start.timestamp()), tz=timezone.utc
         )
-        if args.cta_schedule.exists():
-            shutil.copy2(args.cta_schedule, run_directory / "cta_schedule_before_run.csv")
         compile_cta_schedule(
             canonical_schedule,
             test_start=test_start_utc,
