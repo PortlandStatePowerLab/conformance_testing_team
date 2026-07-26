@@ -126,3 +126,5 @@ Do_not_add/
 __pycache__/
 secrets/
 power_diagnostics/
+conformance_runs/
+
