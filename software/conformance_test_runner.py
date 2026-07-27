@@ -168,7 +168,6 @@ class ProgressReporter:
         self._interactive = bool(self._stream.isatty())
         self._minimum_interval = 1.0 if self._interactive else 60.0
         self._last_update = float("-inf")
-        self._previous_width = 0
         self._finished = False
 
     def update(
@@ -183,9 +182,12 @@ class ProgressReporter:
             return
         line = progress_text(self._events, elapsed_seconds, status=status)
         if self._interactive:
-            padded = line.ljust(self._previous_width)
-            self._stream.write("\r" + padded)
-            self._previous_width = len(line)
+            terminal_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+            # Leave the final terminal column unused so an exact-width line
+            # cannot wrap when the cursor reaches the right edge.
+            available_width = max(1, terminal_width - 1)
+            fitted = line[:available_width]
+            self._stream.write("\r\x1b[2K" + fitted)
         else:
             self._stream.write(line + "\n")
         self._stream.flush()

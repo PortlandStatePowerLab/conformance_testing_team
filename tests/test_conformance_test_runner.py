@@ -66,6 +66,23 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         self.assertIn("status running", lines[0])
         self.assertIn("status interrupted", lines[1])
 
+    def test_interactive_progress_redraws_one_terminal_line(self):
+        class InteractiveStream(io.StringIO):
+            def isatty(self):
+                return True
+
+        events = load_schedule(MASTER_SCHEDULE)
+        output = InteractiveStream()
+        reporter = ProgressReporter(events, stream=output)
+        reporter.update(0)
+        reporter.update(1, force=True)
+        live_output = output.getvalue()
+        self.assertNotIn("\n", live_output)
+        self.assertEqual(live_output.count("\r\x1b[2K"), 2)
+
+        reporter.finish(2, "completed")
+        self.assertTrue(output.getvalue().endswith("\n"))
+
     def test_clock_text_supports_tests_longer_than_one_day(self):
         self.assertEqual(clock_text(25 * 3600), "25:00:00")
 
