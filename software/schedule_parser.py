@@ -23,7 +23,6 @@ SCHEDULE_COLUMNS = (
     "event_type",
     "action",
     "event_duration_minutes",
-    "advanced_duration_minutes",
     "advanced_value",
     "advanced_units",
     "expected_operational_states",
@@ -204,7 +203,6 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     event_type = row["event_type"].strip().lower()
     action = row["action"].strip().lower()
     duration_text = row["event_duration_minutes"].strip()
-    advanced_duration_text = row["advanced_duration_minutes"].strip()
     advanced_value_text = row["advanced_value"].strip()
     advanced_units_text = row["advanced_units"].strip().lower()
     expected_states_text = row["expected_operational_states"].strip()
@@ -227,17 +225,19 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
             raise ValueError(f"unsupported CTA action '{action}'")
         expected_states = _parse_expected_states(expected_states_text)
         if action == "advanced_load_up":
-            if duration_text:
+            if not duration_text or not advanced_value_text or not advanced_units_text:
                 raise ValueError(
-                    "advanced_load_up uses advanced_duration_minutes, not "
-                    "event_duration_minutes"
+                    "advanced_load_up requires event_duration_minutes, advanced_value, and advanced_units"
                 )
-            if not advanced_duration_text or not advanced_value_text or not advanced_units_text:
-                raise ValueError(
-                    "advanced_load_up requires advanced_duration_minutes, advanced_value, and advanced_units"
+            advanced_duration = (
+                0
+                if duration_text.lower() == UNKNOWN_DURATION
+                else _parse_bounded_integer(
+                    duration_text,
+                    "event_duration_minutes",
+                    1,
+                    MAX_EVENT_DURATION_MINUTES,
                 )
-            advanced_duration = _parse_bounded_integer(
-                advanced_duration_text, "advanced_duration_minutes", 1, 0xFFFF
             )
             advanced_value = _parse_bounded_integer(
                 advanced_value_text, "advanced_value", 1, 0xFFFE
@@ -252,7 +252,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
                 raise ValueError(
                     "Basic DR CTA events require event_duration_minutes"
                 )
-            if advanced_duration_text or advanced_value_text or advanced_units_text:
+            if advanced_value_text or advanced_units_text:
                 raise ValueError("Basic DR CTA events cannot contain advanced load-up values")
             duration = encode_event_duration(duration_text)
         if volume_text or flow_text:
@@ -260,7 +260,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     elif event_type == "water_draw":
         if action != "water_draw":
             raise ValueError("water_draw action must be 'water_draw'")
-        if duration_text or advanced_duration_text or advanced_value_text or advanced_units_text or expected_states_text:
+        if duration_text or advanced_value_text or advanced_units_text or expected_states_text:
             raise ValueError("water draws cannot contain CTA argument or expectation values")
         if not volume_text or not flow_text:
             raise ValueError("water draws require target_volume_gal and expected_flow_gpm")
@@ -269,7 +269,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     else:
         if action != "end":
             raise ValueError("test action must be 'end'")
-        if duration_text or advanced_duration_text or advanced_value_text or advanced_units_text or expected_states_text or volume_text or flow_text:
+        if duration_text or advanced_value_text or advanced_units_text or expected_states_text or volume_text or flow_text:
             raise ValueError("test end cannot contain CTA or water-draw values")
 
     event_id = row["event_id"].strip()

@@ -21,6 +21,19 @@ Validate the schedule without accessing hardware:
 python3 software/conformance_test_runner.py
 ```
 
+The repository Makefile provides shorter equivalents:
+
+```bash
+make help
+make test
+make validate
+make run
+make run-water
+```
+
+Use `make run` for hardware tests without water draws. `make run-water`
+explicitly enables scheduled valve output.
+
 To import the workbook without invoking the runner:
 
 ```bash

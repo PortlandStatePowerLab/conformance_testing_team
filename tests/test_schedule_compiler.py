@@ -55,8 +55,8 @@ class ScheduleCompilerTests(unittest.TestCase):
 
     def test_advanced_load_up_is_compiled_with_all_three_arguments(self):
         rows = [
-            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "", "60", "5", "100_wh", "3|6", "", "", ""],
-            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", ""],
+            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:
             output_directory = Path(directory)

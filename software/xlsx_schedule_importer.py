@@ -211,9 +211,6 @@ def workbook_rows(
             "event_duration_minutes": _plain_number(
                 raw["event_duration_minutes"]
             ).lower(),
-            "advanced_duration_minutes": _plain_number(
-                raw["advanced_duration_minutes"]
-            ),
             "advanced_value": _plain_number(raw["advanced_value"]),
             "advanced_units": raw["advanced_units"].strip().lower(),
             "expected_operational_states": "|".join(
@@ -252,7 +249,11 @@ def import_xlsx_schedule(
             delete=False,
         ) as handle:
             temporary_path = Path(handle.name)
-            writer = csv.DictWriter(handle, fieldnames=SCHEDULE_COLUMNS)
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=SCHEDULE_COLUMNS,
+                lineterminator="\n",
+            )
             writer.writeheader()
             writer.writerows(rows)
         load_schedule(temporary_path)

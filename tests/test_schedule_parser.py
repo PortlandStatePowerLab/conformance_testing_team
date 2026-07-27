@@ -65,9 +65,9 @@ class MasterScheduleTests(unittest.TestCase):
 
     def test_overlapping_draws_are_rejected(self):
         rows = [
-            ["true", "water_draw_1", "00:00:00", "event", "water_draw", "water_draw", "", "", "", "", "", "15", "3", ""],
-            ["true", "water_draw_2", "00:04:00", "event", "water_draw", "water_draw", "", "", "", "", "", "1", "3", ""],
-            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+            ["true", "water_draw_1", "00:00:00", "event", "water_draw", "water_draw", "", "", "", "", "15", "3", ""],
+            ["true", "water_draw_2", "00:04:00", "event", "water_draw", "water_draw", "", "", "", "", "1", "3", ""],
+            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "schedule.csv"
@@ -80,8 +80,8 @@ class MasterScheduleTests(unittest.TestCase):
 
     def test_advanced_load_up_arguments_are_parsed(self):
         rows = [
-            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "", "60", "5", "100_wh", "3|6", "", "", ""],
-            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", ""],
+            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "schedule.csv"
@@ -94,6 +94,20 @@ class MasterScheduleTests(unittest.TestCase):
         self.assertEqual(event.advanced_value, 5)
         self.assertEqual(event.advanced_units, 0x02)
         self.assertEqual(event.expected_operational_states, (3, 6))
+
+    def test_advanced_load_up_unknown_duration_uses_zero(self):
+        rows = [
+            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "unknown", "5", "100_wh", "3|6", "", "", ""],
+            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            event = load_schedule(path)[0]
+        self.assertEqual(event.advanced_duration_minutes, 0)
 
     def test_empty_trailing_spreadsheet_column_is_accepted(self):
         expected_count = len(load_schedule(MASTER_SCHEDULE))
