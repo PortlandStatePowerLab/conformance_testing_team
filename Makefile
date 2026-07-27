@@ -1,8 +1,7 @@
 PYTHON ?= python3
-BUILD_DIR := ~/cta_2045_controller/dcs/build/debug
-PROGRAM := $(BUILD_DIR)/cta2045_controller
+CTA_DCS_DIR ?= $(HOME)/cta_2045_controller/dcs
 
-.PHONY: help test validate run run-water build_cta test_cta
+.PHONY: help test validate run run-water build_cta schedule_cta run_cta test_cta clean_cta clean
 
 help:
 	@echo "Water-heater conformance test commands:"
@@ -10,6 +9,11 @@ help:
 	@echo "  make validate   Import and validate the XLSX schedule without hardware"
 	@echo "  make run        Run the hardware test without scheduled valve output"
 	@echo "  make run-water  Run the hardware test with scheduled valve output enabled"
+	@echo "  make build_cta  Build the CTA-2045 controller"
+	@echo "  make schedule_cta  Create the controller's standalone test schedule"
+	@echo "  make run_cta    Build and run the CTA-2045 controller"
+	@echo "  make test_cta   Build and run the controller's standalone test"
+	@echo "  make clean_cta  Remove the CTA-2045 controller build directory"
 
 test:
 	$(PYTHON) -m unittest discover -s tests -v
@@ -24,12 +28,18 @@ run-water:
 	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output
 
 build_cta:
-	cmake -S . -B $(BUILD_DIR) -DCONTROLLER=ON -DCMAKE_BUILD_TYPE=Debug
-	cmake --build $(BUILD_DIR) --target cta2045_controller
+	$(MAKE) -C $(CTA_DCS_DIR) controller
 
-test_cta: controller
-	bash controller/create_schedule.sh
-	cd controller && ../$(PROGRAM)
+schedule_cta:
+	$(MAKE) -C $(CTA_DCS_DIR) schedule
 
-clean:
-	cmake -E remove_directory $(BUILD_DIR)
+run_cta:
+	$(MAKE) -C $(CTA_DCS_DIR) run
+
+test_cta:
+	$(MAKE) -C $(CTA_DCS_DIR) test
+
+clean_cta:
+	$(MAKE) -C $(CTA_DCS_DIR) clean
+
+clean: clean_cta
