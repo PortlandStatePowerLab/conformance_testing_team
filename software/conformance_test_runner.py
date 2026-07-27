@@ -479,6 +479,9 @@ def run_hardware_test(
             {
                 "CTA_EVENT_LOG_PATH": str(run_directory / "cta_events.csv"),
                 "CTA_COMMODITY_LOG_PATH": str(run_directory / "cta_commodity.csv"),
+                "CTA_DEVICE_INFO_LOG_PATH": str(
+                    run_directory / "cta_device_information.csv"
+                ),
             }
         )
         controller = start_process(
