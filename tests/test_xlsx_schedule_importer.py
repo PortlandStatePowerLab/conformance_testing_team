@@ -21,11 +21,16 @@ class XlsxScheduleImporterTests(unittest.TestCase):
         self.assertEqual(rows[-1]["event_type"], "test")
 
     def test_generated_csv_passes_schedule_validation(self):
+        rows = workbook_rows(WORKBOOK)
+        expected_enabled_events = sum(
+            row["enabled"].strip().lower() in {"true", "1", "yes", "y"}
+            for row in rows
+        )
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "canonical.csv"
             import_xlsx_schedule(WORKBOOK, destination)
             events = load_schedule(destination)
-        self.assertEqual(len(events), 9)
+        self.assertEqual(len(events), expected_enabled_events)
         self.assertEqual(events[-1].event_id, "test_end")
 
 
