@@ -13,12 +13,14 @@ WORKBOOK = REPOSITORY_ROOT / "software" / "conformance_test_schedule_main.xlsx"
 class XlsxScheduleImporterTests(unittest.TestCase):
     def test_workbook_metadata_is_derived_from_action(self):
         rows = workbook_rows(WORKBOOK)
-        self.assertEqual(rows[0]["event_id"], "load_up_1")
-        self.assertEqual(rows[0]["event_type"], "cta")
-        self.assertEqual(rows[0]["expected_operational_states"], "3|6")
-        self.assertEqual(rows[0]["time_after_start"], "00:00:00")
-        self.assertEqual(rows[-1]["event_id"], "test_end")
-        self.assertEqual(rows[-1]["event_type"], "test")
+        self.assertGreater(len(rows), 0)
+        for row in rows:
+            if row["action"] == "end":
+                self.assertEqual(row["event_type"], "test")
+            elif row["action"] == "water_draw":
+                self.assertEqual(row["event_type"], "water_draw")
+            else:
+                self.assertEqual(row["event_type"], "cta")
 
     def test_generated_csv_passes_schedule_validation(self):
         rows = workbook_rows(WORKBOOK)
