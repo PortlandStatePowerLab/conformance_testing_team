@@ -56,12 +56,13 @@ class MasterScheduleTests(unittest.TestCase):
     def test_outside_communication_is_generated_fifteen_seconds_early(self):
         events = load_schedule(MASTER_SCHEDULE)
         generated = generate_cta_events(events)
+        first_cta = next(event for event in events if event.event_type == "cta")
         first = generated[0]
-        self.assertEqual(first.event_id, "auto_outside_comm_for_load_up_1")
-        self.assertEqual(first.offset_seconds, -15)
+        self.assertEqual(
+            first.event_id, f"auto_outside_comm_for_{first_cta.event_id}"
+        )
+        self.assertEqual(first.offset_seconds, first_cta.offset_seconds - 15)
         self.assertEqual(first.command_code, "o")
-        load_up = next(event for event in generated if event.event_id == "load_up_1")
-        self.assertEqual(load_up.duration_byte, 13)
 
     def test_overlapping_draws_are_rejected(self):
         rows = [

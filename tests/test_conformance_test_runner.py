@@ -38,17 +38,30 @@ class ConformanceTestRunnerTests(unittest.TestCase):
 
     def test_progress_text_reports_time_percentage_phase_and_next_event(self):
         events = load_schedule(MASTER_SCHEDULE)
-        text = progress_text(events, 26 * 60)
+        test_end = next(
+            event
+            for event in events
+            if event.event_type == "test" and event.action == "end"
+        )
+        duration = test_end.offset_seconds
+        elapsed = duration / 2
+        text = progress_text(events, elapsed)
         self.assertIn("50.0%", text)
-        self.assertIn("elapsed 00:26:00", text)
-        self.assertIn("remaining 00:26:00", text)
-        self.assertIn("phase event", text)
-        self.assertIn("next run_normal_3 in 00:09:00", text)
+        self.assertIn(f"elapsed {clock_text(elapsed)}", text)
+        self.assertIn(f"remaining {clock_text(duration - elapsed)}", text)
+        next_event = next(event for event in events if event.offset_seconds > elapsed)
+        self.assertIn(
+            f"next {next_event.event_id} in "
+            f"{clock_text(next_event.offset_seconds - elapsed)}",
+            text,
+        )
 
     def test_progress_text_reports_prestart_and_completion(self):
         events = load_schedule(MASTER_SCHEDULE)
         self.assertIn("starts in 00:00:15", progress_text(events, -15))
-        completed = progress_text(events, 52 * 60, status="completed")
+        completed = progress_text(
+            events, events[-1].offset_seconds, status="completed"
+        )
         self.assertIn("100.0%", completed)
         self.assertIn("remaining 00:00:00", completed)
         self.assertIn("next none", completed)

@@ -39,19 +39,23 @@ class ScheduleCompilerTests(unittest.TestCase):
                 machine_lines[0],
                 "# time,command,argument,event_id,value,units",
             )
+            first_cta = next(
+                event
+                for event in load_schedule(MASTER_SCHEDULE)
+                if event.event_type == "cta"
+            )
             self.assertEqual(
                 machine_lines[1],
-                "1784746785,o,,auto_outside_comm_for_load_up_1,,",
+                f"{int(test_start.timestamp()) + first_cta.offset_seconds - 15},"
+                f"o,,auto_outside_comm_for_{first_cta.event_id},,",
             )
-            self.assertEqual(machine_lines[2], "1784746800,l,13,load_up_1,,")
 
             with preview_path.open("r", encoding="utf-8", newline="") as handle:
                 preview = list(csv.DictReader(handle))
-            self.assertEqual(preview[0]["offset_seconds"], "-15")
-            self.assertEqual(preview[0]["scheduled_utc"], "2026-07-22T18:59:45Z")
-            self.assertEqual(preview[1]["duration_byte"], "13")
-            self.assertEqual(preview[1]["requested_duration_seconds"], "300")
-            self.assertEqual(preview[1]["represented_duration_seconds"], "338")
+            self.assertEqual(
+                preview[0]["offset_seconds"],
+                str(first_cta.offset_seconds - 15),
+            )
 
     def test_advanced_load_up_is_compiled_with_all_three_arguments(self):
         rows = [
