@@ -19,7 +19,7 @@ import time
 from typing import TYPE_CHECKING
 
 # Physical station connection for the installed MAX1238.
-from software.common.hardware_map import (
+from software.station.station_hardware_map import (
     MAX1238_I2C_ADDR,
     MAX1238_I2C_BUS,
 )
@@ -27,7 +27,7 @@ from software.common.hardware_map import (
 if TYPE_CHECKING:
     # Imported only by static type checkers. The real hardware import remains inside the
     # build_max1238() function, so this module can be imported on Windows.
-    from software.adc.max1238 import Max1238
+    from software.adc.max1238_driver import Max1238
 
 # endregion Imports
 
@@ -80,7 +80,7 @@ def build_max1238(
         GPIO, actuate the valve, or access the ACS37800.
     """
     # Keeps the Linux-only hardware dependency out of Windows import paths.
-    from software.adc.max1238 import (
+    from software.adc.max1238_driver import (
         ClockType,
         Max1238,
         Polarity,

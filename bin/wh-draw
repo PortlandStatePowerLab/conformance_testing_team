@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
-
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-
 cd "${REPOSITORY_ROOT}"
-exec python3 -m software.commands.check_adc_raw_command "$@"
+exec python3 -m software.commands.run_water_draw_command "$@"
