@@ -157,6 +157,9 @@ def progress_text(
 class ProgressReporter:
     """Render live terminal progress without flooding redirected output."""
 
+    _GREEN = "\x1b[32m"
+    _RESET_COLOR = "\x1b[0m"
+
     def __init__(
         self,
         events: list[ScheduleEvent],
@@ -187,7 +190,9 @@ class ProgressReporter:
             # cannot wrap when the cursor reaches the right edge.
             available_width = max(1, terminal_width - 1)
             fitted = line[:available_width]
-            self._stream.write("\r\x1b[2K" + fitted)
+            self._stream.write(
+                "\r\x1b[2K" + self._GREEN + fitted + self._RESET_COLOR
+            )
         else:
             self._stream.write(line + "\n")
         self._stream.flush()

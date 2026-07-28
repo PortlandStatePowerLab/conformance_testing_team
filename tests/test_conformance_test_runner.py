@@ -79,6 +79,8 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         live_output = output.getvalue()
         self.assertNotIn("\n", live_output)
         self.assertEqual(live_output.count("\r\x1b[2K"), 2)
+        self.assertEqual(live_output.count("\x1b[32m"), 2)
+        self.assertEqual(live_output.count("\x1b[0m"), 2)
 
         reporter.finish(2, "completed")
         self.assertTrue(output.getvalue().endswith("\n"))
