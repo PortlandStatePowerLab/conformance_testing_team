@@ -12,15 +12,17 @@ from pathlib import Path
 from typing import Iterable
 
 try:
+    from .pacific_time import pacific_datetime
     from .schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 except ImportError:
+    from pacific_time import pacific_datetime
     from schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 
 
 MACHINE_COLUMNS = ("time", "command", "argument", "event_id", "value", "units")
 PREVIEW_COLUMNS = (
     "event_id",
-    "scheduled_utc",
+    "scheduled_pacific",
     "offset_seconds",
     "action",
     "command_code",
@@ -135,8 +137,8 @@ def compile_cta_schedule(
         preview_rows.append(
             {
                 "event_id": event.event_id,
-                "scheduled_utc": scheduled.isoformat(timespec="seconds").replace(
-                    "+00:00", "Z"
+                "scheduled_pacific": pacific_datetime(scheduled).isoformat(
+                    timespec="seconds"
                 ),
                 "offset_seconds": event.offset_seconds,
                 "action": event.action,

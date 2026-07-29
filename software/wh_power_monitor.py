@@ -11,10 +11,18 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from software.pacific_time import (
+    PACIFIC_TIMEZONE,
+    pacific_filename_timestamp,
+    pacific_timestamp,
+)
 
 
 MINIMUM_HEARTBEAT_SECONDS = 60.0
@@ -24,8 +32,6 @@ DEFAULT_CURRENT_CHANGE_AMPS = 0.015
 DEFAULT_POWER_CHANGE_WATTS = 25.0
 DEFAULT_VOLTAGE_CHANGE_VOLTS = 1.0
 DEFAULT_ON_CURRENT_AMPS = 0.1
-PACIFIC_TIMEZONE = ZoneInfo("America/Los_Angeles")
-
 CSV_COLUMNS = (
     "timestamp_pacific",
     "monitor_elapsed_seconds",
@@ -38,22 +44,6 @@ CSV_COLUMNS = (
     "apparent_power",
     "power_factor",
 )
-
-
-def utc_timestamp() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
-
-
-def pacific_timestamp(value: datetime | None = None) -> str:
-    """Return Pacific civil time with the applicable PDT/PST UTC offset."""
-    current = value or datetime.now(timezone.utc)
-    if current.tzinfo is None or current.utcoffset() is None:
-        raise ValueError("timestamp must include timezone information")
-    return current.astimezone(PACIFIC_TIMEZONE).isoformat(timespec="milliseconds")
 
 
 def finite_positive(value: str) -> float:
@@ -184,7 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _default_output_path() -> Path:
     repository_root = Path(__file__).resolve().parents[1]
-    filename = datetime.now(timezone.utc).strftime("power_data_%Y_%m_%d_%H%M%SZ.csv")
+    filename = f"power_data_{pacific_filename_timestamp()}.csv"
     return repository_root / "saved_data" / filename
 
 
@@ -258,7 +248,12 @@ def run_monitor(args: argparse.Namespace, stop_event: threading.Event) -> int:
 
         print(
             "POWER_MONITOR_READY "
-            + json.dumps({"output_csv": str(output_path), "timestamp_utc": utc_timestamp()}),
+            + json.dumps(
+                {
+                    "output_csv": str(output_path),
+                    "timestamp_pacific": pacific_timestamp(),
+                }
+            ),
             flush=True,
         )
 
@@ -316,7 +311,7 @@ def run_monitor(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     "POWER_MONITOR_RECORD "
                     + json.dumps(
                         {
-                            "timestamp_utc": utc_timestamp(),
+                            "timestamp_pacific": pacific_timestamp(),
                             "status": status,
                             "reasons": reasons,
                         }
@@ -328,7 +323,12 @@ def run_monitor(args: argparse.Namespace, stop_event: threading.Event) -> int:
 
     print(
         "POWER_MONITOR_STOPPED "
-        + json.dumps({"output_csv": str(output_path), "timestamp_utc": utc_timestamp()}),
+        + json.dumps(
+            {
+                "output_csv": str(output_path),
+                "timestamp_pacific": pacific_timestamp(),
+            }
+        ),
         flush=True,
     )
     return 0

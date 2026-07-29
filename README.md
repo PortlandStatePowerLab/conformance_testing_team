@@ -74,6 +74,10 @@ Each hardware run creates a unique directory under
 `saved_data/conformance_runs/`. It contains the archived master and generated
 CTA schedules, controller event and commodity CSVs, power data, water-draw CSVs,
 orchestrator events, and process logs.
+Automatic run-directory names and all human-readable recorded timestamps use
+Pacific civil time. ISO-8601 fields include `-07:00` during PDT or `-08:00`
+during PST; directory and automatic file names include the `PDT` or `PST`
+designation.
 
 During a hardware run, the terminal shows a live one-line progress display with
 percentage complete, elapsed and remaining time, current phase, next scheduled

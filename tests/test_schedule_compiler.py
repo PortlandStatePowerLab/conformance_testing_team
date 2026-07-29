@@ -56,6 +56,10 @@ class ScheduleCompilerTests(unittest.TestCase):
                 preview[0]["offset_seconds"],
                 str(first_cta.offset_seconds - 15),
             )
+            self.assertEqual(
+                preview[0]["scheduled_pacific"],
+                "2026-07-22T11:59:45-07:00",
+            )
 
     def test_advanced_load_up_is_compiled_with_all_three_arguments(self):
         rows = [

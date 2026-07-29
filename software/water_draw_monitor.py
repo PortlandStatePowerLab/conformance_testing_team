@@ -11,7 +11,6 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +19,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from software.adc.max1238_builder import build_max1238
+from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
 from software.sensors.sensor_reader import SensorReader
 from software.station.station_hardware_map import VALVE_PIN
 from software.valve.gpio_valve_builder import build_gpio_valve
@@ -38,7 +38,7 @@ EXIT_TERMINATED = 5
 
 CSV_COLUMNS = (
     "event_id",
-    "timestamp_utc",
+    "timestamp_pacific",
     "draw_elapsed_seconds",
     "status",
     "stop_reason",
@@ -57,14 +57,6 @@ CSV_COLUMNS = (
     "flow_raw_counts",
     "ambient_raw_counts",
 )
-
-
-def utc_timestamp() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
 
 
 def positive_float(value: str) -> float:
@@ -131,7 +123,7 @@ def default_output_path(event_id: str, directory: Path) -> Path:
         character if character.isalnum() or character in "-_" else "_"
         for character in event_id
     )
-    timestamp = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H%M%SZ")
+    timestamp = pacific_filename_timestamp()
     return directory / f"water_draw_{safe_event_id}_{timestamp}.csv"
 
 
@@ -154,7 +146,7 @@ def _row(
     row.update(
         {
             "event_id": event_id,
-            "timestamp_utc": utc_timestamp(),
+            "timestamp_pacific": pacific_timestamp(),
             "draw_elapsed_seconds": f"{elapsed_seconds:.3f}",
             "status": status,
             "stop_reason": stop_reason,
@@ -231,7 +223,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     {
                         "event_id": args.event_id,
                         "output_csv": str(output_path),
-                        "timestamp_utc": utc_timestamp(),
+                        "timestamp_pacific": pacific_timestamp(),
                     }
                 ),
                 flush=True,
@@ -241,7 +233,10 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
             print(
                 "WATER_DRAW_VALVE_OPEN "
                 + json.dumps(
-                    {"event_id": args.event_id, "timestamp_utc": utc_timestamp()}
+                    {
+                        "event_id": args.event_id,
+                        "timestamp_pacific": pacific_timestamp(),
+                    }
                 ),
                 flush=True,
             )
@@ -337,7 +332,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                 + json.dumps(
                     {
                         "event_id": args.event_id,
-                        "timestamp_utc": utc_timestamp(),
+                        "timestamp_pacific": pacific_timestamp(),
                         "stop_reason": stop_reason,
                         "volume_gal": volume_gal,
                         "exit_code": exit_code,

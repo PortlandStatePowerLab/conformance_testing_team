@@ -34,6 +34,8 @@ except ImportError:
     from sensors.sensor_configuration_loader import load_sensor_configuration
     from xlsx_schedule_importer import import_xlsx_schedule
 
+from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
+
 
 SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
 CONFORMANCE_REPOSITORY = SOFTWARE_DIRECTORY.parent
@@ -54,7 +56,7 @@ DEFAULT_CTA_SCHEDULE = DEFAULT_CTA_DIRECTORY / "schedule.csv"
 DEFAULT_PRESTART_SECONDS = 15.0
 
 RUN_EVENT_COLUMNS = (
-    "timestamp_utc",
+    "timestamp_pacific",
     "test_elapsed_seconds",
     "event_id",
     "event",
@@ -65,12 +67,6 @@ RUN_EVENT_COLUMNS = (
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def utc_text(value: datetime | None = None) -> str:
-    return (value or utc_now()).isoformat(timespec="milliseconds").replace(
-        "+00:00", "Z"
-    )
 
 
 def finite_positive(value: str) -> float:
@@ -234,7 +230,7 @@ class RunEventLogger:
     ) -> None:
         self._writer.writerow(
             {
-                "timestamp_utc": utc_text(),
+                "timestamp_pacific": pacific_timestamp(),
                 "test_elapsed_seconds": f"{time.monotonic() - self._start_monotonic:.3f}",
                 "event_id": event_id,
                 "event": event,
@@ -381,7 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _create_run_directory(results_root: Path, requested_id: str | None) -> Path:
-    run_id = requested_id or utc_now().strftime("run_%Y_%m_%d_%H%M%SZ")
+    run_id = requested_id or f"run_{pacific_filename_timestamp()}"
     run_directory = (results_root / run_id).resolve()
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
@@ -512,6 +508,7 @@ def run_hardware_test(
         controller_environment = os.environ.copy()
         controller_environment.update(
             {
+                "TZ": "America/Los_Angeles",
                 "CTA_EVENT_LOG_PATH": str(run_directory / "cta_events.csv"),
                 "CTA_COMMODITY_LOG_PATH": str(run_directory / "cta_commodity.csv"),
                 "CTA_DEVICE_INFO_LOG_PATH": str(
@@ -544,7 +541,9 @@ def run_hardware_test(
         logger.record(
             "test_start_scheduled",
             "pending",
-            details={"test_start_utc": utc_text(test_start_utc)},
+            details={
+                "test_start_pacific": pacific_timestamp(test_start_utc)
+            },
         )
 
         draws = [event for event in events if event.event_type == "water_draw"]
