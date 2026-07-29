@@ -92,6 +92,7 @@ dmypy.json
 # Pytest
 # =========================
 .pytest_cache/
+.ruff_cache/
 
 # =========================
 # Logs
@@ -128,3 +129,20 @@ secrets/
 power_diagnostics/
 conformance_runs/
 
+# =========================
+# Generated runtime outputs
+# =========================
+runtime_logs/*
+!runtime_logs/README.md
+
+measurement_data/generated/*
+!measurement_data/generated/README.md
+
+measurement_data/raw/*
+!measurement_data/raw/README.md
+
+measurement_data/combined/*
+!measurement_data/combined/README.md
+
+generated_results/*
+!generated_results/README.md
