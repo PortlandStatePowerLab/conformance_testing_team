@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from typing import Protocol
 
+from software.exception_notes import add_exception_note
 from software.sensors.sensor_reader import SensorSnapshot
 from software.valve.valve_interface import Valve
 
@@ -103,7 +104,8 @@ def run_controlled_water_draw(
         except BaseException as close_error:
             if workflow_error is None:
                 raise
-            workflow_error.add_note(
+            add_exception_note(
+                workflow_error,
                 f"Valve close also failed: {close_error!r}"
             )
 

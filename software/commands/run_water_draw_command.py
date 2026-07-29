@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from software.cold_water.station_sensor_source import (
     build_station_sensor_session,
 )
+from software.exception_notes import add_exception_note
 from software.runtime.controlled_water_draw_workflow import (
     MAX_RUN_MINUTES,
     run_controlled_water_draw,
@@ -53,7 +54,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if cleanup_error is None:
                 cleanup_error = valve_cleanup_error
             else:
-                cleanup_error.add_note(
+                add_exception_note(
+                    cleanup_error,
                     f"Valve cleanup also failed: {valve_cleanup_error!r}"
                 )
 
@@ -63,7 +65,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if cleanup_error is None:
                 cleanup_error = sensor_close_error
             else:
-                cleanup_error.add_note(
+                add_exception_note(
+                    cleanup_error,
                     f"Sensor session cleanup also failed: {sensor_close_error!r}"
                 )
 

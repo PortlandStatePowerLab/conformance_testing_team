@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from types import ModuleType
 
+from software.exception_notes import add_exception_note
+
 
 class GpioValveDriver:
     """Drive one valve-relay GPIO and safely manage its lifecycle"""
@@ -61,7 +63,8 @@ class GpioValveDriver:
         except BaseException as cleanup_error:
             if close_error is None:
                 raise
-            close_error.add_note(
+            add_exception_note(
+                close_error,
                 f"GPIO pin cleanup also failed: {cleanup_error!r}"
             )
             raise close_error from cleanup_error

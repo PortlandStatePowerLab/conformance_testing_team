@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
+from software.exception_notes import add_exception_note
 from software.valve.gpio_valve_builder import build_gpio_valve
 from software.valve.valve_diagnostic import MAX_PULSE_SECONDS, run_valve_diagnostic
 
@@ -39,7 +40,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             except BaseException as cleanup_error:
                 if diagnostic_error is None:
                     raise
-                diagnostic_error.add_note(
+                add_exception_note(
+                    diagnostic_error,
                     f"Valve cleanup also failed: {cleanup_error!r}"
                 )
     return 0

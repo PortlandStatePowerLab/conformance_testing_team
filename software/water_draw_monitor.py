@@ -22,6 +22,7 @@ from software.cold_water.client import DEFAULT_SOCKET_PATH
 from software.cold_water.station_sensor_source import (
     build_station_sensor_session,
 )
+from software.exception_notes import add_exception_note
 from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
 from software.station.station_hardware_map import VALVE_PIN
 from software.valve.gpio_valve_builder import build_gpio_valve
@@ -331,7 +332,8 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     if cleanup_error is None:
                         cleanup_error = error
                     else:
-                        cleanup_error.add_note(
+                        add_exception_note(
+                            cleanup_error,
                             f"Sensor session cleanup also failed: {error!r}"
                         )
 

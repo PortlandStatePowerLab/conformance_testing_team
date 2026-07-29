@@ -16,6 +16,7 @@ from software.cold_water.client import (
     SnapshotClient,
     SshSnapshotClient,
 )
+from software.exception_notes import add_exception_note
 from software.sensors.sensor_reader import SensorReader, SensorSnapshot
 from software.station.station_identity import station_number
 
@@ -71,7 +72,9 @@ class StationSensorSession:
                 if first_error is None:
                     first_error = error
                 else:
-                    first_error.add_note(f"ADC close also failed: {error!r}")
+                    add_exception_note(
+                        first_error, f"ADC close also failed: {error!r}"
+                    )
         if first_error is not None:
             raise first_error
 

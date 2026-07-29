@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
+from software.exception_notes import add_exception_note
 from software.station.station_hardware_map import VALVE_PIN
 from software.valve.valve_interface import Valve
 
@@ -42,6 +43,7 @@ def run_valve_diagnostic(
         except BaseException as close_error:
             if diagnostic_error is None:
                 raise
-            diagnostic_error.add_note(
+            add_exception_note(
+                diagnostic_error,
                 f"Valve close also failed: {close_error!r}"
             )

@@ -1,5 +1,7 @@
 """Laptop-safe tests for the controlled water-draw workflow."""
 
+from __future__ import annotations
+
 import unittest
 from software.sensors.sensor_reader import SensorSnapshot
 
