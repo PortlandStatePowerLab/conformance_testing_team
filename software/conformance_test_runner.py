@@ -17,13 +17,21 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import IO, Any
 
+# Preserve the documented direct-script launch while allowing package imports.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 try:
     from .schedule_compiler import compile_cta_schedule
     from .schedule_parser import ScheduleEvent, load_schedule
+    from .sensors.sensor_configuration_loader import (
+        load_sensor_conversion_config,
+    )
     from .xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
     from schedule_compiler import compile_cta_schedule
     from schedule_parser import ScheduleEvent, load_schedule
+    from sensors.sensor_configuration_loader import load_sensor_conversion_config
     from xlsx_schedule_importer import import_xlsx_schedule
 
 
@@ -338,6 +346,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cta-binary", type=Path, default=DEFAULT_CTA_BINARY)
     parser.add_argument("--cta-schedule", type=Path, default=DEFAULT_CTA_SCHEDULE)
     parser.add_argument(
+        "--sensor-calibration",
+        type=Path,
+        help=(
+            "water-sensor calibration JSON containing electrical and/or "
+            "sensor_ranges overrides; nominal values are used when omitted"
+        ),
+    )
+    parser.add_argument(
         "--prestart-seconds",
         type=finite_positive,
         default=DEFAULT_PRESTART_SECONDS,
@@ -374,6 +390,7 @@ def _launch_water_draw(
     run_directory: Path,
     *,
     enable_output: bool,
+    sensor_calibration: Path | None,
 ) -> ManagedProcess:
     output_csv = run_directory / f"{event.event_id}.csv"
     command = [
@@ -389,6 +406,8 @@ def _launch_water_draw(
         "--sample-interval-seconds",
         "0.5",
     ]
+    if sensor_calibration is not None:
+        command.extend(["--sensor-calibration", str(sensor_calibration)])
     if enable_output:
         command.append("--enable-output")
     return start_process(
@@ -425,11 +444,17 @@ def run_hardware_test(
         raise FileNotFoundError(f"CTA controller binary not found: {args.cta_binary}")
     if args.prestart_seconds < 15.0:
         raise ValueError("prestart-seconds must be at least the 15-second CTA lead")
+    if args.sensor_calibration is not None:
+        load_sensor_conversion_config(args.sensor_calibration)
 
     run_directory = _create_run_directory(args.results_root, args.run_id)
     if args.master_schedule.suffix.lower() == ".xlsx":
         shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")
     shutil.copy2(canonical_schedule, run_directory / "master_schedule.csv")
+    archived_sensor_calibration: Path | None = None
+    if args.sensor_calibration is not None:
+        archived_sensor_calibration = run_directory / "sensor_calibration.json"
+        shutil.copy2(args.sensor_calibration, archived_sensor_calibration)
     start_monotonic = time.monotonic()
     logger = RunEventLogger(run_directory / "orchestrator_events.csv", start_monotonic)
     power: ManagedProcess | None = None
@@ -572,6 +597,7 @@ def run_hardware_test(
                     event,
                     run_directory,
                     enable_output=args.enable_water_output,
+                    sensor_calibration=archived_sensor_calibration,
                 )
                 logger.record(
                     "water_draw_started",

@@ -15,14 +15,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-try:
-    from .helpers.hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS
-    from .station.station_hardware_map import VALVE_PIN
-    from .valve.gpio_valve_builder import build_gpio_valve
-except ImportError:
-    from helpers.hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS
-    from station.station_hardware_map import VALVE_PIN
-    from valve.gpio_valve_builder import build_gpio_valve
+# Preserve direct-script execution in addition to the scheduler's module launch.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from software.adc.max1238_builder import build_max1238
+from software.sensors.sensor_reader import SensorReader
+from software.station.station_hardware_map import VALVE_PIN
+from software.valve.gpio_valve_builder import build_gpio_valve
 
 
 DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.5
@@ -199,14 +199,6 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
             )
             return EXIT_SUCCESS
 
-        # Hardware construction occurs only after explicit output authorization.
-        try:
-            from .helpers.max1238_adc import Max1238Adc
-            from .helpers.water_sensor_reader import WaterSensorReader
-        except ImportError:
-            from helpers.max1238_adc import Max1238Adc
-            from helpers.water_sensor_reader import WaterSensorReader
-
         adc = None
         valve = None
         volume_gal = 0.0
@@ -220,12 +212,8 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
         try:
             valve = build_gpio_valve()
 
-            adc = Max1238Adc(
-                address=MAX1238_I2C_ADDR,
-                bus_number=MAX1238_I2C_BUS,
-            )
-            adc.setup()
-            sensor_reader = WaterSensorReader(
+            adc = build_max1238()
+            sensor_reader = SensorReader(
                 adc, calibration_path=args.sensor_calibration
             )
             print(
@@ -265,7 +253,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     break
 
                 try:
-                    snapshot = sensor_reader.snapshot()
+                    snapshot = sensor_reader.get_sensor_snapshot()
                 except Exception as exc:
                     stop_reason = f"sensor_error:{type(exc).__name__}"
                     exit_code = EXIT_SENSOR_ERROR
