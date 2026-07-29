@@ -378,7 +378,8 @@ def _launch_water_draw(
     output_csv = run_directory / f"{event.event_id}.csv"
     command = [
         sys.executable,
-        str(SOFTWARE_DIRECTORY / "water_draw_monitor.py"),
+        "-m",
+        "software.water_draw_monitor",
         "--event-id",
         event.event_id,
         "--target-gal",

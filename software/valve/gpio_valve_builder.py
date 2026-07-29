@@ -1,7 +1,11 @@
 """Construct and safely configure the WH1 GPIO valve driver."""
 
-from software.station.station_hardware_map import VALVE_PIN
-from software.valve.gpio_valve_driver import GpioValveDriver
+try:
+    from ..station.station_hardware_map import VALVE_PIN
+except ImportError:
+    from station.station_hardware_map import VALVE_PIN
+
+from .gpio_valve_driver import GpioValveDriver
 
 
 def build_gpio_valve(*, pin: int = VALVE_PIN) -> GpioValveDriver:

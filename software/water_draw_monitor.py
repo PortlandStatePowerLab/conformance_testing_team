@@ -16,9 +16,13 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .helpers.hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS, VALVE_PIN
+    from .helpers.hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS
+    from .station.station_hardware_map import VALVE_PIN
+    from .valve.gpio_valve_builder import build_gpio_valve
 except ImportError:
-    from helpers.hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS, VALVE_PIN
+    from helpers.hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS
+    from station.station_hardware_map import VALVE_PIN
+    from valve.gpio_valve_builder import build_gpio_valve
 
 
 DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.5
@@ -195,9 +199,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
             )
             return EXIT_SUCCESS
 
-        # Hardware imports occur only after explicit output authorization.
-        import RPi.GPIO as GPIO
-
+        # Hardware construction occurs only after explicit output authorization.
         try:
             from .helpers.max1238_adc import Max1238Adc
             from .helpers.water_sensor_reader import WaterSensorReader
@@ -206,7 +208,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
             from helpers.water_sensor_reader import WaterSensorReader
 
         adc = None
-        valve_configured = False
+        valve = None
         volume_gal = 0.0
         last_snapshot = None
         start = time.monotonic()
@@ -216,10 +218,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
         exit_code = EXIT_SENSOR_ERROR
 
         try:
-            GPIO.setwarnings(False)
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(VALVE_PIN, GPIO.OUT, initial=GPIO.LOW)
-            valve_configured = True
+            valve = build_gpio_valve()
 
             adc = Max1238Adc(
                 address=MAX1238_I2C_ADDR,
@@ -241,7 +240,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                 flush=True,
             )
 
-            GPIO.output(VALVE_PIN, GPIO.HIGH)
+            valve.open()
             print(
                 "WATER_DRAW_VALVE_OPEN "
                 + json.dumps(
@@ -307,13 +306,20 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     break
                 stop_event.wait(args.sample_interval_seconds)
         finally:
-            if valve_configured:
+            cleanup_error: BaseException | None = None
+            if valve is not None:
                 try:
-                    GPIO.output(VALVE_PIN, GPIO.LOW)
-                finally:
-                    GPIO.cleanup(VALVE_PIN)
+                    valve.cleanup()
+                except BaseException as error:
+                    cleanup_error = error
             if adc is not None:
-                adc.close()
+                try:
+                    adc.close()
+                except BaseException as error:
+                    if cleanup_error is None:
+                        cleanup_error = error
+                    else:
+                        cleanup_error.add_note(f"ADC close also failed: {error!r}")
 
             elapsed = time.monotonic() - start
             writer.writerow(
@@ -322,7 +328,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     elapsed_seconds=elapsed,
                     status="completed" if exit_code == EXIT_SUCCESS else "stopped",
                     stop_reason=stop_reason,
-                    valve_state="closed" if valve_configured else "not_configured",
+                    valve_state="closed" if valve is not None else "not_configured",
                     target_volume_gal=args.target_gal,
                     volume_gal=volume_gal,
                     snapshot=last_snapshot,
@@ -342,6 +348,8 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                 ),
                 flush=True,
             )
+            if cleanup_error is not None:
+                raise cleanup_error
         return exit_code
 
 
