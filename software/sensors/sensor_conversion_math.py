@@ -3,7 +3,7 @@
 This module defines the station's nominal electrical and sensor-range values,
 plus the immutable ``SensorConversionConfig`` used by conversion functions.
 Effective ADC limits and current-loop spans are derived from that configuration
-so nominal and calibrated operation share one source of truth.
+so nominal and configured operation share one source of truth.
 
 The functions transform ADC counts into voltage, shunt voltage into loop
 current, linear current-loop signals into engineering values, and LM35 voltage
@@ -25,7 +25,7 @@ from dataclasses import dataclass
 
 # Nominal MAX1238 and installed signal-path values.
 #
-# These constants remain unchanged when a caller supplies calibrated values in
+# These constants remain unchanged when a caller supplies configured values in
 # a separate ``SensorConversionConfig``.
 
 # ADC (MAX1238) datasheet specifies 1 LSB = VREF / 2^N
@@ -51,7 +51,7 @@ NOMINAL_FLOW_MAX_GPM = 10.0
 
 # region Sensor Conversion Configuration
 
-# Packages either nominal or calibrated values in ``SensorConversionConfig``.
+# Packages either nominal or configured values in ``SensorConversionConfig``.
 @dataclass(frozen=True)
 class SensorConversionConfig:
     """Store electrical and sensor-range values used by conversions.
@@ -242,7 +242,7 @@ def voltage_to_linear_loop_value(
     Args:
         measured_voltage_v: Voltage measured across the current-loop shunt.
         loop_span: Effective ``LinearCurrentLoopSpan`` engineering-unit range.
-        conversion_config: Active electrical and calibration values.
+        conversion_config: Active electrical and sensor-range values.
 
     Returns:
         Converted value in ``loop_span.units``.

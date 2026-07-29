@@ -105,7 +105,7 @@ class WaterDrawTests(unittest.TestCase):
             self.assertEqual(result, EXIT_SUCCESS)
             build_valve.assert_called_once_with()
             build_adc.assert_called_once_with()
-            sensor_reader.assert_called_once_with(adc, calibration_path=None)
+            sensor_reader.assert_called_once_with(adc, configuration_path=None)
             sensor_reader.return_value.get_sensor_snapshot.assert_called_once_with()
             valve.open.assert_called_once_with()
             valve.cleanup.assert_called_once_with()

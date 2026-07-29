@@ -7,7 +7,7 @@ WH1 sensor configuration, deterministic conversions, grouped measurement reading
 ## Contains
 
 - `sensor_conversion_math.py`: deterministic signal and unit conversions.
-- `sensor_configuration_loader.py`: calibration override loading and validation.
+- `sensor_configuration_loader.py`: optional configuration override loading and validation.
 - `sensor_reader.py`: grouped ADC measurements and `SensorSnapshot`.
 - `sensor_diagnostic.py`: reusable sensor reporting check.
 

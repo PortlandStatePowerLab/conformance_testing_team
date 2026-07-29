@@ -12,29 +12,31 @@ from software.sensors.sensor_conversion_math import (
 )
 
 
-def load_sensor_conversion_config(
-    calibration_path: Path | None,
+def load_sensor_configuration(
+    configuration_path: Path | None,
 ) -> SensorConversionConfig:
-    """Load optional calibration overrides onto the nominal configuration."""
-    if calibration_path is None:
+    """Load optional station configuration overrides onto nominal values."""
+    if configuration_path is None:
         return NOMINAL_SENSOR_CONFIG
 
-    if not calibration_path.exists():
+    if not configuration_path.exists():
         raise FileNotFoundError(
-            f"Calibration file does not exist: {calibration_path}"
+            f"Sensor configuration file does not exist: {configuration_path}"
         )
 
-    calibration_data = json.loads(calibration_path.read_text(encoding="utf-8"))
-    if not isinstance(calibration_data, dict):
-        raise ValueError("calibration data must be a JSON object")
+    configuration_data = json.loads(
+        configuration_path.read_text(encoding="utf-8")
+    )
+    if not isinstance(configuration_data, dict):
+        raise ValueError("sensor configuration data must be a JSON object")
 
-    electrical_overrides = calibration_data.get("electrical", {})
-    sensor_overrides = calibration_data.get("sensor_ranges", {})
+    electrical_overrides = configuration_data.get("electrical", {})
+    sensor_overrides = configuration_data.get("sensor_ranges", {})
 
     if not isinstance(electrical_overrides, dict):
-        raise ValueError("electrical calibration data must be a JSON object")
+        raise ValueError("electrical configuration data must be a JSON object")
     if not isinstance(sensor_overrides, dict):
-        raise ValueError("sensor_ranges calibration data must be a JSON object")
+        raise ValueError("sensor_ranges configuration data must be a JSON object")
 
     return replace(
         NOMINAL_SENSOR_CONFIG,
@@ -75,3 +77,7 @@ def load_sensor_conversion_config(
             )
         ),
     )
+
+
+# Backward-compatible name for callers that adopted the earlier terminology.
+load_sensor_conversion_config = load_sensor_configuration

@@ -105,12 +105,12 @@ class ConformanceTestRunnerTests(unittest.TestCase):
     def test_clock_text_supports_tests_longer_than_one_day(self):
         self.assertEqual(clock_text(25 * 3600), "25:00:00")
 
-    def test_water_draw_receives_archived_sensor_calibration(self):
+    def test_water_draw_receives_archived_sensor_configuration(self):
         event = SimpleNamespace(event_id="water_draw_1", target_volume_gal=5.0)
         with tempfile.TemporaryDirectory() as directory:
             run_directory = Path(directory)
-            calibration = run_directory / "sensor_calibration.json"
-            calibration.write_text("{}", encoding="utf-8")
+            configuration = run_directory / "sensor_configuration.json"
+            configuration.write_text("{}", encoding="utf-8")
             with patch(
                 "software.conformance_test_runner.start_process"
             ) as start_process:
@@ -118,12 +118,12 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                     event,
                     run_directory,
                     enable_output=True,
-                    sensor_calibration=calibration,
+                    sensor_configuration=configuration,
                 )
 
         command = start_process.call_args.args[1]
-        calibration_index = command.index("--sensor-calibration")
-        self.assertEqual(command[calibration_index + 1], str(calibration))
+        configuration_index = command.index("--sensor-configuration")
+        self.assertEqual(command[configuration_index + 1], str(configuration))
         self.assertIn("--enable-output", command)
 
 

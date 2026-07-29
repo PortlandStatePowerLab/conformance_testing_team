@@ -87,7 +87,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--event-id", required=True)
     parser.add_argument("--target-gal", required=True, type=positive_float)
     parser.add_argument("--output-csv", type=Path)
-    parser.add_argument("--sensor-calibration", type=Path)
+    parser.add_argument(
+        "--sensor-configuration",
+        "--sensor-calibration",
+        dest="sensor_configuration",
+        type=Path,
+        help=(
+            "optional water-sensor configuration JSON; "
+            "nominal values are used when omitted"
+        ),
+    )
     parser.add_argument(
         "--sample-interval-seconds",
         type=positive_float,
@@ -214,7 +223,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
 
             adc = build_max1238()
             sensor_reader = SensorReader(
-                adc, calibration_path=args.sensor_calibration
+                adc, configuration_path=args.sensor_configuration
             )
             print(
                 "WATER_DRAW_READY "

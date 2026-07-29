@@ -37,7 +37,7 @@ from software.sensors.sensor_conversion_math import (
 # Shared hardware-agnostic ADC read interface from ``adc_interface.py``.
 from software.adc.adc_interface import SensorAdc
 from software.sensors.sensor_configuration_loader import (
-    load_sensor_conversion_config,
+    load_sensor_configuration,
 )
 
 # endregion Imports
@@ -124,7 +124,7 @@ class SensorReader:
     Args:
         adc (SensorAdc): ADC-compatible object supplied by the station assembly
             layer. The caller retains ownership of the object.
-        calibration_path (Path | None): Optional JSON calibration path. When
+        configuration_path (Path | None): Optional JSON configuration path. When
             omitted, nominal sensor-conversion values are used. An explicitly
             supplied path must exist.
 
@@ -138,11 +138,18 @@ class SensorReader:
         self,
         adc: SensorAdc,
         *,
+        configuration_path: Path | None = None,
         calibration_path: Path | None = None,
     ) -> None:
+        if configuration_path is not None and calibration_path is not None:
+            raise ValueError(
+                "use configuration_path; do not also provide calibration_path"
+            )
         self._adc = adc
 
-        self._conversion_config = load_sensor_conversion_config(calibration_path)
+        self._conversion_config = load_sensor_configuration(
+            configuration_path or calibration_path
+        )
         self._temperature_span = self._conversion_config.temperature_span
         self._temperature_span_f = self._conversion_config.temperature_span_f
         self._flow_span = self._conversion_config.flow_span
