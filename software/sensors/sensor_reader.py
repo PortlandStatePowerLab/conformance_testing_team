@@ -61,6 +61,8 @@ class SensorSnapshot:
         ambient_temp_c (float): LM35 ambient temperature in degrees Celsius.
         ambient_temp_f (float): LM35 ambient temperature in degrees Fahrenheit.
         flow_gpm (float): Flow transmitter reading in gallons per minute.
+        cold_source_station (str): Station that acquired the cold-water value.
+        cold_source_timestamp_pacific (str): Source reading's Pacific timestamp.
 
     Timing:
         Values are read sequentially during one ADC scan and are not physically
@@ -78,6 +80,8 @@ class SensorSnapshot:
     ambient_temp_c: float
     ambient_temp_f: float
     flow_gpm: float
+    cold_source_station: str = "local"
+    cold_source_timestamp_pacific: str = ""
 
 # endregion Sensor Data
 

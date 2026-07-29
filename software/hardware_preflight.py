@@ -25,6 +25,9 @@ from software.conformance_test_runner import (
     DEFAULT_CTA_BINARY,
     DEFAULT_RESULTS_ROOT,
 )
+from software.cold_water.station_sensor_source import (
+    build_station_sensor_session,
+)
 from software.schedule_parser import load_schedule
 from software.sensors.sensor_configuration_loader import (
     load_sensor_configuration,
@@ -35,6 +38,7 @@ from software.station.station_hardware_map import (
     MAX1238_I2C_BUS,
     VALVE_PIN,
 )
+from software.station.station_identity import station_number
 
 DEFAULT_SERIAL_PORT = Path("/dev/ttyUSB0")
 
@@ -170,6 +174,22 @@ def _gpio_low_details() -> str:
     return f"GPIO{VALVE_PIN} initialized LOW and released"
 
 
+def _station_sensor_details(configuration_path: Path | None) -> str:
+    number = station_number()
+    session = build_station_sensor_session(
+        configuration_path=configuration_path,
+        active_station_number=number,
+    )
+    try:
+        snapshot = session.reader.get_sensor_snapshot()
+    finally:
+        session.close()
+    return (
+        f"WH-station{number} snapshot ready; "
+        f"cold source=WH-station1; cold={snapshot.cold_temp_f:.2f} F"
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -231,6 +251,12 @@ def run_preflight(args: argparse.Namespace) -> list[PreflightCheck]:
         checks.extend(
             [
                 _check("Python RPi.GPIO", lambda: _require_module("RPi.GPIO")),
+                _check(
+                    "station sensor snapshot",
+                    lambda: _station_sensor_details(
+                        args.sensor_configuration
+                    ),
+                ),
                 _check("valve safety", _gpio_low_details),
             ]
         )

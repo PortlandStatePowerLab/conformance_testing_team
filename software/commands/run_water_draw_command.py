@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from software.adc.max1238_builder import build_max1238
+from software.cold_water.station_sensor_source import (
+    build_station_sensor_session,
+)
 from software.runtime.controlled_water_draw_workflow import (
     MAX_RUN_MINUTES,
     run_controlled_water_draw,
 )
-from software.sensors.sensor_reader import SensorReader
 from software.valve.gpio_valve_builder import build_gpio_valve
 
 
@@ -28,14 +29,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.max_run_minutes <= 0.0:
         raise SystemExit("--max-run-minutes must be greater than zero")
 
-    adc = build_max1238()
+    sensor_session = build_station_sensor_session()
     valve = None
     workflow_error: BaseException | None = None
     try:
         valve = build_gpio_valve()
+        sensor_session.reader.get_sensor_snapshot()
         run_controlled_water_draw(
             args.target_gal,
-            sensor_reader=SensorReader(adc),
+            sensor_reader=sensor_session.reader,
             valve=valve,
             max_run_minutes=args.max_run_minutes,
         )
@@ -56,13 +58,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
 
         try:
-            adc.close()
-        except BaseException as adc_close_error:
+            sensor_session.close()
+        except BaseException as sensor_close_error:
             if cleanup_error is None:
-                cleanup_error = adc_close_error
+                cleanup_error = sensor_close_error
             else:
                 cleanup_error.add_note(
-                    f"ADC close also failed: {adc_close_error!r}"
+                    f"Sensor session cleanup also failed: {sensor_close_error!r}"
                 )
 
         if workflow_error is None and cleanup_error is not None:

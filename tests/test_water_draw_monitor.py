@@ -3,6 +3,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from software.helpers.sensor_conversion import (
@@ -69,7 +70,11 @@ class WaterDrawTests(unittest.TestCase):
             )
             stop_event = threading.Event()
             valve = Mock()
-            adc = Mock()
+            sensor_reader = Mock()
+            sensor_session = SimpleNamespace(
+                reader=sensor_reader,
+                close=Mock(),
+            )
             snapshot = SensorSnapshot(
                 hot_raw_counts=100,
                 cold_raw_counts=200,
@@ -90,26 +95,24 @@ class WaterDrawTests(unittest.TestCase):
                     return_value=valve,
                 ) as build_valve,
                 patch(
-                    "software.water_draw_monitor.build_max1238",
-                    return_value=adc,
-                ) as build_adc,
-                patch("software.water_draw_monitor.SensorReader") as sensor_reader,
+                    "software.water_draw_monitor.build_station_sensor_session",
+                    return_value=sensor_session,
+                ) as build_sensors,
                 patch(
                     "software.water_draw_monitor.time.monotonic",
                     side_effect=[0.0, 60.0, 60.0],
                 ),
             ):
-                sensor_reader.return_value.get_sensor_snapshot.return_value = snapshot
+                sensor_reader.get_sensor_snapshot.return_value = snapshot
                 result = run_draw(args, stop_event)
 
             self.assertEqual(result, EXIT_SUCCESS)
             build_valve.assert_called_once_with()
-            build_adc.assert_called_once_with()
-            sensor_reader.assert_called_once_with(adc, configuration_path=None)
-            sensor_reader.return_value.get_sensor_snapshot.assert_called_once_with()
+            build_sensors.assert_called_once()
+            self.assertEqual(sensor_reader.get_sensor_snapshot.call_count, 2)
             valve.open.assert_called_once_with()
             valve.cleanup.assert_called_once_with()
-            adc.close.assert_called_once_with()
+            sensor_session.close.assert_called_once_with()
             with output.open("r", encoding="utf-8", newline="") as handle:
                 rows = list(csv.DictReader(handle))
             self.assertEqual(rows[0]["flow_gpm"], "1.0")

@@ -35,6 +35,11 @@ releasing the pin:
 make preflight-water
 ```
 
+WH-station1 owns the shared cold-water sensor. Its socket-activated service
+supports simultaneous tests on all four stations without allowing multiple
+processes to own the Pi 1 MAX1238. See
+`software/cold_water/README.md` for Pi 1 systemd and restricted-SSH setup.
+
 The repository Makefile provides shorter equivalents:
 
 ```bash

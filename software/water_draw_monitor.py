@@ -18,9 +18,11 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from software.adc.max1238_builder import build_max1238
+from software.cold_water.client import DEFAULT_SOCKET_PATH
+from software.cold_water.station_sensor_source import (
+    build_station_sensor_session,
+)
 from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
-from software.sensors.sensor_reader import SensorReader
 from software.station.station_hardware_map import VALVE_PIN
 from software.valve.gpio_valve_builder import build_gpio_valve
 
@@ -56,6 +58,8 @@ CSV_COLUMNS = (
     "cold_raw_counts",
     "flow_raw_counts",
     "ambient_raw_counts",
+    "cold_source_station",
+    "cold_source_timestamp_pacific",
 )
 
 
@@ -89,6 +93,15 @@ def build_parser() -> argparse.ArgumentParser:
             "nominal values are used when omitted"
         ),
     )
+    parser.add_argument("--station-number", type=int, choices=(1, 2, 3, 4))
+    parser.add_argument(
+        "--cold-water-socket",
+        type=Path,
+        default=DEFAULT_SOCKET_PATH,
+    )
+    parser.add_argument("--cold-water-host")
+    parser.add_argument("--cold-water-user")
+    parser.add_argument("--cold-water-identity-file", type=Path)
     parser.add_argument(
         "--sample-interval-seconds",
         type=positive_float,
@@ -200,7 +213,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
             )
             return EXIT_SUCCESS
 
-        adc = None
+        sensor_session = None
         valve = None
         volume_gal = 0.0
         last_snapshot = None
@@ -213,10 +226,17 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
         try:
             valve = build_gpio_valve()
 
-            adc = build_max1238()
-            sensor_reader = SensorReader(
-                adc, configuration_path=args.sensor_configuration
+            sensor_session = build_station_sensor_session(
+                configuration_path=args.sensor_configuration,
+                active_station_number=args.station_number,
+                socket_path=args.cold_water_socket,
+                remote_host=args.cold_water_host,
+                remote_user=args.cold_water_user,
+                identity_file=args.cold_water_identity_file,
             )
+            sensor_reader = sensor_session.reader
+            # A fresh local/remote snapshot is required before valve actuation.
+            sensor_reader.get_sensor_snapshot()
             print(
                 "WATER_DRAW_READY "
                 + json.dumps(
@@ -304,14 +324,16 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     valve.cleanup()
                 except BaseException as error:
                     cleanup_error = error
-            if adc is not None:
+            if sensor_session is not None:
                 try:
-                    adc.close()
+                    sensor_session.close()
                 except BaseException as error:
                     if cleanup_error is None:
                         cleanup_error = error
                     else:
-                        cleanup_error.add_note(f"ADC close also failed: {error!r}")
+                        cleanup_error.add_note(
+                            f"Sensor session cleanup also failed: {error!r}"
+                        )
 
             elapsed = time.monotonic() - start
             writer.writerow(

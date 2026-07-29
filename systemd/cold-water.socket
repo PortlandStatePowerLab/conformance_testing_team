@@ -1,0 +1,13 @@
+[Unit]
+Description=On-demand WH-station1 sensor snapshot socket
+
+[Socket]
+ListenStream=/run/cold-water/cold-water.sock
+SocketUser=pi
+SocketGroup=coldwater
+SocketMode=0660
+DirectoryMode=0750
+RemoveOnStop=true
+
+[Install]
+WantedBy=sockets.target
