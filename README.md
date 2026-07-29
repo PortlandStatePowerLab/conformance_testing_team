@@ -21,6 +21,20 @@ Validate the schedule without accessing hardware:
 python3 software/conformance_test_runner.py
 ```
 
+On the Raspberry Pi, check station prerequisites before launching processes:
+
+```bash
+make preflight
+```
+
+Before enabling scheduled valve output, run the water preflight. It verifies
+that the schedule contains a water draw and initializes GPIO17 LOW before
+releasing the pin:
+
+```bash
+make preflight-water
+```
+
 The repository Makefile provides shorter equivalents:
 
 ```bash
