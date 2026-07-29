@@ -1,7 +1,8 @@
 PYTHON ?= python3
 CTA_DCS_DIR ?= $(HOME)/cta_2045_controller/dcs
+SENSOR_CALIBRATION ?=
 
-.PHONY: help test validate run run-water build_cta schedule_cta run_cta test_cta clean_cta clean
+.PHONY: help test validate run run-water run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
 
 help:
 	@echo "Water-heater conformance test commands:"
@@ -9,6 +10,7 @@ help:
 	@echo "  make validate   Import and validate the XLSX schedule without hardware"
 	@echo "  make run        Run the hardware test without scheduled valve output"
 	@echo "  make run-water  Run the hardware test with scheduled valve output enabled"
+	@echo "  make run-water-calibrated SENSOR_CALIBRATION=<file>  Run with water output and sensor calibration"
 	@echo "  make build_cta  Build the CTA-2045 controller"
 	@echo "  make schedule_cta  Create the controller's standalone test schedule"
 	@echo "  make run_cta    Build and run the CTA-2045 controller"
@@ -26,6 +28,11 @@ run:
 
 run-water:
 	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output
+
+run-water-calibrated:
+	@test -n "$(SENSOR_CALIBRATION)" || (echo "SENSOR_CALIBRATION is required"; exit 2)
+	@test -f "$(SENSOR_CALIBRATION)" || (echo "Sensor calibration file not found: $(SENSOR_CALIBRATION)"; exit 2)
+	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output --sensor-calibration "$(SENSOR_CALIBRATION)"
 
 build_cta:
 	$(MAKE) -C $(CTA_DCS_DIR) controller
