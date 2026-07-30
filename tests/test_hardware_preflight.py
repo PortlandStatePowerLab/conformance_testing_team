@@ -14,11 +14,25 @@ from software import hardware_preflight
 
 class HardwarePreflightTest(unittest.TestCase):
     def test_schedule_requires_water_draw_only_in_water_mode(self):
-        schedule = Path(__file__).resolve().parents[1] / "software" / (
-            "conformance_test_schedule.csv"
-        )
-        details = hardware_preflight._schedule_details(schedule, True)
-        self.assertIn("1 water draw(s)", details)
+        schedule = Path("schedule.csv")
+        events = [
+            SimpleNamespace(event_type="cta"),
+            SimpleNamespace(event_type="water_draw"),
+            SimpleNamespace(event_type="water_draw"),
+        ]
+
+        with patch.object(hardware_preflight, "load_schedule", return_value=events):
+            details = hardware_preflight._schedule_details(schedule, True)
+
+        self.assertEqual(details, "3 enabled events; 2 water draw(s)")
+
+        with patch.object(hardware_preflight, "load_schedule", return_value=[]):
+            self.assertEqual(
+                hardware_preflight._schedule_details(schedule, False),
+                "0 enabled events; 0 water draw(s)",
+            )
+            with self.assertRaisesRegex(ValueError, "has no water draws"):
+                hardware_preflight._schedule_details(schedule, True)
 
     def test_nominal_sensor_configuration_is_explicit(self):
         self.assertEqual(
