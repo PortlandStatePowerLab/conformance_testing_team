@@ -38,7 +38,7 @@ from software.station.station_hardware_map import (
     MAX1238_I2C_BUS,
     VALVE_PIN,
 )
-from software.station.station_identity import station_number
+from software.station.station_identity import station_number, station_results_directory
 
 DEFAULT_SERIAL_PORT = Path("/dev/ttyUSB0")
 
@@ -224,7 +224,9 @@ def run_preflight(args: argparse.Namespace) -> list[PreflightCheck]:
         ),
         _check(
             "results directory",
-            lambda: _require_results_write(args.results_root),
+            lambda: _require_results_write(
+                station_results_directory(args.results_root)
+            ),
         ),
         _check(
             "schedule",

@@ -75,10 +75,14 @@ python3 software/conformance_test_runner.py \
   --enable-water-output
 ```
 
-Each hardware run creates a unique directory under
-`saved_data/conformance_runs/`. It contains the archived master and generated
+Each hardware run detects `WH-station1` through `WH-station4` from the Pi
+hostname and creates a unique directory under
+`saved_data/conformance_runs/WH-n/`, where `n` is the station number. It
+contains the archived master and generated
 CTA schedules, controller event and commodity CSVs, power data, water-draw CSVs,
 orchestrator events, and process logs.
+If the hostname does not identify a configured station, the run falls back to
+`saved_data/conformance_runs/`.
 Automatic run-directory names and all human-readable recorded timestamps use
 Pacific civil time. ISO-8601 fields include `-07:00` during PDT or `-08:00`
 during PST; directory and automatic file names include the `PDT` or `PST`

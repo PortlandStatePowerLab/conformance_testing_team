@@ -35,6 +35,7 @@ except ImportError:
     from xlsx_schedule_importer import import_xlsx_schedule
 
 from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
+from software.station.station_identity import station_results_directory
 
 
 SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
@@ -445,7 +446,9 @@ def run_hardware_test(
     if args.sensor_configuration is not None:
         load_sensor_configuration(args.sensor_configuration)
 
-    run_directory = _create_run_directory(args.results_root, args.run_id)
+    run_directory = _create_run_directory(
+        station_results_directory(args.results_root), args.run_id
+    )
     if args.master_schedule.suffix.lower() == ".xlsx":
         shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")
     shutil.copy2(canonical_schedule, run_directory / "master_schedule.csv")

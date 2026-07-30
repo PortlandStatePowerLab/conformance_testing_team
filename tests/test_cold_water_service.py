@@ -5,6 +5,7 @@ from __future__ import annotations
 import socket
 import threading
 import unittest
+from pathlib import Path
 from unittest.mock import Mock
 
 from software.cold_water.client import _StreamSnapshotClient
@@ -12,7 +13,7 @@ from software.cold_water.service import SnapshotService
 from software.cold_water.station_sensor_source import CompositeSensorReader
 from software.cold_water import station_sensor_source
 from software.sensors.sensor_reader import SensorSnapshot
-from software.station.station_identity import station_number
+from software.station.station_identity import station_number, station_results_directory
 
 
 def snapshot(*, cold_temp_c: float = 24.0) -> SensorSnapshot:
@@ -37,6 +38,16 @@ class ColdWaterServiceTest(unittest.TestCase):
         self.assertEqual(station_number("wh-STATION4"), 4)
         with self.assertRaises(ValueError):
             station_number("raspberrypi")
+
+    def test_station_results_directory_uses_water_heater_number(self):
+        self.assertEqual(
+            station_results_directory(Path("/results"), "WH-station3"),
+            Path("/results/WH-3"),
+        )
+        self.assertEqual(
+            station_results_directory(Path("/results"), "unknown-host"),
+            Path("/results"),
+        )
 
     def test_composite_replaces_only_cold_fields(self):
         local = Mock()
