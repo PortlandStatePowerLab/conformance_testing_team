@@ -14,6 +14,12 @@ states from the action instead of relying on Excel to calculate formulas.
 For Basic DR commands, `event_duration_minutes` accepts a whole number from
 1 through 2150, or `unknown`. The compiler rounds a numeric duration up to the
 next CTA-2045 duration-byte value so the encoded event does not expire early.
+Beginning with the first CTA command prerequisite, the compiler automatically
+refreshes outside communication every 13 minutes 30 seconds for the entire
+test, including run-normal periods. The heartbeat stops at test end. These
+generated refreshes do not repeat or extend user commands; all user-entered CTA
+commands and their 15-second outside-communication prerequisites retain their
+scheduled times.
 
 Validate the schedule without accessing hardware:
 
