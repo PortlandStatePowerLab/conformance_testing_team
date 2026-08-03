@@ -1,11 +1,11 @@
 {
-    "vrms_scale": 0.008780204629562442,
-    "irms_scale": 0.00164517563361494,
-    "vrms_offset": 121,
-    "irms_offset": 16,
-    "last_cal_time": "2026-07-08T18:37:14",
-    "line_vrms_used": 121.0,
-    "clamp_irms_used": 7.4,
-    "vrms_offset_volts": 1.0624047601770554,
-    "irms_offset_amps": 0.02632281013783904
+  "vrms_scale": 0.009745005684586649,
+  "irms_scale": 0.0018116105714931104,
+  "vrms_offset": 1431,
+  "irms_offset": 42,
+  "last_cal_time": "2026-08-03T14:52:12",
+  "line_vrms_used": 120.0,
+  "clamp_irms_used": 8.02,
+  "vrms_offset_volts": 13.945103134643494,
+  "irms_offset_amps": 0.07608764400271063
 }
