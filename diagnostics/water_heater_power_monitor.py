@@ -2,6 +2,15 @@
 from smbus2 import SMBus
 import time, json, os
 from datetime import datetime
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SOFTWARE_DIR = REPO_ROOT / "software"
+
+if str(SOFTWARE_DIR) not in sys.path:
+    sys.path.insert(0, str(SOFTWARE_DIR))
+
 
 # -----------------------------
 # Helpers
@@ -26,8 +35,8 @@ from helpers.hardware_map import (
 pi_number = get_pi_number()
 
 # Folder/file locations
-OUTPUT_FOLDER = os.path.join(os.path.expanduser("../"), "saved_data")
-CALIBRATION_DIR = os.path.join(OUTPUT_FOLDER, "calibration")
+OUTPUT_FOLDER = str(REPO_ROOT / "saved_data")
+CALIBRATION_DIR = str(REPO_ROOT / "saved_data" / "calibration")
 
 def main():
     """Run the main logging loop for the ACS37800 sensor.
