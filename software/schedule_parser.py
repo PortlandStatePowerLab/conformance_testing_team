@@ -50,6 +50,7 @@ TRUE_VALUES = {"true", "yes", "1"}
 FALSE_VALUES = {"false", "no", "0"}
 UNKNOWN_DURATION = "unknown"
 OUTSIDE_COMMUNICATION_LEAD_SECONDS = 15
+OUTSIDE_COMMUNICATION_REFRESH_SECONDS = 13 * 60 + 30
 MAX_FINITE_DURATION_BYTE = 0xFE
 MAX_FINITE_DURATION_SECONDS = 2 * MAX_FINITE_DURATION_BYTE**2
 MAX_EVENT_DURATION_MINUTES = 2150
@@ -378,19 +379,37 @@ def generate_cta_events(
     events: Iterable[ScheduleEvent],
     *,
     outside_communication_lead_seconds: int = OUTSIDE_COMMUNICATION_LEAD_SECONDS,
+    outside_communication_refresh_seconds: int = (
+        OUTSIDE_COMMUNICATION_REFRESH_SECONDS
+    ),
 ) -> list[GeneratedCtaEvent]:
-    """Create an in-memory CTA schedule with automatic communication notices."""
+    """Create CTA events with prerequisites and communication refreshes."""
     if outside_communication_lead_seconds < 0:
         raise ValueError("outside communication lead must not be negative")
+    if outside_communication_refresh_seconds <= 0:
+        raise ValueError("outside communication refresh must be positive")
 
+    scheduled_events = list(events)
+    cta_events = [event for event in scheduled_events if event.event_type == "cta"]
+    test_end = next(
+        (
+            event
+            for event in scheduled_events
+            if event.event_type == "test" and event.action == "end"
+        ),
+        None,
+    )
     generated: list[GeneratedCtaEvent] = []
-    for event in events:
-        if event.event_type != "cta":
-            continue
+    outside_communication_offsets: set[int] = set()
+    for event in cta_events:
+        prerequisite_offset = (
+            event.offset_seconds - outside_communication_lead_seconds
+        )
+        outside_communication_offsets.add(prerequisite_offset)
         generated.append(
             GeneratedCtaEvent(
                 event_id=f"auto_outside_comm_for_{event.event_id}",
-                offset_seconds=event.offset_seconds - outside_communication_lead_seconds,
+                offset_seconds=prerequisite_offset,
                 action="outside_communication",
                 command_code="o",
                 duration_byte=None,
@@ -430,6 +449,39 @@ def generate_cta_events(
                 generated=False,
             )
         )
+
+    if cta_events and test_end is not None:
+        heartbeat_offset = (
+            min(outside_communication_offsets)
+            + outside_communication_refresh_seconds
+        )
+        heartbeat_number = 1
+        while heartbeat_offset < test_end.offset_seconds:
+            if heartbeat_offset in outside_communication_offsets:
+                heartbeat_offset += outside_communication_refresh_seconds
+                heartbeat_number += 1
+                continue
+            generated.append(
+                GeneratedCtaEvent(
+                    event_id=(
+                        "auto_outside_comm_heartbeat_"
+                        f"{heartbeat_number:02d}"
+                    ),
+                    offset_seconds=heartbeat_offset,
+                    action="outside_communication",
+                    command_code="o",
+                    duration_byte=None,
+                    advanced_duration_minutes=None,
+                    advanced_value=None,
+                    advanced_units=None,
+                    expected_operational_states=(),
+                    requested_duration_seconds=None,
+                    represented_duration_seconds=None,
+                    generated=True,
+                )
+            )
+            heartbeat_number += 1
+            heartbeat_offset += outside_communication_refresh_seconds
     return sorted(generated, key=lambda event: (event.offset_seconds, event.generated))
 
 
