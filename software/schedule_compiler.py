@@ -103,6 +103,7 @@ def compile_cta_schedule(
     controller_output: Path | str,
     preview_output: Path | str,
     outside_communication_lead_seconds: int = 15,
+    outside_communication_heartbeat_enabled: bool = True,
 ) -> list[GeneratedCtaEvent]:
     """Validate and compile one master schedule without starting hardware."""
     if test_start.tzinfo is None or test_start.utcoffset() is None:
@@ -114,6 +115,9 @@ def compile_cta_schedule(
     cta_events = generate_cta_events(
         events,
         outside_communication_lead_seconds=outside_communication_lead_seconds,
+        outside_communication_heartbeat_enabled=(
+            outside_communication_heartbeat_enabled
+        ),
     )
 
     machine_rows: list[dict[str, object]] = []
@@ -198,6 +202,11 @@ def main() -> int:
     parser.add_argument("--controller-output", required=True, type=Path)
     parser.add_argument("--preview-output", required=True, type=Path)
     parser.add_argument("--outside-communication-lead-seconds", type=int, default=15)
+    parser.add_argument(
+        "--disable-outside-communication-heartbeat",
+        action="store_true",
+        help="omit recurring outside-communication refreshes",
+    )
     args = parser.parse_args()
 
     try:
@@ -207,6 +216,9 @@ def main() -> int:
             controller_output=args.controller_output,
             preview_output=args.preview_output,
             outside_communication_lead_seconds=args.outside_communication_lead_seconds,
+            outside_communication_heartbeat_enabled=(
+                not args.disable_outside_communication_heartbeat
+            ),
         )
     except (OSError, ValueError) as exc:
         parser.exit(1, f"{exc}\n")

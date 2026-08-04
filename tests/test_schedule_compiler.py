@@ -133,6 +133,43 @@ class ScheduleCompilerTests(unittest.TestCase):
             any(event.offset_seconds > 30 * 60 for event in heartbeats)
         )
 
+    def test_heartbeat_can_be_disabled_without_removing_prerequisites(self):
+        rows = [
+            ["true", "load_up_1", "00:00:00", "event", "cta", "load_up", "20", "", "", "3|6", "", "", ""],
+            ["true", "normal_1", "00:25:00", "event", "cta", "run_normal", "unknown", "", "", "0|1", "", "", ""],
+            ["true", "test_end", "00:27:00", "event", "test", "end", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            output_directory = Path(directory)
+            master_path = output_directory / "master.csv"
+            with master_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+
+            events = compile_cta_schedule(
+                master_path,
+                test_start=datetime(2026, 7, 22, 19, 0, 0, tzinfo=timezone.utc),
+                controller_output=output_directory / "schedule.csv",
+                preview_output=output_directory / "preview.csv",
+                outside_communication_heartbeat_enabled=False,
+            )
+
+        self.assertFalse(
+            any(
+                event.event_id.startswith("auto_outside_comm_heartbeat_")
+                for event in events
+            )
+        )
+        prerequisites = [
+            event for event in events if event.prerequisite_for is not None
+        ]
+        self.assertEqual(len(prerequisites), 2)
+        self.assertEqual(
+            [event.offset_seconds for event in prerequisites],
+            [-15, 25 * 60 - 15],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

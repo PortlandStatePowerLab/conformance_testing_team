@@ -21,6 +21,15 @@ generated refreshes do not repeat or extend user commands; all user-entered CTA
 commands and their 15-second outside-communication prerequisites retain their
 scheduled times.
 
+The heartbeat is enabled by default. Disable only the recurring refreshes for
+a controlled comparison while retaining every command prerequisite:
+
+```bash
+make run-water HEARTBEAT=false
+```
+
+`make run` and `make run-water` without the variable use `HEARTBEAT=true`.
+
 Validate the schedule without accessing hardware:
 
 ```bash

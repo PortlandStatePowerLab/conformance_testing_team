@@ -8,6 +8,7 @@ from unittest.mock import patch
 from software.conformance_test_runner import (
     ProgressReporter,
     _launch_water_draw,
+    build_parser,
     clock_text,
     progress_text,
     safe_identifier,
@@ -22,6 +23,16 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_outside_communication_heartbeat_defaults_enabled(self):
+        self.assertFalse(
+            build_parser().parse_args([]).disable_outside_communication_heartbeat
+        )
+        self.assertTrue(
+            build_parser()
+            .parse_args(["--disable-outside-communication-heartbeat"])
+            .disable_outside_communication_heartbeat
+        )
+
     def test_schedule_summary(self):
         events = load_schedule(MASTER_SCHEDULE)
         summary = schedule_summary(events)

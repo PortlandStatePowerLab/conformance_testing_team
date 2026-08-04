@@ -203,6 +203,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--results-root", type=Path, default=DEFAULT_RESULTS_ROOT)
     parser.add_argument("--sensor-configuration", type=Path)
     parser.add_argument(
+        "--disable-outside-communication-heartbeat",
+        action="store_true",
+        help="report that recurring outside-communication refreshes are disabled",
+    )
+    parser.add_argument(
         "--power-configuration-dir",
         type=Path,
         default=Path(__file__).resolve().parents[1] / "saved_data" / "calibration",
@@ -231,6 +236,15 @@ def run_preflight(args: argparse.Namespace) -> list[PreflightCheck]:
         _check(
             "schedule",
             lambda: _schedule_details(args.schedule, args.water),
+        ),
+        PreflightCheck(
+            "outside communication heartbeat",
+            True,
+            (
+                "disabled; 15-second command prerequisites remain enabled"
+                if args.disable_outside_communication_heartbeat
+                else "enabled; refresh interval 13 minutes 30 seconds"
+            ),
         ),
         _check(
             "sensor configuration",

@@ -382,6 +382,7 @@ def generate_cta_events(
     outside_communication_refresh_seconds: int = (
         OUTSIDE_COMMUNICATION_REFRESH_SECONDS
     ),
+    outside_communication_heartbeat_enabled: bool = True,
 ) -> list[GeneratedCtaEvent]:
     """Create CTA events with prerequisites and communication refreshes."""
     if outside_communication_lead_seconds < 0:
@@ -450,7 +451,11 @@ def generate_cta_events(
             )
         )
 
-    if cta_events and test_end is not None:
+    if (
+        outside_communication_heartbeat_enabled
+        and cta_events
+        and test_end is not None
+    ):
         heartbeat_offset = (
             min(outside_communication_offsets)
             + outside_communication_refresh_seconds

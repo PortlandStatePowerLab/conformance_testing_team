@@ -374,6 +374,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="pass --enable-output to scheduled water draws",
     )
+    parser.add_argument(
+        "--disable-outside-communication-heartbeat",
+        action="store_true",
+        help=(
+            "disable recurring 13-minute-30-second outside-communication "
+            "refreshes; per-command prerequisites remain enabled"
+        ),
+    )
     return parser
 
 
@@ -474,6 +482,9 @@ def run_hardware_test(
             details={
                 "run_directory": str(run_directory),
                 "water_output_enabled": args.enable_water_output,
+                "outside_communication_heartbeat_enabled": (
+                    not args.disable_outside_communication_heartbeat
+                ),
             },
         )
 
@@ -505,6 +516,9 @@ def run_hardware_test(
             test_start=test_start_utc,
             controller_output=args.cta_schedule,
             preview_output=run_directory / "cta_schedule_preview.csv",
+            outside_communication_heartbeat_enabled=(
+                not args.disable_outside_communication_heartbeat
+            ),
         )
         shutil.copy2(args.cta_schedule, run_directory / "cta_schedule_generated.csv")
 
@@ -695,6 +709,14 @@ def main() -> int:
         events = load_schedule(canonical_schedule)
         summary = schedule_summary(events)
         print("SCHEDULE_VALID " + json.dumps(summary, sort_keys=True))
+        print(
+            "OUTSIDE_COMMUNICATION_HEARTBEAT "
+            + (
+                "disabled (15-second command prerequisites remain enabled)"
+                if args.disable_outside_communication_heartbeat
+                else "enabled (refresh interval 13 minutes 30 seconds)"
+            )
+        )
         if args.master_schedule.suffix.lower() == ".xlsx":
             print(f"CANONICAL_SCHEDULE {canonical_schedule}")
         if not args.run_hardware:
