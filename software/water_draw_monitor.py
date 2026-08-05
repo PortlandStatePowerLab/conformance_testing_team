@@ -63,6 +63,15 @@ CSV_COLUMNS = (
     "cold_source_timestamp_pacific",
 )
 
+TEMPERATURE_COLUMNS = (
+    "hot_temp_c",
+    "hot_temp_f",
+    "cold_temp_c",
+    "cold_temp_f",
+    "ambient_temp_c",
+    "ambient_temp_f",
+)
+
 
 def positive_float(value: str) -> float:
     parsed = float(value)
@@ -172,6 +181,9 @@ def _row(
     if snapshot is not None:
         for field in CSV_COLUMNS[8:]:
             row[field] = getattr(snapshot, field)
+        row["flow_gpm"] = f"{snapshot.flow_gpm:.6f}"
+        for field in TEMPERATURE_COLUMNS:
+            row[field] = f"{getattr(snapshot, field):.2f}"
     return row
 
 
