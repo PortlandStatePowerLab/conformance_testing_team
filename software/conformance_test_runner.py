@@ -22,6 +22,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
+    from .conformance_report import generate_conformance_report
     from .schedule_compiler import compile_cta_schedule
     from .schedule_parser import ScheduleEvent, load_schedule
     from .sensors.sensor_configuration_loader import (
@@ -29,6 +30,7 @@ try:
     )
     from .xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
+    from conformance_report import generate_conformance_report
     from schedule_compiler import compile_cta_schedule
     from schedule_parser import ScheduleEvent, load_schedule
     from sensors.sensor_configuration_loader import load_sensor_configuration
@@ -696,6 +698,16 @@ def run_hardware_test(
 
         logger.record("run_finished", outcome)
         logger.close()
+        try:
+            report_path = generate_conformance_report(run_directory)
+            print(f"CONFORMANCE_REPORT {report_path}", flush=True)
+        except Exception as report_error:
+            print(
+                "CONFORMANCE_REPORT_ERROR "
+                f"{type(report_error).__name__}: {report_error}",
+                file=sys.stderr,
+                flush=True,
+            )
     return run_directory
 
 

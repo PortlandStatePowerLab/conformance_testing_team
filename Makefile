@@ -5,7 +5,7 @@ SENSOR_CALIBRATION ?=
 HEARTBEAT ?= true
 HEARTBEAT_FLAG = $(if $(filter false,$(HEARTBEAT)),--disable-outside-communication-heartbeat,)
 
-.PHONY: help test validate check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
+.PHONY: help test validate report check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
 
 help:
 	@echo "Water-heater conformance test commands:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make run        Run the hardware test without scheduled valve output"
 	@echo "  make run-water  Run the hardware test with scheduled valve output enabled"
 	@echo "  HEARTBEAT=false  Disable recurring outside-communication refreshes"
+	@echo "  make report RUN_DIRECTORY=<run-folder>  Regenerate the final report workbook"
 	@echo "  make run-water-configured SENSOR_CONFIGURATION=<file>  Run with water output and sensor configuration"
 	@echo "  make build_cta  Build the CTA-2045 controller"
 	@echo "  make schedule_cta  Create the controller's standalone test schedule"
@@ -28,6 +29,11 @@ test:
 
 validate:
 	$(PYTHON) software/conformance_test_runner.py
+
+report:
+	@test -n "$(RUN_DIRECTORY)" || (echo "RUN_DIRECTORY is required"; exit 2)
+	@test -d "$(RUN_DIRECTORY)" || (echo "Run directory not found: $(RUN_DIRECTORY)"; exit 2)
+	$(PYTHON) -m software.conformance_report "$(RUN_DIRECTORY)"
 
 check-heartbeat:
 	@test "$(HEARTBEAT)" = "true" -o "$(HEARTBEAT)" = "false" || (echo "HEARTBEAT must be true or false"; exit 2)

@@ -95,7 +95,16 @@ hostname and creates a unique directory under
 `saved_data/conformance_runs/WH-n/`, where `n` is the station number. It
 contains the archived master and generated
 CTA schedules, controller event and commodity CSVs, power data, water-draw CSVs,
-orchestrator events, and process logs.
+orchestrator events, process logs, and a human-readable
+`conformance_test_report.xlsx` workbook. The workbook is generated when the run
+closes and contains Event Timeline, Device Information, Master Schedule, and
+Commodity Summary sheets. The detailed source CSV files remain unchanged.
+
+Regenerate the workbook for an existing run with:
+
+```bash
+make report RUN_DIRECTORY=saved_data/conformance_runs/WH-1/run_YYYY_MM_DD_HHMMSS_PDT
+```
 If the hostname does not identify a configured station, the run falls back to
 `saved_data/conformance_runs/`.
 Automatic run-directory names and all human-readable recorded timestamps use
