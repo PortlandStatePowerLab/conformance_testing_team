@@ -34,8 +34,8 @@ from software.sensors.sensor_conversion_math import (
     voltage_to_linear_loop_value,
 )
 
-# Shared hardware-agnostic ADC read interface from ``adc_interface.py``.
-from software.adc.adc_interface import SensorAdc
+# Shared hardware-agnostic ADC read protocol exposed through the ``software.adc`` public API.
+from software.adc import SensorAdc
 from software.sensors.sensor_configuration_loader import (
     load_sensor_configuration,
 )
