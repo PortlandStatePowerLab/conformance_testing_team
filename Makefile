@@ -8,12 +8,13 @@ HEARTBEAT_FLAG = $(if $(filter false,$(HEARTBEAT)),--disable-outside-communicati
 PREFLIGHT_SCHEDULE_FLAG = $(if $(SCHEDULE),--schedule "$(SCHEDULE)",)
 RUNNER_SCHEDULE_FLAG = $(if $(SCHEDULE),--master-schedule "$(SCHEDULE)",)
 
-.PHONY: help test validate report check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
+.PHONY: help test validate schedule-gui report check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
 
 help:
 	@echo "Water-heater conformance test commands:"
 	@echo "  make test       Run the hardware-independent automated tests"
 	@echo "  make validate   Import and validate the XLSX schedule without hardware"
+	@echo "  make schedule-gui  Start the local schedule editor on 127.0.0.1:5000"
 	@echo "  make preflight  Check CTA, power, I2C, schedule, and station prerequisites"
 	@echo "  make preflight-water  Also initialize GPIO17 LOW and require a water draw"
 	@echo "  make run        Run the hardware test without scheduled valve output"
@@ -33,6 +34,9 @@ test:
 
 validate:
 	$(PYTHON) software/conformance_test_runner.py $(RUNNER_SCHEDULE_FLAG)
+
+schedule-gui:
+	$(PYTHON) -m software.schedule_gui
 
 report:
 	@test -n "$(RUN_DIRECTORY)" || (echo "RUN_DIRECTORY is required"; exit 2)

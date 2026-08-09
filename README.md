@@ -43,6 +43,17 @@ make run-water SCHEDULE=software/gui_schedules/my_test.csv
 For run targets, the selected CSV is passed to both preflight and the test
 runner so the schedule checked is the schedule executed.
 
+Start the local browser schedule editor with:
+
+```bash
+make schedule-gui
+```
+
+It listens on `127.0.0.1:5000` by default and saves validated canonical CSV
+files under `software/gui_schedules`. From another computer, use an SSH tunnel
+to the test station and open `http://127.0.0.1:5000` locally. The editor does
+not read or modify the XLSX workbook and does not launch hardware tests.
+
 Validate the schedule without accessing hardware:
 
 ```bash
