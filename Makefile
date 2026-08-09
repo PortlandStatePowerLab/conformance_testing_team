@@ -2,8 +2,11 @@ PYTHON ?= python3
 CTA_DCS_DIR ?= $(HOME)/cta_2045_controller/dcs
 SENSOR_CONFIGURATION ?=
 SENSOR_CALIBRATION ?=
+SCHEDULE ?=
 HEARTBEAT ?= true
 HEARTBEAT_FLAG = $(if $(filter false,$(HEARTBEAT)),--disable-outside-communication-heartbeat,)
+PREFLIGHT_SCHEDULE_FLAG = $(if $(SCHEDULE),--schedule "$(SCHEDULE)",)
+RUNNER_SCHEDULE_FLAG = $(if $(SCHEDULE),--master-schedule "$(SCHEDULE)",)
 
 .PHONY: help test validate report check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
 
@@ -15,6 +18,7 @@ help:
 	@echo "  make preflight-water  Also initialize GPIO17 LOW and require a water draw"
 	@echo "  make run        Run the hardware test without scheduled valve output"
 	@echo "  make run-water  Run the hardware test with scheduled valve output enabled"
+	@echo "  SCHEDULE=<csv>  Use a canonical CSV instead of the default XLSX schedule"
 	@echo "  HEARTBEAT=false  Disable recurring outside-communication refreshes"
 	@echo "  make report RUN_DIRECTORY=<run-folder>  Regenerate the final report workbook"
 	@echo "  make run-water-configured SENSOR_CONFIGURATION=<file>  Run with water output and sensor configuration"
@@ -28,7 +32,7 @@ test:
 	$(PYTHON) -m unittest discover -s tests -v
 
 validate:
-	$(PYTHON) software/conformance_test_runner.py
+	$(PYTHON) software/conformance_test_runner.py $(RUNNER_SCHEDULE_FLAG)
 
 report:
 	@test -n "$(RUN_DIRECTORY)" || (echo "RUN_DIRECTORY is required"; exit 2)
@@ -39,22 +43,22 @@ check-heartbeat:
 	@test "$(HEARTBEAT)" = "true" -o "$(HEARTBEAT)" = "false" || (echo "HEARTBEAT must be true or false"; exit 2)
 
 preflight: check-heartbeat
-	$(PYTHON) -m software.hardware_preflight $(HEARTBEAT_FLAG)
+	$(PYTHON) -m software.hardware_preflight $(PREFLIGHT_SCHEDULE_FLAG) $(HEARTBEAT_FLAG)
 
 preflight-water: check-heartbeat
-	$(PYTHON) -m software.hardware_preflight --water $(HEARTBEAT_FLAG) $(if $(SENSOR_CONFIGURATION),--sensor-configuration "$(SENSOR_CONFIGURATION)")
+	$(PYTHON) -m software.hardware_preflight --water $(PREFLIGHT_SCHEDULE_FLAG) $(HEARTBEAT_FLAG) $(if $(SENSOR_CONFIGURATION),--sensor-configuration "$(SENSOR_CONFIGURATION)")
 
 run: preflight
-	$(PYTHON) software/conformance_test_runner.py --run-hardware $(HEARTBEAT_FLAG)
+	$(PYTHON) software/conformance_test_runner.py --run-hardware $(RUNNER_SCHEDULE_FLAG) $(HEARTBEAT_FLAG)
 
 run-water: preflight-water
-	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output $(HEARTBEAT_FLAG)
+	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output $(RUNNER_SCHEDULE_FLAG) $(HEARTBEAT_FLAG)
 
 run-water-configured:
 	@test -n "$(SENSOR_CONFIGURATION)" || (echo "SENSOR_CONFIGURATION is required"; exit 2)
 	@test -f "$(SENSOR_CONFIGURATION)" || (echo "Sensor configuration file not found: $(SENSOR_CONFIGURATION)"; exit 2)
 	@$(MAKE) preflight-water SENSOR_CONFIGURATION="$(SENSOR_CONFIGURATION)"
-	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output $(HEARTBEAT_FLAG) --sensor-configuration "$(SENSOR_CONFIGURATION)"
+	$(PYTHON) software/conformance_test_runner.py --run-hardware --enable-water-output $(RUNNER_SCHEDULE_FLAG) $(HEARTBEAT_FLAG) --sensor-configuration "$(SENSOR_CONFIGURATION)"
 
 # Backward-compatible alias for the earlier target and variable names.
 run-water-calibrated:

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conformance Test Schedule</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #172033; background: #f3f5f8; }
+    body { margin: 0; padding: 1.5rem; }
+    main { max-width: 1500px; margin: auto; }
+    h1 { margin: 0 0 .25rem; }
+    .toolbar, .status { background: white; padding: 1rem; border-radius: .6rem; margin: 1rem 0; box-shadow: 0 1px 4px #0002; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
+    label { display: grid; gap: .25rem; font-size: .85rem; }
+    input, select, button { font: inherit; padding: .45rem; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: .82rem; }
+    th, td { border: 1px solid #d8dde7; padding: .3rem; vertical-align: top; }
+    th { background: #e8edf5; white-space: nowrap; }
+    td input, td select { width: 8rem; box-sizing: border-box; }
+    td .wide { width: 13rem; }
+    .scroll { overflow-x: auto; box-shadow: 0 1px 4px #0002; }
+    .valid { border-left: .4rem solid #238636; }
+    .invalid { border-left: .4rem solid #cf222e; }
+    .muted { color: #596579; }
+    #messages { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Conformance Test Schedule</h1>
+  <div class="muted">Creates canonical CSV schedules. Python performs final validation.</div>
+  <div class="toolbar">
+    <label>Schedule name<input id="name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
+    <label>Saved schedule<select id="saved"><option value="">New schedule</option></select></label>
+    <button id="load" type="button">Load</button>
+    <button id="add" type="button">Add event</button>
+    <button id="validate" type="button">Validate</button>
+    <button id="save" type="button">Save validated CSV</button>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr id="headers"></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
+</main>
+<script>
+const columns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes"];
+const actions = ["advanced_load_up","load_up","run_normal","shed","critical_peak","grid_emergency","water_draw","end"];
+const eventTypes = ["cta","water_draw","test"];
+const units = ["","1_wh","10_wh","100_wh","1000_wh"];
+const tbody = document.querySelector("#rows");
+const status = document.querySelector("#status");
+const messages = document.querySelector("#messages");
+
+document.querySelector("#headers").innerHTML = columns.map(c => `<th>${c}</th>`).join("") + "<th></th>";
+
+function selectHtml(values, selected) {
+  return `<select>${values.map(v => `<option ${v === selected ? "selected" : ""}>${v}</option>`).join("")}</select>`;
+}
+
+function addRow(source = {}) {
+  const row = document.createElement("tr");
+  for (const column of columns) {
+    const cell = document.createElement("td");
+    const value = source[column] ?? "";
+    if (column === "enabled") cell.innerHTML = selectHtml(["TRUE", "FALSE"], value || "TRUE");
+    else if (column === "event_type") cell.innerHTML = selectHtml(eventTypes, value || "cta");
+    else if (column === "action") cell.innerHTML = selectHtml(actions, value || "load_up");
+    else if (column === "advanced_units") cell.innerHTML = selectHtml(units, value);
+    else {
+      const input = document.createElement("input");
+      input.value = value;
+      input.className = ["event_id", "notes"].includes(column) ? "wide" : "";
+      if (column === "time_after_start") { input.placeholder = "HH:MM:SS"; input.pattern = "[0-9]+:[0-5][0-9]:[0-5][0-9]"; }
+      if (["target_volume_gal", "expected_flow_gpm"].includes(column)) { input.type = "number"; input.min = "0.000001"; input.step = "any"; }
+      cell.append(input);
+    }
+    cell.dataset.column = column;
+    row.append(cell);
+  }
+  const remove = document.createElement("td");
+  remove.innerHTML = '<button type="button">Remove</button>';
+  remove.firstChild.onclick = () => row.remove();
+  row.append(remove);
+  tbody.append(row);
+}
+
+function rows() {
+  return [...tbody.rows].map(row => Object.fromEntries(columns.map(column => {
+    const control = row.querySelector(`[data-column="${column}"] > *`);
+    return [column, control.value];
+  })));
+}
+
+async function request(path, body) {
+  const response = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const result = await response.json();
+  if (!response.ok) throw result;
+  return result;
+}
+
+function show(result, valid) {
+  status.className = `status ${valid ? "valid" : "invalid"}`;
+  if (result.summary) messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${result.summary.duration_seconds} seconds.`;
+  else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
+}
+
+async function refreshSchedules() {
+  const result = await fetch("/api/schedules").then(r => r.json());
+  const saved = document.querySelector("#saved");
+  saved.innerHTML = '<option value="">New schedule</option>' + result.schedules.map(name => `<option>${name}</option>`).join("");
+}
+
+document.querySelector("#add").onclick = () => addRow();
+document.querySelector("#validate").onclick = async () => { try { show(await request("/api/validate", {rows: rows()}), true); } catch (error) { show(error, false); } };
+document.querySelector("#save").onclick = async () => {
+  const name = document.querySelector("#name");
+  if (!name.reportValidity()) return;
+  try { const result = await request("/api/save", {name: name.value, rows: rows()}); show(result, true); await refreshSchedules(); } catch (error) { show(error, false); }
+};
+document.querySelector("#load").onclick = async () => {
+  const selected = document.querySelector("#saved").value;
+  if (!selected) return;
+  try {
+    const response = await fetch(`/api/schedules/${encodeURIComponent(selected)}`);
+    const result = await response.json();
+    if (!response.ok) throw result;
+    tbody.innerHTML = "";
+    result.rows.forEach(addRow);
+    document.querySelector("#name").value = result.name.replace(/\.csv$/i, "");
+    messages.textContent = `Loaded ${result.name}. Validate before saving changes.`;
+    status.className = "status";
+  } catch (error) { show(error, false); }
+};
+
+addRow({enabled:"TRUE", event_id:"load_up_1", time_after_start:"00:00:00", phase:"pre_event", event_type:"cta", action:"load_up", event_duration_minutes:"unknown", expected_operational_states:"3|6"});
+addRow({enabled:"TRUE", event_id:"test_end", time_after_start:"01:00:00", phase:"recovery", event_type:"test", action:"end"});
+refreshSchedules();
+</script>
+</body>
+</html>

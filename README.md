@@ -30,6 +30,19 @@ make run-water HEARTBEAT=false
 
 `make run` and `make run-water` without the variable use `HEARTBEAT=true`.
 
+All Make commands continue to use the XLSX schedule by default. To validate,
+preflight, or run an existing canonical CSV instead, pass the same optional
+`SCHEDULE` variable:
+
+```bash
+make validate SCHEDULE=software/gui_schedules/my_test.csv
+make preflight-water SCHEDULE=software/gui_schedules/my_test.csv
+make run-water SCHEDULE=software/gui_schedules/my_test.csv
+```
+
+For run targets, the selected CSV is passed to both preflight and the test
+runner so the schedule checked is the schedule executed.
+
 Validate the schedule without accessing hardware:
 
 ```bash

@@ -6,11 +6,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from software.conformance_test_runner import (
+    DEFAULT_MASTER_SCHEDULE,
     ProgressReporter,
     _launch_water_draw,
     build_parser,
     clock_text,
     progress_text,
+    prepare_master_schedule,
     safe_identifier,
     schedule_summary,
 )
@@ -23,6 +25,24 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_default_master_schedule_remains_xlsx(self):
+        self.assertEqual(
+            build_parser().parse_args([]).master_schedule,
+            DEFAULT_MASTER_SCHEDULE,
+        )
+
+    def test_csv_master_schedule_is_validated_and_used_directly(self):
+        with patch(
+            "software.conformance_test_runner.load_schedule"
+        ) as validate_schedule:
+            selected = prepare_master_schedule(
+                MASTER_SCHEDULE,
+                Path("unused-canonical-output.csv"),
+            )
+
+        self.assertEqual(selected, MASTER_SCHEDULE)
+        validate_schedule.assert_called_once_with(MASTER_SCHEDULE)
+
     def test_outside_communication_heartbeat_defaults_enabled(self):
         self.assertFalse(
             build_parser().parse_args([]).disable_outside_communication_heartbeat
