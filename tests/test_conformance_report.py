@@ -84,7 +84,7 @@ class ConformanceReportTests(unittest.TestCase):
             self.create_run(directory)
             timeline = build_timeline(directory)
 
-        self.assertEqual(sum(row["event"] == "operational_state" for row in timeline), 2)
+        self.assertEqual(sum(row["event"] == "operational_state" for row in timeline), 3)
         self.assertEqual(sum(row["event"] == "command_sent" for row in timeline), 1)
         self.assertEqual(sum(row["event"] == "command_completed" for row in timeline), 1)
         self.assertFalse(any(row["timestamp_pacific"].endswith("10:01:00.500-07:00") for row in timeline))

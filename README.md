@@ -99,6 +99,7 @@ orchestrator events, process logs, and a human-readable
 `conformance_test_report.xlsx` workbook. The workbook is generated when the run
 closes and contains Event Timeline, Device Information, Master Schedule, and
 Commodity Summary sheets. The detailed source CSV files remain unchanged.
+The timeline retains each approximately one-minute operational-state reading.
 
 Regenerate the workbook for an existing run with:
 

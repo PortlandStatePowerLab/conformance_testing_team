@@ -113,13 +113,9 @@ def _timestamp_key(value: str) -> datetime:
 
 def _cta_timeline_rows(path: Path) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    previous_state: str | None = None
     for source in _read_csv(path):
         event = source.get("event", "")
         state = source.get("operational_state", "").strip()
-        state_changed = event == "operational_state" and state != previous_state
-        if event == "operational_state":
-            previous_state = state
         failure = any(
             token in source.get("result", "").lower()
             for token in ("fail", "nak", "timeout", "no_ack", "error")
@@ -127,7 +123,7 @@ def _cta_timeline_rows(path: Path) -> list[dict[str, Any]]:
         if not (
             event in CTA_LIFECYCLE_EVENTS
             or event in CTA_COMMAND_EVENTS
-            or state_changed
+            or event == "operational_state"
             or failure
         ):
             continue
