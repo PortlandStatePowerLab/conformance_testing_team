@@ -8,129 +8,245 @@
     :root { font-family: system-ui, sans-serif; color: #172033; background: #f3f5f8; }
     body { margin: 0; padding: 1.5rem; }
     main { max-width: 1500px; margin: auto; }
-    h1 { margin: 0 0 .25rem; }
-    .toolbar, .status { background: white; padding: 1rem; border-radius: .6rem; margin: 1rem 0; box-shadow: 0 1px 4px #0002; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
-    label { display: grid; gap: .25rem; font-size: .85rem; }
-    input, select, button { font: inherit; padding: .45rem; }
+    h1, h2 { margin-top: 0; }
+    h2 { margin-bottom: .25rem; }
+    input, select, button { font: inherit; padding: .45rem; box-sizing: border-box; }
     button { cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; background: white; font-size: .82rem; }
-    th, td { border: 1px solid #d8dde7; padding: .3rem; vertical-align: top; }
-    th { background: #e8edf5; white-space: nowrap; }
-    td input, td select { width: 8rem; box-sizing: border-box; }
-    td .wide { width: 13rem; }
-    .technical { display: none; }
+    label { display: grid; gap: .25rem; font-size: .85rem; }
+    .toolbar, .card, .status { background: white; padding: 1rem; border-radius: .65rem; margin: 1rem 0; box-shadow: 0 1px 4px #0002; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
+    .cards { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .card { margin: 0; }
+    .card-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .8rem; }
+    .muted { color: #596579; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { border: 1px solid #d8dde7; padding: .35rem; vertical-align: top; }
+    th { background: #e8edf5; white-space: nowrap; text-align: left; }
+    td input, td select { width: 8.5rem; }
+    td .notes { width: 13rem; }
     td.irrelevant > * { display: none; }
     td.irrelevant::after { content: "—"; color: #8b949e; }
-    input[readonly] { background: #eef1f5; }
-    .scroll { overflow-x: auto; box-shadow: 0 1px 4px #0002; }
+    .end-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .7rem; max-width: 50rem; }
     .valid { border-left: .4rem solid #238636; }
     .invalid { border-left: .4rem solid #cf222e; }
-    .muted { color: #596579; }
     #messages { white-space: pre-wrap; }
+    .empty { padding: 1rem; text-align: center; color: #596579; border: 1px dashed #b7c0cf; }
+    @media (min-width: 1000px) { .cards { grid-template-columns: 1fr 1fr; } .wide-card { grid-column: 1 / -1; } }
   </style>
 </head>
 <body>
 <main>
   <h1>Conformance Test Schedule</h1>
-  <div class="muted">Creates canonical CSV schedules. Python performs final validation.</div>
+  <div class="muted">Author CTA commands and water draws separately. Python combines and validates one canonical CSV.</div>
+
   <div class="toolbar">
     <label>Schedule name<input id="name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
     <label>Saved schedule<select id="saved"><option value="">New schedule</option></select></label>
     <button id="load" type="button">Load</button>
-    <button id="add" type="button">Add event</button>
-    <button id="validate" type="button">Validate</button>
+    <button id="validate" type="button">Validate schedule</button>
     <button id="save" type="button">Save validated CSV</button>
   </div>
-  <div class="scroll">
-    <table>
-      <thead><tr id="headers"></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
+
+  <div class="cards">
+    <section class="card wide-card">
+      <div class="card-heading">
+        <div><h2>CTA Commands</h2><span class="muted">Demand-response commands sent to the CTA-2045 device.</span></div>
+        <button id="add-cta" type="button">Add CTA command</button>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="cta-rows"></tbody>
+        </table>
+      </div>
+      <div id="cta-empty" class="empty" hidden>No CTA commands scheduled.</div>
+    </section>
+
+    <section class="card wide-card">
+      <div class="card-heading">
+        <div><h2>Water Draws</h2><span class="muted">Scheduled valve events with an estimated duration.</span></div>
+        <button id="add-water" type="button">Add water draw</button>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="water-rows"></tbody>
+        </table>
+      </div>
+      <div id="water-empty" class="empty" hidden>No water draws scheduled.</div>
+    </section>
+
+    <section class="card">
+      <div class="card-heading"><div><h2>Test End</h2><span class="muted">Exactly one enabled end event is required.</span></div></div>
+      <div class="end-fields">
+        <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]"></label>
+        <label>Phase<input id="end-phase" value="recovery"></label>
+        <label>Notes<input id="end-notes"></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-heading"><div><h2>Chronological Preview</h2><span class="muted">Combined view of the CSV schedule that Python will validate.</span></div></div>
+      <div class="scroll">
+        <table><thead><tr><th>Time</th><th>Type</th><th>Event</th><th>Details</th></tr></thead><tbody id="preview"></tbody></table>
+      </div>
+    </section>
   </div>
+
   <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
 </main>
 <script>
-const columns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes"];
-const technicalColumns = new Set(["event_type", "expected_operational_states"]);
-let actionDefinitions = [];
-let units = [];
-const tbody = document.querySelector("#rows");
+const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes"];
 const status = document.querySelector("#status");
 const messages = document.querySelector("#messages");
+const ctaBody = document.querySelector("#cta-rows");
+const waterBody = document.querySelector("#water-rows");
+let actionDefinitions = [];
+let units = [];
 
-document.querySelector("#headers").innerHTML = columns.map(c => `<th class="${technicalColumns.has(c) ? "technical" : ""}">${c}</th>`).join("") + "<th></th>";
-
-function selectHtml(values, selected) {
-  return `<select>${values.map(v => `<option ${v === selected ? "selected" : ""}>${v}</option>`).join("")}</select>`;
+function selectControl(values, selected) {
+  const select = document.createElement("select");
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    option.selected = value === selected;
+    select.append(option);
+  }
+  return select;
 }
 
-function addRow(source = {}) {
+function inputControl(value = "", options = {}) {
+  const input = document.createElement("input");
+  input.value = value;
+  Object.assign(input, options);
+  return input;
+}
+
+function cell(row, control, field) {
+  const td = document.createElement("td");
+  td.dataset.field = field;
+  td.append(control);
+  row.append(td);
+  return td;
+}
+
+function removeCell(row, body) {
+  const td = document.createElement("td");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Remove";
+  button.onclick = () => { row.remove(); updateView(); };
+  td.append(button);
+  row.append(td);
+}
+
+function addCta(source = {}) {
   const row = document.createElement("tr");
-  for (const column of columns) {
-    const cell = document.createElement("td");
-    const value = source[column] ?? "";
-    if (technicalColumns.has(column)) cell.classList.add("technical");
-    if (column === "enabled") cell.innerHTML = selectHtml(["TRUE", "FALSE"], value || "TRUE");
-    else if (column === "event_type" || column === "expected_operational_states") {
-      const input = document.createElement("input");
-      input.value = value;
-      input.readOnly = true;
-      cell.append(input);
-    }
-    else if (column === "action") cell.innerHTML = selectHtml(actionDefinitions.map(item => item.action), value || "load_up");
-    else if (column === "advanced_units") cell.innerHTML = selectHtml(units, value);
-    else {
-      const input = document.createElement("input");
-      input.value = value;
-      input.className = ["event_id", "notes"].includes(column) ? "wide" : "";
-      if (column === "event_id") input.readOnly = true;
-      if (column === "time_after_start") { input.placeholder = "HH:MM:SS"; input.pattern = "[0-9]+:[0-5][0-9]:[0-5][0-9]"; }
-      if (["target_volume_gal", "expected_flow_gpm"].includes(column)) { input.type = "number"; input.min = "0.000001"; input.step = "any"; }
-      if (column === "advanced_value") { input.type = "number"; input.min = "1"; input.max = "65534"; input.step = "1"; }
-      cell.append(input);
-    }
-    cell.dataset.column = column;
-    row.append(cell);
-  }
-  const remove = document.createElement("td");
-  remove.innerHTML = '<button type="button">Remove</button>';
-  remove.firstChild.onclick = () => { row.remove(); updateAllRows(); };
-  row.append(remove);
-  tbody.append(row);
-  row.querySelector('[data-column="action"] select').onchange = updateAllRows;
-  updateAllRows();
+  cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
+  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
+  cell(row, inputControl(source.phase || ""), "phase");
+  const command = cell(row, selectControl(actionDefinitions.filter(item => item.event_type === "cta").map(item => item.action), source.action || "load_up"), "action");
+  cell(row, inputControl(source.event_duration_minutes || "unknown"), "event_duration_minutes");
+  cell(row, inputControl(source.advanced_value || "", {type:"number", min:"1", max:"65534", step:"1"}), "advanced_value");
+  cell(row, selectControl(["", ...units], source.advanced_units || ""), "advanced_units");
+  const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
+  removeCell(row, ctaBody);
+  ctaBody.append(row);
+  command.firstElementChild.onchange = updateView;
+  time.firstElementChild.oninput = updateView;
+  row.oninput = updateView;
+  updateView();
 }
 
-function updateAllRows() {
+function addWater(source = {}) {
+  const row = document.createElement("tr");
+  cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
+  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
+  cell(row, inputControl(source.phase || "event"), "phase");
+  cell(row, inputControl(source.target_volume_gal || "", {type:"number", min:"0.000001", step:"any"}), "target_volume_gal");
+  cell(row, inputControl(source.expected_flow_gpm || "", {type:"number", min:"0.000001", step:"any"}), "expected_flow_gpm");
+  const estimate = document.createElement("span"); cell(row, estimate, "estimate");
+  const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
+  removeCell(row, waterBody);
+  waterBody.append(row);
+  time.firstElementChild.oninput = updateView;
+  row.oninput = updateView;
+  updateView();
+}
+
+function rowValue(row, field) {
+  const control = row.querySelector(`[data-field="${field}"] > *`);
+  return !control || control.disabled ? "" : control.value;
+}
+
+function blankCanonicalRow() {
+  return Object.fromEntries(canonicalColumns.map(column => [column, ""]));
+}
+
+function scheduleRows() {
+  const rows = [];
+  for (const row of ctaBody.rows) {
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"cta", action:rowValue(row,"action"), event_duration_minutes:rowValue(row,"event_duration_minutes"), advanced_value:rowValue(row,"advanced_value"), advanced_units:rowValue(row,"advanced_units"), notes:rowValue(row,"notes")});
+  }
+  for (const row of waterBody.rows) {
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), notes:rowValue(row,"notes")});
+  }
+  rows.push({...blankCanonicalRow(), enabled:"TRUE", time_after_start:document.querySelector("#end-time").value, phase:document.querySelector("#end-phase").value, event_type:"test", action:"end", notes:document.querySelector("#end-notes").value});
+  return rows;
+}
+
+function elapsedSeconds(value) {
+  const parts = value.split(":");
+  if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) return Number.POSITIVE_INFINITY;
+  return Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2]);
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds % 60);
+  return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function updateView() {
+  for (const row of ctaBody.rows) {
+    const action = rowValue(row, "action");
+    const advanced = action === "advanced_load_up";
+    for (const field of ["advanced_value", "advanced_units"]) {
+      const td = row.querySelector(`[data-field="${field}"]`);
+      td.classList.toggle("irrelevant", !advanced);
+      td.firstElementChild.disabled = !advanced;
+    }
+  }
+  for (const row of waterBody.rows) {
+    const volume = Number(rowValue(row, "target_volume_gal"));
+    const flow = Number(rowValue(row, "expected_flow_gpm"));
+    row.querySelector('[data-field="estimate"] span').textContent = formatDuration((volume / flow) * 60);
+  }
+  document.querySelector("#cta-empty").hidden = ctaBody.rows.length !== 0;
+  document.querySelector("#water-empty").hidden = waterBody.rows.length !== 0;
   const counts = {};
-  for (const row of tbody.rows) {
-    const action = row.querySelector('[data-column="action"] select').value;
-    const details = actionDefinitions.find(item => item.action === action);
-    if (!details) continue;
-    counts[action] = (counts[action] || 0) + 1;
-    row.querySelector('[data-column="event_id"] input').value = action === "end" ? "test_end" : `${action}_${counts[action]}`;
-    row.querySelector('[data-column="event_type"] input').value = details.event_type;
-    row.querySelector('[data-column="expected_operational_states"] input').value = details.expected_operational_states.join("|");
-    const active = new Set(details.fields);
-    for (const column of ["event_duration_minutes", "advanced_value", "advanced_units", "target_volume_gal", "expected_flow_gpm"]) {
-      const cell = row.querySelector(`[data-column="${column}"]`);
-      const relevant = active.has(column);
-      cell.classList.toggle("irrelevant", !relevant);
-      cell.firstElementChild.disabled = !relevant;
-    }
-  }
+  const previewRows = scheduleRows().map((row, sourceIndex) => {
+    counts[row.action] = (counts[row.action] || 0) + 1;
+    const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
+    let details = row.phase || "";
+    if (row.action === "water_draw") details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    else if (row.event_type === "cta") details = `duration ${row.event_duration_minutes || "?"} min${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}` : ""}`;
+    return {...row, id, details, sourceIndex};
+  }).sort((a,b) => elapsedSeconds(a.time_after_start) - elapsedSeconds(b.time_after_start) || a.sourceIndex - b.sourceIndex);
+  document.querySelector("#preview").innerHTML = previewRows.map(row => `<tr><td>${escapeHtml(row.time_after_start)}</td><td>${escapeHtml(row.event_type)}</td><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.details)}</td></tr>`).join("");
 }
 
-function rows() {
-  return [...tbody.rows].map(row => Object.fromEntries(columns.map(column => {
-    const control = row.querySelector(`[data-column="${column}"] > *`);
-    return [column, control.disabled ? "" : control.value];
-  })));
+function escapeHtml(value) {
+  const span = document.createElement("span");
+  span.textContent = value;
+  return span.innerHTML;
 }
 
 async function request(path, body) {
-  const response = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const response = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
   const result = await response.json();
   if (!response.ok) throw result;
   return result;
@@ -142,18 +258,38 @@ function show(result, valid) {
   else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
 }
 
-async function refreshSchedules() {
-  const result = await fetch("/api/schedules").then(r => r.json());
+async function refreshSchedules(selected = "") {
+  const result = await fetch("/api/schedules").then(response => response.json());
   const saved = document.querySelector("#saved");
-  saved.innerHTML = '<option value="">New schedule</option>' + result.schedules.map(name => `<option>${name}</option>`).join("");
+  saved.replaceChildren(new Option("New schedule", ""), ...result.schedules.map(name => new Option(name, name)));
+  saved.value = selected;
 }
 
-document.querySelector("#add").onclick = () => addRow();
-document.querySelector("#validate").onclick = async () => { try { show(await request("/api/validate", {rows: rows()}), true); } catch (error) { show(error, false); } };
+function loadRows(rows) {
+  ctaBody.replaceChildren();
+  waterBody.replaceChildren();
+  let end = null;
+  for (const row of rows) {
+    if (row.action === "water_draw") addWater(row);
+    else if (row.action === "end") end = row;
+    else addCta(row);
+  }
+  if (end) {
+    document.querySelector("#end-time").value = end.time_after_start;
+    document.querySelector("#end-phase").value = end.phase;
+    document.querySelector("#end-notes").value = end.notes;
+  }
+  updateView();
+}
+
+document.querySelector("#add-cta").onclick = () => addCta();
+document.querySelector("#add-water").onclick = () => addWater();
+for (const id of ["end-time", "end-phase", "end-notes"]) document.querySelector(`#${id}`).oninput = updateView;
+document.querySelector("#validate").onclick = async () => { try { show(await request("/api/validate", {rows:scheduleRows()}), true); } catch (error) { show(error, false); } };
 document.querySelector("#save").onclick = async () => {
   const name = document.querySelector("#name");
   if (!name.reportValidity()) return;
-  try { const result = await request("/api/save", {name: name.value, rows: rows()}); show(result, true); await refreshSchedules(); } catch (error) { show(error, false); }
+  try { const result = await request("/api/save", {name:name.value, rows:scheduleRows()}); show(result, true); await refreshSchedules(result.saved); } catch (error) { show(error, false); }
 };
 document.querySelector("#load").onclick = async () => {
   const selected = document.querySelector("#saved").value;
@@ -162,8 +298,7 @@ document.querySelector("#load").onclick = async () => {
     const response = await fetch(`/api/schedules/${encodeURIComponent(selected)}`);
     const result = await response.json();
     if (!response.ok) throw result;
-    tbody.innerHTML = "";
-    result.rows.forEach(addRow);
+    loadRows(result.rows);
     document.querySelector("#name").value = result.name.replace(/\.csv$/i, "");
     messages.textContent = `Loaded ${result.name}. Validate before saving changes.`;
     status.className = "status";
@@ -173,12 +308,12 @@ document.querySelector("#load").onclick = async () => {
 async function initialize() {
   const metadata = await fetch("/api/metadata").then(response => response.json());
   actionDefinitions = metadata.actions;
-  units = ["", ...metadata.advanced_units];
-  addRow({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"unknown"});
-  addRow({enabled:"TRUE", time_after_start:"01:00:00", phase:"recovery", action:"end"});
+  units = metadata.advanced_units;
+  addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"unknown"});
+  updateView();
   await refreshSchedules();
 }
-initialize().catch(error => show({error: `Could not initialize editor: ${error}`}, false));
+initialize().catch(error => show({error:`Could not initialize editor: ${error}`}, false));
 </script>
 </body>
 </html>
