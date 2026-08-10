@@ -19,6 +19,10 @@
     th { background: #e8edf5; white-space: nowrap; }
     td input, td select { width: 8rem; box-sizing: border-box; }
     td .wide { width: 13rem; }
+    .technical { display: none; }
+    td.irrelevant > * { display: none; }
+    td.irrelevant::after { content: "—"; color: #8b949e; }
+    input[readonly] { background: #eef1f5; }
     .scroll { overflow-x: auto; box-shadow: 0 1px 4px #0002; }
     .valid { border-left: .4rem solid #238636; }
     .invalid { border-left: .4rem solid #cf222e; }
@@ -48,14 +52,14 @@
 </main>
 <script>
 const columns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes"];
-const actions = ["advanced_load_up","load_up","run_normal","shed","critical_peak","grid_emergency","water_draw","end"];
-const eventTypes = ["cta","water_draw","test"];
-const units = ["","1_wh","10_wh","100_wh","1000_wh"];
+const technicalColumns = new Set(["event_type", "expected_operational_states"]);
+let actionDefinitions = [];
+let units = [];
 const tbody = document.querySelector("#rows");
 const status = document.querySelector("#status");
 const messages = document.querySelector("#messages");
 
-document.querySelector("#headers").innerHTML = columns.map(c => `<th>${c}</th>`).join("") + "<th></th>";
+document.querySelector("#headers").innerHTML = columns.map(c => `<th class="${technicalColumns.has(c) ? "technical" : ""}">${c}</th>`).join("") + "<th></th>";
 
 function selectHtml(values, selected) {
   return `<select>${values.map(v => `<option ${v === selected ? "selected" : ""}>${v}</option>`).join("")}</select>`;
@@ -66,16 +70,24 @@ function addRow(source = {}) {
   for (const column of columns) {
     const cell = document.createElement("td");
     const value = source[column] ?? "";
+    if (technicalColumns.has(column)) cell.classList.add("technical");
     if (column === "enabled") cell.innerHTML = selectHtml(["TRUE", "FALSE"], value || "TRUE");
-    else if (column === "event_type") cell.innerHTML = selectHtml(eventTypes, value || "cta");
-    else if (column === "action") cell.innerHTML = selectHtml(actions, value || "load_up");
+    else if (column === "event_type" || column === "expected_operational_states") {
+      const input = document.createElement("input");
+      input.value = value;
+      input.readOnly = true;
+      cell.append(input);
+    }
+    else if (column === "action") cell.innerHTML = selectHtml(actionDefinitions.map(item => item.action), value || "load_up");
     else if (column === "advanced_units") cell.innerHTML = selectHtml(units, value);
     else {
       const input = document.createElement("input");
       input.value = value;
       input.className = ["event_id", "notes"].includes(column) ? "wide" : "";
+      if (column === "event_id") input.readOnly = true;
       if (column === "time_after_start") { input.placeholder = "HH:MM:SS"; input.pattern = "[0-9]+:[0-5][0-9]:[0-5][0-9]"; }
       if (["target_volume_gal", "expected_flow_gpm"].includes(column)) { input.type = "number"; input.min = "0.000001"; input.step = "any"; }
+      if (column === "advanced_value") { input.type = "number"; input.min = "1"; input.max = "65534"; input.step = "1"; }
       cell.append(input);
     }
     cell.dataset.column = column;
@@ -83,15 +95,37 @@ function addRow(source = {}) {
   }
   const remove = document.createElement("td");
   remove.innerHTML = '<button type="button">Remove</button>';
-  remove.firstChild.onclick = () => row.remove();
+  remove.firstChild.onclick = () => { row.remove(); updateAllRows(); };
   row.append(remove);
   tbody.append(row);
+  row.querySelector('[data-column="action"] select').onchange = updateAllRows;
+  updateAllRows();
+}
+
+function updateAllRows() {
+  const counts = {};
+  for (const row of tbody.rows) {
+    const action = row.querySelector('[data-column="action"] select').value;
+    const details = actionDefinitions.find(item => item.action === action);
+    if (!details) continue;
+    counts[action] = (counts[action] || 0) + 1;
+    row.querySelector('[data-column="event_id"] input').value = action === "end" ? "test_end" : `${action}_${counts[action]}`;
+    row.querySelector('[data-column="event_type"] input').value = details.event_type;
+    row.querySelector('[data-column="expected_operational_states"] input').value = details.expected_operational_states.join("|");
+    const active = new Set(details.fields);
+    for (const column of ["event_duration_minutes", "advanced_value", "advanced_units", "target_volume_gal", "expected_flow_gpm"]) {
+      const cell = row.querySelector(`[data-column="${column}"]`);
+      const relevant = active.has(column);
+      cell.classList.toggle("irrelevant", !relevant);
+      cell.firstElementChild.disabled = !relevant;
+    }
+  }
 }
 
 function rows() {
   return [...tbody.rows].map(row => Object.fromEntries(columns.map(column => {
     const control = row.querySelector(`[data-column="${column}"] > *`);
-    return [column, control.value];
+    return [column, control.disabled ? "" : control.value];
   })));
 }
 
@@ -136,9 +170,15 @@ document.querySelector("#load").onclick = async () => {
   } catch (error) { show(error, false); }
 };
 
-addRow({enabled:"TRUE", event_id:"load_up_1", time_after_start:"00:00:00", phase:"pre_event", event_type:"cta", action:"load_up", event_duration_minutes:"unknown", expected_operational_states:"3|6"});
-addRow({enabled:"TRUE", event_id:"test_end", time_after_start:"01:00:00", phase:"recovery", event_type:"test", action:"end"});
-refreshSchedules();
+async function initialize() {
+  const metadata = await fetch("/api/metadata").then(response => response.json());
+  actionDefinitions = metadata.actions;
+  units = ["", ...metadata.advanced_units];
+  addRow({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"unknown"});
+  addRow({enabled:"TRUE", time_after_start:"01:00:00", phase:"recovery", action:"end"});
+  await refreshSchedules();
+}
+initialize().catch(error => show({error: `Could not initialize editor: ${error}`}, false));
 </script>
 </body>
 </html>

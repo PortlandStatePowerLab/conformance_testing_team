@@ -9,6 +9,7 @@ import json
 import os
 import re
 import tempfile
+from collections import Counter
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,9 +17,23 @@ from typing import Any
 from urllib.parse import unquote
 
 try:
-    from .schedule_parser import SCHEDULE_COLUMNS, ScheduleValidationError, load_schedule
+    from .cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from .schedule_parser import (
+        ADVANCED_UNIT_CODES,
+        CTA_ACTION_CODES,
+        SCHEDULE_COLUMNS,
+        ScheduleValidationError,
+        load_schedule,
+    )
 except ImportError:
-    from schedule_parser import SCHEDULE_COLUMNS, ScheduleValidationError, load_schedule
+    from cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from schedule_parser import (
+        ADVANCED_UNIT_CODES,
+        CTA_ACTION_CODES,
+        SCHEDULE_COLUMNS,
+        ScheduleValidationError,
+        load_schedule,
+    )
 
 
 SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
@@ -26,6 +41,43 @@ DEFAULT_SCHEDULE_DIRECTORY = SOFTWARE_DIRECTORY / "gui_schedules"
 EDITOR_PATH = SOFTWARE_DIRECTORY / "templates" / "schedule_gui.html"
 SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 MAX_REQUEST_BYTES = 1_000_000
+
+
+def editor_metadata() -> dict[str, Any]:
+    """Describe editor choices from the same definitions used by Python."""
+    actions = []
+    for action in CTA_ACTION_CODES:
+        actions.append(
+            {
+                "action": action,
+                "event_type": "cta",
+                "expected_operational_states": list(
+                    EXPECTED_STATES_BY_ACTION.get(action, ())
+                ),
+                "fields": (
+                    ["event_duration_minutes", "advanced_value", "advanced_units"]
+                    if action == "advanced_load_up"
+                    else ["event_duration_minutes"]
+                ),
+            }
+        )
+    actions.extend(
+        [
+            {
+                "action": "water_draw",
+                "event_type": "water_draw",
+                "expected_operational_states": [],
+                "fields": ["target_volume_gal", "expected_flow_gpm"],
+            },
+            {
+                "action": "end",
+                "event_type": "test",
+                "expected_operational_states": [],
+                "fields": [],
+            },
+        ]
+    )
+    return {"actions": actions, "advanced_units": list(ADVANCED_UNIT_CODES)}
 
 
 def normalize_schedule_name(value: str) -> str:
@@ -59,6 +111,28 @@ def _canonical_rows(value: Any) -> list[dict[str, str]]:
     return rows
 
 
+def derive_rows(value: Any) -> list[dict[str, str]]:
+    """Derive technical canonical fields from each user-selected action."""
+    rows = _canonical_rows(value)
+    action_counts: Counter[str] = Counter()
+    metadata = {item["action"]: item for item in editor_metadata()["actions"]}
+    for row in rows:
+        action = row["action"].strip().lower()
+        details = metadata.get(action)
+        if details is None:
+            continue
+        action_counts[action] += 1
+        row["action"] = action
+        row["event_type"] = details["event_type"]
+        row["event_id"] = (
+            "test_end" if action == "end" else f"{action}_{action_counts[action]}"
+        )
+        row["expected_operational_states"] = "|".join(
+            str(state) for state in details["expected_operational_states"]
+        )
+    return rows
+
+
 def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=SCHEDULE_COLUMNS, lineterminator="\n")
@@ -68,7 +142,7 @@ def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
 
 def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
     """Validate browser rows through the existing authoritative CSV parser."""
-    rows = _canonical_rows(value)
+    rows = derive_rows(value)
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -169,6 +243,9 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             if self.schedule_directory.is_dir():
                 names = sorted(path.name for path in self.schedule_directory.glob("*.csv"))
             self._json(HTTPStatus.OK, {"schedules": names})
+            return
+        if self.path == "/api/metadata":
+            self._json(HTTPStatus.OK, editor_metadata())
             return
         prefix = "/api/schedules/"
         if self.path.startswith(prefix):

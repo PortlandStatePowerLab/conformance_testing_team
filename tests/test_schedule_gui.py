@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 
 from software.schedule_gui import (
+    derive_rows,
+    editor_metadata,
     load_schedule_rows,
     normalize_schedule_name,
     save_schedule,
@@ -22,6 +24,33 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_metadata_comes_from_existing_python_definitions(self):
+        metadata = editor_metadata()
+        actions = {item["action"]: item for item in metadata["actions"]}
+
+        self.assertEqual(actions["load_up"]["event_type"], "cta")
+        self.assertEqual(actions["load_up"]["expected_operational_states"], [3, 6])
+        self.assertEqual(
+            actions["water_draw"]["fields"],
+            ["target_volume_gal", "expected_flow_gpm"],
+        )
+        self.assertIn("100_wh", metadata["advanced_units"])
+
+    def test_technical_fields_are_derived_from_action(self):
+        source = master_rows()
+        for row in source:
+            row["event_id"] = "browser value is ignored"
+            row["event_type"] = "browser value is ignored"
+            row["expected_operational_states"] = "255"
+
+        derived = derive_rows(source)
+
+        self.assertEqual(derived[0]["event_id"], "load_up_1")
+        self.assertEqual(derived[0]["event_type"], "cta")
+        self.assertEqual(derived[0]["expected_operational_states"], "3|6")
+        self.assertEqual(derived[-1]["event_id"], "test_end")
+        self.assertEqual(derived[-1]["event_type"], "test")
+
     def test_existing_canonical_rows_validate_without_gui_rules(self):
         rows, summary = validate_rows(master_rows())
 
