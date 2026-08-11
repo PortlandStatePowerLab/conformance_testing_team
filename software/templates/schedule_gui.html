@@ -49,6 +49,8 @@
     <button id="save" type="button">Save validated CSV</button>
   </div>
 
+  <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
+
   <div class="cards">
     <section class="card wide-card">
       <div class="card-heading">
@@ -95,7 +97,6 @@
     </section>
   </div>
 
-  <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
 </main>
 <script>
 const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes","advanced_efficiency"];
