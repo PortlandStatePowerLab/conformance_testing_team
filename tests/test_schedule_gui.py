@@ -35,6 +35,7 @@ class ScheduleGuiTests(unittest.TestCase):
             ["target_volume_gal", "expected_flow_gpm"],
         )
         self.assertIn("100_wh", metadata["advanced_units"])
+        self.assertTrue(metadata["hostname"])
         self.assertEqual(
             [item["value"] for item in metadata["advanced_efficiencies"]],
             list(range(11)),

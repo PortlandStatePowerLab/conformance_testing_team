@@ -39,6 +39,7 @@
 <main>
   <h1>Conformance Test Schedule</h1>
   <div class="muted">Author CTA commands and water draws separately. Python combines and validates one canonical CSV.</div>
+  <div class="status">Schedule server: <strong id="station-hostname">loading…</strong></div>
 
   <div class="toolbar">
     <label>Schedule name<input id="name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
@@ -81,7 +82,7 @@
       <div class="card-heading"><div><h2>Test End</h2><span class="muted">Exactly one enabled end event is required.</span></div></div>
       <div class="end-fields">
         <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]"></label>
-        <label>Phase<input id="end-phase" value="recovery"></label>
+        <label>Phase<select id="end-phase"><option>pre_event</option><option>event</option><option selected>recovery</option></select></label>
         <label>Notes<input id="end-notes"></label>
       </div>
     </section>
@@ -105,6 +106,7 @@ const waterBody = document.querySelector("#water-rows");
 let actionDefinitions = [];
 let units = [];
 let efficiencies = [];
+const phases = ["pre_event", "event", "recovery"];
 
 function selectControl(values, selected) {
   const select = document.createElement("select");
@@ -157,7 +159,7 @@ function addCta(source = {}) {
   const row = document.createElement("tr");
   cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
   const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
-  cell(row, inputControl(source.phase || ""), "phase");
+  cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "pre_event"), "phase");
   const command = cell(row, selectControl(actionDefinitions.filter(item => item.event_type === "cta").map(item => item.action), source.action || "load_up"), "action");
   cell(row, inputControl(source.event_duration_minutes || "unknown"), "event_duration_minutes");
   cell(row, inputControl(source.advanced_value || "", {type:"number", min:"1", max:"65534", step:"1"}), "advanced_value");
@@ -176,7 +178,7 @@ function addWater(source = {}) {
   const row = document.createElement("tr");
   cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
   const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
-  cell(row, inputControl(source.phase || "event"), "phase");
+  cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "event"), "phase");
   cell(row, inputControl(source.target_volume_gal || "", {type:"number", min:"0.000001", step:"any"}), "target_volume_gal");
   cell(row, inputControl(source.expected_flow_gpm || "", {type:"number", min:"0.000001", step:"any"}), "expected_flow_gpm");
   const estimate = document.createElement("span"); cell(row, estimate, "estimate");
@@ -288,7 +290,7 @@ function loadRows(rows) {
   }
   if (end) {
     document.querySelector("#end-time").value = end.time_after_start;
-    document.querySelector("#end-phase").value = end.phase;
+    document.querySelector("#end-phase").value = phases.includes(end.phase) ? end.phase : "recovery";
     document.querySelector("#end-notes").value = end.notes;
   }
   updateView();
@@ -319,6 +321,7 @@ document.querySelector("#load").onclick = async () => {
 
 async function initialize() {
   const metadata = await fetch("/api/metadata").then(response => response.json());
+  document.querySelector("#station-hostname").textContent = metadata.hostname;
   actionDefinitions = metadata.actions;
   units = metadata.advanced_units;
   efficiencies = metadata.advanced_efficiencies;

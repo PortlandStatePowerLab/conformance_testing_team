@@ -8,6 +8,7 @@ import csv
 import json
 import os
 import re
+import socket
 import tempfile
 from collections import Counter
 from http import HTTPStatus
@@ -83,6 +84,7 @@ def editor_metadata() -> dict[str, Any]:
         ]
     )
     return {
+        "hostname": socket.gethostname(),
         "actions": actions,
         "advanced_units": list(ADVANCED_UNIT_CODES),
         "advanced_efficiencies": [
