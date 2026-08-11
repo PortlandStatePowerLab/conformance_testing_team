@@ -21,7 +21,7 @@ try:
     from .schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
-        SCHEDULE_COLUMNS,
+        EXTENDED_SCHEDULE_COLUMNS,
         ScheduleValidationError,
         load_schedule,
     )
@@ -30,7 +30,7 @@ except ImportError:
     from schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
-        SCHEDULE_COLUMNS,
+        EXTENDED_SCHEDULE_COLUMNS,
         ScheduleValidationError,
         load_schedule,
     )
@@ -55,7 +55,12 @@ def editor_metadata() -> dict[str, Any]:
                     EXPECTED_STATES_BY_ACTION.get(action, ())
                 ),
                 "fields": (
-                    ["event_duration_minutes", "advanced_value", "advanced_units"]
+                    [
+                        "event_duration_minutes",
+                        "advanced_value",
+                        "advanced_units",
+                        "advanced_efficiency",
+                    ]
                     if action == "advanced_load_up"
                     else ["event_duration_minutes"]
                 ),
@@ -77,7 +82,20 @@ def editor_metadata() -> dict[str, Any]:
             },
         ]
     )
-    return {"actions": actions, "advanced_units": list(ADVANCED_UNIT_CODES)}
+    return {
+        "actions": actions,
+        "advanced_units": list(ADVANCED_UNIT_CODES),
+        "advanced_efficiencies": [
+            {"value": 0, "label": "0 — Off"},
+            {"value": 1, "label": "1 — Least energy efficient"},
+            *(
+                {"value": value, "label": str(value)}
+                for value in range(2, 9)
+            ),
+            {"value": 9, "label": "9 — Most energy efficient"},
+            {"value": 10, "label": "10 — Vacation mode (optional SGD support)"},
+        ],
+    }
 
 
 def normalize_schedule_name(value: str) -> str:
@@ -99,13 +117,13 @@ def _canonical_rows(value: Any) -> list[dict[str, str]]:
     for index, source in enumerate(value, start=1):
         if not isinstance(source, dict):
             raise ValueError(f"row {index} must be an object")
-        unexpected = sorted(set(source).difference(SCHEDULE_COLUMNS))
+        unexpected = sorted(set(source).difference(EXTENDED_SCHEDULE_COLUMNS))
         if unexpected:
             raise ValueError(f"row {index} contains unknown fields: {unexpected}")
         rows.append(
             {
                 column: "" if source.get(column) is None else str(source.get(column, ""))
-                for column in SCHEDULE_COLUMNS
+                for column in EXTENDED_SCHEDULE_COLUMNS
             }
         )
     return rows
@@ -135,7 +153,9 @@ def derive_rows(value: Any) -> list[dict[str, str]]:
 
 def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=SCHEDULE_COLUMNS, lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -150,7 +170,7 @@ def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
         ) as handle:
             temporary_path = Path(handle.name)
             writer = csv.DictWriter(
-                handle, fieldnames=SCHEDULE_COLUMNS, lineterminator="\n"
+                handle, fieldnames=EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
             )
             writer.writeheader()
             writer.writerows(rows)

@@ -56,7 +56,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Efficiency (optional)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="cta-rows"></tbody>
         </table>
       </div>
@@ -97,13 +97,14 @@
   <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
 </main>
 <script>
-const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes"];
+const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes","advanced_efficiency"];
 const status = document.querySelector("#status");
 const messages = document.querySelector("#messages");
 const ctaBody = document.querySelector("#cta-rows");
 const waterBody = document.querySelector("#water-rows");
 let actionDefinitions = [];
 let units = [];
+let efficiencies = [];
 
 function selectControl(values, selected) {
   const select = document.createElement("select");
@@ -122,6 +123,16 @@ function inputControl(value = "", options = {}) {
   input.value = value;
   Object.assign(input, options);
   return input;
+}
+
+function efficiencyControl(selected) {
+  const select = document.createElement("select");
+  select.append(new Option("Not included", ""));
+  for (const item of efficiencies) {
+    select.append(new Option(item.label, String(item.value)));
+  }
+  select.value = selected === null || selected === undefined ? "" : String(selected);
+  return select;
 }
 
 function cell(row, control, field) {
@@ -151,6 +162,7 @@ function addCta(source = {}) {
   cell(row, inputControl(source.event_duration_minutes || "unknown"), "event_duration_minutes");
   cell(row, inputControl(source.advanced_value || "", {type:"number", min:"1", max:"65534", step:"1"}), "advanced_value");
   cell(row, selectControl(["", ...units], source.advanced_units || ""), "advanced_units");
+  cell(row, efficiencyControl(source.advanced_efficiency), "advanced_efficiency");
   const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
   removeCell(row, ctaBody);
   ctaBody.append(row);
@@ -188,7 +200,7 @@ function blankCanonicalRow() {
 function scheduleRows() {
   const rows = [];
   for (const row of ctaBody.rows) {
-    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"cta", action:rowValue(row,"action"), event_duration_minutes:rowValue(row,"event_duration_minutes"), advanced_value:rowValue(row,"advanced_value"), advanced_units:rowValue(row,"advanced_units"), notes:rowValue(row,"notes")});
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"cta", action:rowValue(row,"action"), event_duration_minutes:rowValue(row,"event_duration_minutes"), advanced_value:rowValue(row,"advanced_value"), advanced_units:rowValue(row,"advanced_units"), advanced_efficiency:rowValue(row,"advanced_efficiency"), notes:rowValue(row,"notes")});
   }
   for (const row of waterBody.rows) {
     rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), notes:rowValue(row,"notes")});
@@ -214,7 +226,7 @@ function updateView() {
   for (const row of ctaBody.rows) {
     const action = rowValue(row, "action");
     const advanced = action === "advanced_load_up";
-    for (const field of ["advanced_value", "advanced_units"]) {
+    for (const field of ["advanced_value", "advanced_units", "advanced_efficiency"]) {
       const td = row.querySelector(`[data-field="${field}"]`);
       td.classList.toggle("irrelevant", !advanced);
       td.firstElementChild.disabled = !advanced;
@@ -233,7 +245,7 @@ function updateView() {
     const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
     let details = row.phase || "";
     if (row.action === "water_draw") details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
-    else if (row.event_type === "cta") details = `duration ${row.event_duration_minutes || "?"} min${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}` : ""}`;
+    else if (row.event_type === "cta") details = `duration ${row.event_duration_minutes || "?"} min${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
     return {...row, id, details, sourceIndex};
   }).sort((a,b) => elapsedSeconds(a.time_after_start) - elapsedSeconds(b.time_after_start) || a.sourceIndex - b.sourceIndex);
   document.querySelector("#preview").innerHTML = previewRows.map(row => `<tr><td>${escapeHtml(row.time_after_start)}</td><td>${escapeHtml(row.event_type)}</td><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.details)}</td></tr>`).join("");
@@ -309,6 +321,7 @@ async function initialize() {
   const metadata = await fetch("/api/metadata").then(response => response.json());
   actionDefinitions = metadata.actions;
   units = metadata.advanced_units;
+  efficiencies = metadata.advanced_efficiencies;
   addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"unknown"});
   updateView();
   await refreshSchedules();

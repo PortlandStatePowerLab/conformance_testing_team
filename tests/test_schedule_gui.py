@@ -35,6 +35,10 @@ class ScheduleGuiTests(unittest.TestCase):
             ["target_volume_gal", "expected_flow_gpm"],
         )
         self.assertIn("100_wh", metadata["advanced_units"])
+        self.assertEqual(
+            [item["value"] for item in metadata["advanced_efficiencies"]],
+            list(range(11)),
+        )
 
     def test_technical_fields_are_derived_from_action(self):
         source = master_rows()
@@ -69,7 +73,16 @@ class ScheduleGuiTests(unittest.TestCase):
 
         self.assertEqual(destination.name, "gui_test.csv")
         self.assertEqual(len(events), summary["enabled_events"])
-        self.assertEqual(loaded_rows, master_rows())
+        self.assertEqual(
+            [
+                {key: row[key] for key in master_rows()[0]}
+                for row in loaded_rows
+            ],
+            master_rows(),
+        )
+        self.assertTrue(
+            all(row["advanced_efficiency"] == "" for row in loaded_rows)
+        )
 
     def test_invalid_update_does_not_overwrite_valid_schedule(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -100,6 +113,49 @@ class ScheduleGuiTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "unknown fields"):
             validate_rows(rows)
+
+    def test_efficiency_zero_survives_gui_save_and_reload(self):
+        rows = [
+            {
+                "enabled": "TRUE",
+                "event_id": "ignored",
+                "time_after_start": "00:00:00",
+                "phase": "event",
+                "event_type": "cta",
+                "action": "advanced_load_up",
+                "event_duration_minutes": "60",
+                "advanced_value": "5",
+                "advanced_units": "100_wh",
+                "expected_operational_states": "",
+                "target_volume_gal": "",
+                "expected_flow_gpm": "",
+                "notes": "",
+                "advanced_efficiency": "0",
+            },
+            {
+                "enabled": "TRUE",
+                "event_id": "ignored",
+                "time_after_start": "01:00:00",
+                "phase": "",
+                "event_type": "test",
+                "action": "end",
+                "event_duration_minutes": "",
+                "advanced_value": "",
+                "advanced_units": "",
+                "expected_operational_states": "",
+                "target_volume_gal": "",
+                "expected_flow_gpm": "",
+                "notes": "",
+                "advanced_efficiency": "",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            destination, _ = save_schedule(Path(directory), "efficiency_zero", rows)
+            loaded = load_schedule_rows(destination)
+            event = load_schedule(destination)[0]
+
+        self.assertEqual(loaded[0]["advanced_efficiency"], "0")
+        self.assertEqual(event.advanced_efficiency, 0)
 
 
 if __name__ == "__main__":

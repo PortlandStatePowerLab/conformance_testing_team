@@ -30,6 +30,7 @@ SCHEDULE_COLUMNS = (
     "expected_flow_gpm",
     "notes",
 )
+EXTENDED_SCHEDULE_COLUMNS = SCHEDULE_COLUMNS + ("advanced_efficiency",)
 
 CTA_ACTION_CODES = {
     "advanced_load_up": "a",
@@ -84,6 +85,7 @@ class ScheduleEvent:
     advanced_duration_minutes: int | None
     advanced_value: int | None
     advanced_units: int | None
+    advanced_efficiency: int | None
     expected_operational_states: tuple[int, ...]
     target_volume_gal: float | None
     expected_flow_gpm: float | None
@@ -109,6 +111,7 @@ class GeneratedCtaEvent:
     advanced_duration_minutes: int | None
     advanced_value: int | None
     advanced_units: int | None
+    advanced_efficiency: int | None
     expected_operational_states: tuple[int, ...]
     requested_duration_seconds: int | None
     represented_duration_seconds: int | None
@@ -206,6 +209,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     duration_text = row["event_duration_minutes"].strip()
     advanced_value_text = row["advanced_value"].strip()
     advanced_units_text = row["advanced_units"].strip().lower()
+    advanced_efficiency_text = (row.get("advanced_efficiency") or "").strip()
     expected_states_text = row["expected_operational_states"].strip()
     volume_text = row["target_volume_gal"].strip()
     flow_text = row["expected_flow_gpm"].strip()
@@ -217,6 +221,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     advanced_duration = None
     advanced_value = None
     advanced_units = None
+    advanced_efficiency = None
     expected_states: tuple[int, ...] = ()
     volume = None
     flow = None
@@ -248,12 +253,16 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
                     "advanced_units must be one of " + ", ".join(ADVANCED_UNIT_CODES)
                 )
             advanced_units = ADVANCED_UNIT_CODES[advanced_units_text]
+            if advanced_efficiency_text:
+                advanced_efficiency = _parse_bounded_integer(
+                    advanced_efficiency_text, "advanced_efficiency", 0, 10
+                )
         else:
             if not duration_text:
                 raise ValueError(
                     "Basic DR CTA events require event_duration_minutes"
                 )
-            if advanced_value_text or advanced_units_text:
+            if advanced_value_text or advanced_units_text or advanced_efficiency_text:
                 raise ValueError("Basic DR CTA events cannot contain advanced load-up values")
             duration = encode_event_duration(duration_text)
         if volume_text or flow_text:
@@ -261,7 +270,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     elif event_type == "water_draw":
         if action != "water_draw":
             raise ValueError("water_draw action must be 'water_draw'")
-        if duration_text or advanced_value_text or advanced_units_text or expected_states_text:
+        if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text:
             raise ValueError("water draws cannot contain CTA argument or expectation values")
         if not volume_text or not flow_text:
             raise ValueError("water draws require target_volume_gal and expected_flow_gpm")
@@ -270,7 +279,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     else:
         if action != "end":
             raise ValueError("test action must be 'end'")
-        if duration_text or advanced_value_text or advanced_units_text or expected_states_text or volume_text or flow_text:
+        if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text or volume_text or flow_text:
             raise ValueError("test end cannot contain CTA or water-draw values")
 
     event_id = row["event_id"].strip()
@@ -288,6 +297,7 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         advanced_duration_minutes=advanced_duration,
         advanced_value=advanced_value,
         advanced_units=advanced_units,
+        advanced_efficiency=advanced_efficiency,
         expected_operational_states=expected_states,
         target_volume_gal=volume,
         expected_flow_gpm=flow,
@@ -308,17 +318,19 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
         normalized_columns = list(actual_columns)
         while normalized_columns and not normalized_columns[-1].strip():
             normalized_columns.pop()
-        if tuple(normalized_columns) != SCHEDULE_COLUMNS:
+        if tuple(normalized_columns) not in (SCHEDULE_COLUMNS, EXTENDED_SCHEDULE_COLUMNS):
             raise ScheduleValidationError(
                 [
-                    "CSV columns must exactly match: " + ",".join(SCHEDULE_COLUMNS),
+                    "CSV columns must exactly match: "
+                    + ",".join(SCHEDULE_COLUMNS)
+                    + " optionally followed by advanced_efficiency",
                     "found: " + ",".join(actual_columns),
                 ]
             )
         for row_number, row in enumerate(reader, start=2):
             unexpected_values: list[str] = []
             for column, value in row.items():
-                if column in SCHEDULE_COLUMNS:
+                if column in EXTENDED_SCHEDULE_COLUMNS:
                     continue
                 if isinstance(value, list):
                     unexpected_values.extend(
@@ -417,6 +429,7 @@ def generate_cta_events(
                 advanced_duration_minutes=None,
                 advanced_value=None,
                 advanced_units=None,
+                advanced_efficiency=None,
                 expected_operational_states=(),
                 requested_duration_seconds=None,
                 represented_duration_seconds=None,
@@ -436,6 +449,7 @@ def generate_cta_events(
                 advanced_duration_minutes=event.advanced_duration_minutes,
                 advanced_value=event.advanced_value,
                 advanced_units=event.advanced_units,
+                advanced_efficiency=event.advanced_efficiency,
                 expected_operational_states=event.expected_operational_states,
                 requested_duration_seconds=(
                     event.event_duration.requested_seconds
@@ -479,6 +493,7 @@ def generate_cta_events(
                     advanced_duration_minutes=None,
                     advanced_value=None,
                     advanced_units=None,
+                    advanced_efficiency=None,
                     expected_operational_states=(),
                     requested_duration_seconds=None,
                     represented_duration_seconds=None,

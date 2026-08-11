@@ -14,6 +14,11 @@ states from the action instead of relying on Excel to calculate formulas.
 For Basic DR commands, `event_duration_minutes` accepts a whole number from
 1 through 2150, or `unknown`. The compiler rounds a numeric duration up to the
 next CTA-2045 duration-byte value so the encoded event does not expire early.
+For Advanced Load Up, the GUI also offers an optional suggested efficiency:
+blank omits the optional payload byte, while values 0 through 10 include it.
+Zero means off, 1 is least efficient, 9 is most efficient, and 10 requests
+vacation mode (which an SGD is not required to support). Existing XLSX and CSV
+schedules without this optional column retain the original 7-byte request.
 Beginning with the first CTA command prerequisite, the compiler automatically
 refreshes outside communication every 13 minutes 30 seconds for the entire
 test, including run-normal periods. The heartbeat stops at test end. These

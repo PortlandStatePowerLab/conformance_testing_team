@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from software.schedule_parser import (
+    EXTENDED_SCHEDULE_COLUMNS,
     SCHEDULE_COLUMNS,
     ScheduleValidationError,
     encode_event_duration,
@@ -109,6 +110,38 @@ class MasterScheduleTests(unittest.TestCase):
                 writer.writerows(rows)
             event = load_schedule(path)[0]
         self.assertEqual(event.advanced_duration_minutes, 0)
+
+    def test_optional_advanced_efficiency_accepts_zero_through_ten(self):
+        for efficiency in ("0", "5", "10"):
+            with self.subTest(efficiency=efficiency), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "schedule.csv"
+                rows = [
+                    ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", "", efficiency],
+                    ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+                ]
+                with path.open("w", encoding="utf-8", newline="") as handle:
+                    writer = csv.writer(handle)
+                    writer.writerow(EXTENDED_SCHEDULE_COLUMNS)
+                    writer.writerows(rows)
+
+                event = load_schedule(path)[0]
+
+                self.assertEqual(event.advanced_efficiency, int(efficiency))
+
+    def test_reserved_advanced_efficiency_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            rows = [
+                ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", "", "11"],
+                ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+            ]
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+
+            with self.assertRaisesRegex(ScheduleValidationError, "between 0 and 10"):
+                load_schedule(path)
 
     def test_empty_trailing_spreadsheet_column_is_accepted(self):
         expected_count = len(load_schedule(MASTER_SCHEDULE))
