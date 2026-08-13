@@ -9,6 +9,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+# Support normal direct execution from either the repository root or this
+# diagnostics directory. The project keeps shared hardware helpers under
+# software/helpers rather than installing them as a site package.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+SOFTWARE_ROOT = REPOSITORY_ROOT / "software"
+for import_root in (REPOSITORY_ROOT, SOFTWARE_ROOT):
+    import_path = str(import_root)
+    if import_path not in sys.path:
+        sys.path.insert(0, import_path)
+
 from smbus2 import SMBus
 
 # -----------------------------
