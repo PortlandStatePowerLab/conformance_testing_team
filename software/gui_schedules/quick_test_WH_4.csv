@@ -1,0 +1,6 @@
+enabled,event_id,time_after_start,phase,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes,advanced_efficiency
+TRUE,load_up_1,00:00:00,pre_event,cta,load_up,60,,,3|6,,,,
+TRUE,shed_1,00:02:00,event,cta,shed,unknown,,,2|4,,,,
+TRUE,run_normal_1,00:05:00,pre_event,cta,run_normal,unknown,,,0|1,,,,
+TRUE,water_draw_1,00:01:00,event,water_draw,water_draw,,,,,12,3,,
+TRUE,test_end,00:06:00,recovery,test,end,,,,,,,,
