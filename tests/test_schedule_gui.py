@@ -1,8 +1,14 @@
 import csv
+import json
 import tempfile
+import threading
 import unittest
+from http.server import ThreadingHTTPServer
 from pathlib import Path
+from urllib.request import Request, urlopen
+from unittest.mock import patch
 
+from software.hardware_preflight import PreflightCheck
 from software.schedule_gui import (
     derive_rows,
     editor_metadata,
@@ -10,6 +16,8 @@ from software.schedule_gui import (
     load_schedule_rows,
     normalize_schedule_name,
     save_schedule,
+    schedule_uses_water,
+    ScheduleGuiHandler,
     station_schedule_choices,
     station_schedule_filename,
     station_suffix_from_hostname,
@@ -150,6 +158,75 @@ class ScheduleGuiTests(unittest.TestCase):
                 {"filename": "beta_WH_1.csv", "name": "beta"},
             ],
         )
+
+    def test_preflight_mode_is_derived_from_saved_schedule(self):
+        with tempfile.TemporaryDirectory() as directory:
+            schedule_directory = Path(directory)
+            water_path, _ = save_schedule(
+                schedule_directory, "water", master_rows()
+            )
+            no_water_rows = [
+                row for row in master_rows() if row["event_type"] != "water_draw"
+            ]
+            dry_path, _ = save_schedule(
+                schedule_directory, "dry", no_water_rows
+            )
+
+            self.assertTrue(schedule_uses_water(water_path))
+            self.assertFalse(schedule_uses_water(dry_path))
+
+    def test_preflight_endpoint_streams_checks_and_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            schedule_directory = Path(directory)
+            schedule_path, _ = save_schedule(
+                schedule_directory, "stream_test_WH_1", master_rows()
+            )
+            handler = type(
+                "TestScheduleGuiHandler",
+                (ScheduleGuiHandler,),
+                {
+                    "schedule_directory": schedule_directory,
+                    "hostname": "WH-station1",
+                    "station_suffix": "WH_1",
+                    "log_message": lambda *args: None,
+                },
+            )
+            server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            def fake_preflight(args, on_check=None):
+                checks = [
+                    PreflightCheck("platform", True, "linux"),
+                    PreflightCheck("ACS37800", False, "not found"),
+                ]
+                for check in checks:
+                    on_check(check)
+                return checks
+
+            try:
+                request = Request(
+                    f"http://127.0.0.1:{server.server_port}/api/preflight",
+                    data=json.dumps({"filename": schedule_path.name}).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with patch(
+                    "software.schedule_gui.run_preflight",
+                    side_effect=fake_preflight,
+                ):
+                    with urlopen(request, timeout=5) as response:
+                        events = [json.loads(line) for line in response]
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+        self.assertEqual(events[0]["type"], "start")
+        self.assertTrue(events[0]["water"])
+        self.assertEqual([event["type"] for event in events[1:3]], ["check", "check"])
+        self.assertEqual(events[-1]["type"], "summary")
+        self.assertEqual(events[-1]["failed"], 1)
 
     def test_unknown_browser_fields_are_rejected(self):
         rows = master_rows()

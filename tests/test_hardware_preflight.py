@@ -104,11 +104,17 @@ class HardwarePreflightTest(unittest.TestCase):
             hardware_preflight.PreflightCheck("one", True, "ok"),
             hardware_preflight.PreflightCheck("two", False, "missing"),
         ]
+        def fake_run_preflight(args, on_check=None):
+            for check in checks:
+                if on_check is not None:
+                    on_check(check)
+            return checks
+
         output = io.StringIO()
         with (
             patch(
                 "software.hardware_preflight.run_preflight",
-                return_value=checks,
+                side_effect=fake_run_preflight,
             ),
             redirect_stdout(output),
         ):
@@ -117,6 +123,22 @@ class HardwarePreflightTest(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn("PREFLIGHT_FAIL two: missing", output.getvalue())
         self.assertIn("failed=1", output.getvalue())
+
+    def test_run_preflight_reports_each_check_as_it_finishes(self):
+        args = hardware_preflight.build_parser().parse_args([])
+        completed = []
+        with patch(
+            "software.hardware_preflight._check",
+            side_effect=lambda name, action: hardware_preflight.PreflightCheck(
+                name, True, "ok"
+            ),
+        ):
+            checks = hardware_preflight.run_preflight(
+                args, on_check=completed.append
+            )
+
+        self.assertEqual(completed, checks)
+        self.assertGreater(len(completed), 2)
 
 
 if __name__ == "__main__":

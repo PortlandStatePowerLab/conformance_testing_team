@@ -57,7 +57,10 @@ make schedule-gui
 It listens on `127.0.0.1:5000` by default and saves validated canonical CSV
 files under `software/gui_schedules`. From another computer, use an SSH tunnel
 to the test station and open `http://127.0.0.1:5000` locally. The editor does
-not read or modify the XLSX workbook and does not launch hardware tests.
+not read or modify the XLSX workbook and does not launch hardware tests. After
+validating and saving a schedule, the GUI can run the existing hardware
+preflight checks. It automatically selects water preflight when the saved
+schedule contains an enabled water draw.
 
 Validate the schedule without accessing hardware:
 

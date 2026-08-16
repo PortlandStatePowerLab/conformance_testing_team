@@ -10,6 +10,7 @@ import os
 import re
 import socket
 import tempfile
+import threading
 from collections import Counter
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -26,6 +27,11 @@ try:
         ScheduleValidationError,
         load_schedule,
     )
+    from .hardware_preflight import (
+        PreflightCheck,
+        build_parser as build_preflight_parser,
+        run_preflight,
+    )
 except ImportError:
     from cta_operational_states import EXPECTED_STATES_BY_ACTION
     from schedule_parser import (
@@ -34,6 +40,11 @@ except ImportError:
         EXTENDED_SCHEDULE_COLUMNS,
         ScheduleValidationError,
         load_schedule,
+    )
+    from hardware_preflight import (
+        PreflightCheck,
+        build_parser as build_preflight_parser,
+        run_preflight,
     )
 
 
@@ -283,11 +294,17 @@ def load_schedule_rows(path: Path) -> list[dict[str, str]]:
         return [dict(row) for row in csv.DictReader(handle)]
 
 
+def schedule_uses_water(path: Path) -> bool:
+    """Return whether an already-saved schedule requires water preflight."""
+    return any(event.event_type == "water_draw" for event in load_schedule(path))
+
+
 class ScheduleGuiHandler(BaseHTTPRequestHandler):
     schedule_directory = DEFAULT_SCHEDULE_DIRECTORY
     editor_path = EDITOR_PATH
     hostname = socket.gethostname()
     station_suffix = ""
+    preflight_lock = threading.Lock()
 
     def _json(self, status: HTTPStatus, payload: Any) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -311,6 +328,70 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         if not isinstance(value, dict):
             raise ValueError("request body must be a JSON object")
         return value
+
+    def _stream_preflight(self, filename: str) -> None:
+        friendly_schedule_name(filename, self.station_suffix)
+        path = self.schedule_directory / normalize_schedule_name(filename)
+        if not path.is_file():
+            self._json(HTTPStatus.NOT_FOUND, {"error": "schedule not found"})
+            return
+        if not self.preflight_lock.acquire(blocking=False):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": "another hardware preflight is already running"},
+            )
+            return
+        try:
+            water = schedule_uses_water(path)
+            arguments = ["--schedule", str(path)]
+            if water:
+                arguments.insert(0, "--water")
+            preflight_args = build_preflight_parser().parse_args(arguments)
+
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+
+            def send(payload: dict[str, Any]) -> None:
+                self.wfile.write((json.dumps(payload) + "\n").encode("utf-8"))
+                self.wfile.flush()
+
+            try:
+                send({"type": "start", "schedule": filename, "water": water})
+
+                def report(check: PreflightCheck) -> None:
+                    status = "PASS" if check.passed else "FAIL"
+                    print(f"PREFLIGHT_{status} {check.name}: {check.details}")
+                    send(
+                        {
+                            "type": "check",
+                            "name": check.name,
+                            "passed": check.passed,
+                            "details": check.details,
+                        }
+                    )
+
+                checks = run_preflight(preflight_args, on_check=report)
+                failures = sum(not check.passed for check in checks)
+                print(
+                    f"PREFLIGHT_SUMMARY passed={len(checks) - failures} "
+                    f"failed={failures} water={str(water).lower()}"
+                )
+                send(
+                    {
+                        "type": "summary",
+                        "passed": len(checks) - failures,
+                        "failed": failures,
+                        "water": water,
+                    }
+                )
+            except (BrokenPipeError, ConnectionResetError):
+                return
+            except Exception as exc:
+                send({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+        finally:
+            self.preflight_lock.release()
 
     def do_GET(self) -> None:
         if self.path == "/":
@@ -377,6 +458,9 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                     HTTPStatus.OK,
                     {"saved": destination.name, "summary": summary},
                 )
+                return
+            if self.path == "/api/preflight":
+                self._stream_preflight(str(request.get("filename", "")))
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         except ScheduleValidationError as exc:

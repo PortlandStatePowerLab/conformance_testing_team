@@ -31,6 +31,9 @@
     .valid { border-left: .4rem solid #238636; }
     .invalid { border-left: .4rem solid #cf222e; }
     #messages { white-space: pre-wrap; }
+    #preflight-lines, #preflight-failures { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .9rem; }
+    #preflight-lines { min-height: 2.8rem; }
+    #preflight-failures { color: #b42318; margin-top: .5rem; }
     .empty { padding: 1rem; text-align: center; color: #596579; border: 1px dashed #b7c0cf; }
     @media (min-width: 1000px) { .cards { grid-template-columns: 1fr 1fr; } .wide-card { grid-column: 1 / -1; } }
   </style>
@@ -47,9 +50,15 @@
     <button id="load" type="button">Load</button>
     <button id="validate" type="button">Validate schedule</button>
     <button id="save" type="button">Save validated CSV</button>
+    <button id="preflight" type="button" disabled>Run preflight</button>
   </div>
 
   <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
+  <div id="preflight-status" class="status">
+    <strong id="preflight-heading">Hardware preflight not yet run.</strong>
+    <div id="preflight-lines" class="muted"></div>
+    <div id="preflight-failures"></div>
+  </div>
 
   <div class="cards">
     <section class="card wide-card">
@@ -108,6 +117,16 @@ let actionDefinitions = [];
 let units = [];
 let efficiencies = [];
 const phases = ["pre_event", "event", "recovery"];
+const saveButton = document.querySelector("#save");
+const preflightButton = document.querySelector("#preflight");
+const preflightStatus = document.querySelector("#preflight-status");
+const preflightHeading = document.querySelector("#preflight-heading");
+const preflightLines = document.querySelector("#preflight-lines");
+const preflightFailures = document.querySelector("#preflight-failures");
+let validatedSignature = null;
+let savedSignature = null;
+let savedFilename = "";
+let preflightRunning = false;
 
 function selectControl(values, selected) {
   const select = document.createElement("select");
@@ -212,6 +231,16 @@ function scheduleRows() {
   return rows;
 }
 
+function draftSignature() {
+  return JSON.stringify({name:document.querySelector("#name").value, rows:scheduleRows()});
+}
+
+function updateWorkflowState() {
+  const signature = draftSignature();
+  saveButton.disabled = validatedSignature !== signature;
+  preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
+}
+
 function elapsedSeconds(value) {
   const parts = value.split(":");
   if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) return Number.POSITIVE_INFINITY;
@@ -252,6 +281,7 @@ function updateView() {
     return {...row, id, details, sourceIndex};
   }).sort((a,b) => elapsedSeconds(a.time_after_start) - elapsedSeconds(b.time_after_start) || a.sourceIndex - b.sourceIndex);
   document.querySelector("#preview").innerHTML = previewRows.map(row => `<tr><td>${escapeHtml(row.time_after_start)}</td><td>${escapeHtml(row.event_type)}</td><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.details)}</td></tr>`).join("");
+  updateWorkflowState();
 }
 
 function escapeHtml(value) {
@@ -300,11 +330,32 @@ function loadRows(rows) {
 document.querySelector("#add-cta").onclick = () => addCta();
 document.querySelector("#add-water").onclick = () => addWater();
 for (const id of ["end-time", "end-phase", "end-notes"]) document.querySelector(`#${id}`).oninput = updateView;
-document.querySelector("#validate").onclick = async () => { try { show(await request("/api/validate", {rows:scheduleRows()}), true); } catch (error) { show(error, false); } };
+document.querySelector("#validate").onclick = async () => {
+  try {
+    const result = await request("/api/validate", {rows:scheduleRows()});
+    validatedSignature = draftSignature();
+    show(result, true);
+  } catch (error) {
+    validatedSignature = null;
+    show(error, false);
+  }
+  updateWorkflowState();
+};
 document.querySelector("#save").onclick = async () => {
   const name = document.querySelector("#name");
   if (!name.reportValidity()) return;
-  try { const result = await request("/api/save", {name:name.value, rows:scheduleRows()}); show(result, true); await refreshSchedules(result.saved); } catch (error) { show(error, false); }
+  if (validatedSignature !== draftSignature()) {
+    show({error:"Validate the current schedule before saving."}, false);
+    return;
+  }
+  try {
+    const result = await request("/api/save", {name:name.value, rows:scheduleRows()});
+    savedFilename = result.saved;
+    savedSignature = draftSignature();
+    show(result, true);
+    await refreshSchedules(result.saved);
+  } catch (error) { show(error, false); }
+  updateWorkflowState();
 };
 document.querySelector("#load").onclick = async () => {
   const selected = document.querySelector("#saved").value;
@@ -315,9 +366,79 @@ document.querySelector("#load").onclick = async () => {
     if (!response.ok) throw result;
     loadRows(result.rows);
     document.querySelector("#name").value = result.display_name;
+    validatedSignature = null;
+    savedSignature = null;
+    savedFilename = result.name;
     messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
     status.className = "status";
+    updateWorkflowState();
   } catch (error) { show(error, false); }
+};
+
+function showPreflightEvent(event, rollingLines, failures) {
+  if (event.type === "start") {
+    preflightHeading.textContent = `Hardware preflight running — ${event.water ? "water" : "standard"} mode — ${event.schedule}`;
+  } else if (event.type === "check") {
+    const line = `${event.passed ? "PASS" : "FAIL"} ${event.name}: ${event.details}`;
+    if (event.passed) {
+      rollingLines.push(line);
+      if (rollingLines.length > 2) rollingLines.shift();
+      preflightLines.textContent = rollingLines.join("\n");
+    } else {
+      failures.push(line);
+      preflightFailures.textContent = failures.join("\n");
+    }
+  } else if (event.type === "summary") {
+    const passed = event.failed === 0;
+    preflightStatus.className = `status ${passed ? "valid" : "invalid"}`;
+    preflightHeading.textContent = `${passed ? "PREFLIGHT PASS" : "PREFLIGHT FAILED"} — ${event.passed} passed, ${event.failed} failed — ${event.water ? "water" : "standard"} mode`;
+  } else if (event.type === "error") {
+    preflightStatus.className = "status invalid";
+    preflightHeading.textContent = "PREFLIGHT ERROR";
+    preflightFailures.textContent = event.error;
+  }
+}
+
+preflightButton.onclick = async () => {
+  if (!savedFilename || savedSignature !== draftSignature()) return;
+  preflightRunning = true;
+  updateWorkflowState();
+  preflightStatus.className = "status";
+  preflightHeading.textContent = "Starting hardware preflight…";
+  preflightLines.textContent = "";
+  preflightFailures.textContent = "";
+  const rollingLines = [];
+  const failures = [];
+  try {
+    const response = await fetch("/api/preflight", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({filename:savedFilename}),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw error;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = "";
+    while (true) {
+      const {value, done} = await reader.read();
+      pending += decoder.decode(value || new Uint8Array(), {stream:!done});
+      const lines = pending.split("\n");
+      pending = lines.pop();
+      for (const line of lines) if (line) showPreflightEvent(JSON.parse(line), rollingLines, failures);
+      if (done) break;
+    }
+    if (pending.trim()) showPreflightEvent(JSON.parse(pending), rollingLines, failures);
+  } catch (error) {
+    preflightStatus.className = "status invalid";
+    preflightHeading.textContent = "PREFLIGHT ERROR";
+    preflightFailures.textContent = error.error || String(error);
+  } finally {
+    preflightRunning = false;
+    updateWorkflowState();
+  }
 };
 
 async function initialize() {
@@ -330,6 +451,7 @@ async function initialize() {
   updateView();
   await refreshSchedules();
 }
+document.querySelector("#name").oninput = updateWorkflowState;
 initialize().catch(error => show({error:`Could not initialize editor: ${error}`}, false));
 </script>
 </body>
