@@ -8,6 +8,7 @@ from unittest.mock import patch
 from software.conformance_test_runner import (
     DEFAULT_MASTER_SCHEDULE,
     ProgressReporter,
+    _create_run_directory,
     _launch_water_draw,
     build_parser,
     clock_text,
@@ -70,6 +71,32 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         self.assertEqual(safe_identifier("test run 1"), "test_run_1")
         with self.assertRaises(argparse.ArgumentTypeError):
             safe_identifier("***")
+
+    def test_default_run_directory_uses_schedule_name_and_timestamp(self):
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "software.conformance_test_runner.pacific_filename_timestamp",
+            return_value="2026_08_16_120000_PDT",
+        ):
+            run_directory = _create_run_directory(
+                Path(directory),
+                None,
+                Path("software/gui_schedules/professor_demo.csv"),
+            )
+
+        self.assertEqual(
+            run_directory.name,
+            "professor_demo_2026_08_16_120000_PDT",
+        )
+
+    def test_explicit_run_identifier_still_overrides_schedule_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run_directory = _create_run_directory(
+                Path(directory),
+                "requested_name",
+                Path("software/gui_schedules/professor_demo.csv"),
+            )
+
+        self.assertEqual(run_directory.name, "requested_name")
 
     def test_progress_text_reports_time_percentage_phase_and_next_event(self):
         events = load_schedule(MASTER_SCHEDULE)

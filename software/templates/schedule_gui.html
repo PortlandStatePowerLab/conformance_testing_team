@@ -42,7 +42,7 @@
   <div class="status">Schedule server: <strong id="station-hostname">loading…</strong></div>
 
   <div class="toolbar">
-    <label>Schedule name<input id="name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
+    <label>Schedule name<input id="name" maxlength="75" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
     <label>Saved schedule<select id="saved"><option value="">New schedule</option></select></label>
     <button id="load" type="button">Load</button>
     <button id="validate" type="button">Validate schedule</button>
@@ -276,7 +276,7 @@ function show(result, valid) {
 async function refreshSchedules(selected = "") {
   const result = await fetch("/api/schedules").then(response => response.json());
   const saved = document.querySelector("#saved");
-  saved.replaceChildren(new Option("New schedule", ""), ...result.schedules.map(name => new Option(name, name)));
+  saved.replaceChildren(new Option("New schedule", ""), ...result.schedules.map(schedule => new Option(schedule.name, schedule.filename)));
   saved.value = selected;
 }
 
@@ -314,8 +314,8 @@ document.querySelector("#load").onclick = async () => {
     const result = await response.json();
     if (!response.ok) throw result;
     loadRows(result.rows);
-    document.querySelector("#name").value = result.name.replace(/\.csv$/i, "");
-    messages.textContent = `Loaded ${result.name}. Validate before saving changes.`;
+    document.querySelector("#name").value = result.display_name;
+    messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
     status.className = "status";
   } catch (error) { show(error, false); }
 };

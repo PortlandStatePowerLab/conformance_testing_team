@@ -6,9 +6,13 @@ from pathlib import Path
 from software.schedule_gui import (
     derive_rows,
     editor_metadata,
+    friendly_schedule_name,
     load_schedule_rows,
     normalize_schedule_name,
     save_schedule,
+    station_schedule_choices,
+    station_schedule_filename,
+    station_suffix_from_hostname,
     validate_rows,
 )
 from software.schedule_parser import ScheduleValidationError, load_schedule
@@ -25,7 +29,7 @@ def master_rows():
 
 class ScheduleGuiTests(unittest.TestCase):
     def test_metadata_comes_from_existing_python_definitions(self):
-        metadata = editor_metadata()
+        metadata = editor_metadata("WH-station3")
         actions = {item["action"]: item for item in metadata["actions"]}
 
         self.assertEqual(actions["load_up"]["event_type"], "cta")
@@ -36,6 +40,7 @@ class ScheduleGuiTests(unittest.TestCase):
         )
         self.assertIn("100_wh", metadata["advanced_units"])
         self.assertTrue(metadata["hostname"])
+        self.assertEqual(metadata["station_suffix"], "WH_3")
         self.assertEqual(
             [item["value"] for item in metadata["advanced_efficiencies"]],
             list(range(11)),
@@ -107,6 +112,44 @@ class ScheduleGuiTests(unittest.TestCase):
                     normalize_schedule_name(invalid)
 
         self.assertEqual(normalize_schedule_name("test-one.csv"), "test-one.csv")
+
+    def test_station_schedule_names_are_automatic_and_reversible(self):
+        self.assertEqual(station_suffix_from_hostname("WH-station1"), "WH_1")
+        self.assertEqual(
+            station_schedule_filename("alu_efficiency_test", "WH_1"),
+            "alu_efficiency_test_WH_1.csv",
+        )
+        self.assertEqual(
+            station_schedule_filename("alu_efficiency_test_WH_1.csv", "WH_1"),
+            "alu_efficiency_test_WH_1.csv",
+        )
+        self.assertEqual(
+            friendly_schedule_name("alu_efficiency_test_WH_1.csv", "WH_1"),
+            "alu_efficiency_test",
+        )
+        with self.assertRaisesRegex(ValueError, "belongs to WH-2"):
+            station_schedule_filename("alu_efficiency_test_WH_2", "WH_1")
+
+    def test_schedule_list_contains_only_current_station(self):
+        with tempfile.TemporaryDirectory() as directory:
+            schedule_directory = Path(directory)
+            for filename in (
+                "alpha_WH_1.csv",
+                "beta_WH_1.csv",
+                "alpha_WH_2.csv",
+                "legacy.csv",
+            ):
+                (schedule_directory / filename).touch()
+
+            choices = station_schedule_choices(schedule_directory, "WH_1")
+
+        self.assertEqual(
+            choices,
+            [
+                {"filename": "alpha_WH_1.csv", "name": "alpha"},
+                {"filename": "beta_WH_1.csv", "name": "beta"},
+            ],
+        )
 
     def test_unknown_browser_fields_are_rejected(self):
         rows = master_rows()
