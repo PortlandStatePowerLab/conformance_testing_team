@@ -1,9 +1,9 @@
 enabled,event_id,time_after_start,phase,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes
 TRUE,load_up_1,00:00:00,pre_event,cta,load_up,unknown,,,3|6,,,
-TRUE,run_normal_1,01:30:00,event,cta,run_normal,unknown,,,0|1,,,
-TRUE,water_draw_1,02:00:00,event,water_draw,water_draw,,,,,15,3,
+TRUE,grid_emergency_1,01:30:00,event,cta,grid_emergency,unknown,,,2|4,,,
+TRUE,water_draw_1,02:00:00,recovery,water_draw,water_draw,,,,,15,3,
 TRUE,water_draw_2,02:30:00,event,water_draw,water_draw,,,,,2,3,
 TRUE,water_draw_3,03:40:00,event,water_draw,water_draw,,,,,9,3,
 TRUE,load_up_2,04:40:00,recovery,cta,load_up,unknown,,,3|6,,,
-TRUE,run_normal_2,05:40:00,recovery,cta,run_normal,unknown,,,0|1,,,
+TRUE,run_normal_1,05:40:00,recovery,cta,run_normal,unknown,,,0|1,,,
 TRUE,test_end,06:00:00,recovery,test,end,,,,,,,
