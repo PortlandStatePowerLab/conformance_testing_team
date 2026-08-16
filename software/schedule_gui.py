@@ -41,10 +41,64 @@ SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
 DEFAULT_SCHEDULE_DIRECTORY = SOFTWARE_DIRECTORY / "gui_schedules"
 EDITOR_PATH = SOFTWARE_DIRECTORY / "templates" / "schedule_gui.html"
 SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
+STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
+STATION_SUFFIX = re.compile(r"_WH_(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
 
 
-def editor_metadata() -> dict[str, Any]:
+def station_suffix_from_hostname(hostname: str) -> str:
+    """Return the filename suffix for a recognized water-heater station."""
+    match = STATION_HOSTNAME.fullmatch(hostname.strip())
+    if match is None:
+        raise ValueError(
+            f"hostname {hostname!r} is not a recognized WH-station<number> name"
+        )
+    return f"WH_{int(match.group(1))}"
+
+
+def station_schedule_filename(name: str, station_suffix: str) -> str:
+    """Build the stored filename for a friendly schedule name and station."""
+    normalized = normalize_schedule_name(name)
+    stem = Path(normalized).stem
+    existing_suffix = STATION_SUFFIX.search(stem)
+    if existing_suffix is not None:
+        existing = f"WH_{int(existing_suffix.group(1))}"
+        if existing != station_suffix:
+            raise ValueError(
+                f"schedule name belongs to {existing.replace('_', '-')}, "
+                f"not {station_suffix.replace('_', '-')}"
+            )
+        stem = stem[: existing_suffix.start()]
+    if len(stem) + len(station_suffix) + 1 > 80:
+        raise ValueError("schedule name is too long after adding the station suffix")
+    return f"{stem}_{station_suffix}.csv"
+
+
+def friendly_schedule_name(filename: str, station_suffix: str) -> str:
+    """Return the browser-visible name of a station-owned schedule."""
+    normalized = normalize_schedule_name(filename)
+    expected = f"_{station_suffix}.csv"
+    if not normalized.lower().endswith(expected.lower()):
+        raise ValueError("schedule does not belong to this station")
+    return normalized[: -len(expected)]
+
+
+def station_schedule_choices(directory: Path, station_suffix: str) -> list[dict[str, str]]:
+    """List only schedules owned by the current station."""
+    if not directory.is_dir():
+        return []
+    choices = []
+    for path in directory.glob(f"*_{station_suffix}.csv"):
+        choices.append(
+            {
+                "filename": path.name,
+                "name": friendly_schedule_name(path.name, station_suffix),
+            }
+        )
+    return sorted(choices, key=lambda item: item["name"].lower())
+
+
+def editor_metadata(hostname: str | None = None) -> dict[str, Any]:
     """Describe editor choices from the same definitions used by Python."""
     actions = []
     for action in CTA_ACTION_CODES:
@@ -83,8 +137,13 @@ def editor_metadata() -> dict[str, Any]:
             },
         ]
     )
+    resolved_hostname = hostname or socket.gethostname()
+    station_match = STATION_HOSTNAME.fullmatch(resolved_hostname.strip())
     return {
-        "hostname": socket.gethostname(),
+        "hostname": resolved_hostname,
+        "station_suffix": (
+            station_suffix_from_hostname(resolved_hostname) if station_match else ""
+        ),
         "actions": actions,
         "advanced_units": list(ADVANCED_UNIT_CODES),
         "advanced_efficiencies": [
@@ -227,6 +286,8 @@ def load_schedule_rows(path: Path) -> list[dict[str, str]]:
 class ScheduleGuiHandler(BaseHTTPRequestHandler):
     schedule_directory = DEFAULT_SCHEDULE_DIRECTORY
     editor_path = EDITOR_PATH
+    hostname = socket.gethostname()
+    station_suffix = ""
 
     def _json(self, status: HTTPStatus, payload: Any) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -261,22 +322,34 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if self.path == "/api/schedules":
-            names = []
-            if self.schedule_directory.is_dir():
-                names = sorted(path.name for path in self.schedule_directory.glob("*.csv"))
-            self._json(HTTPStatus.OK, {"schedules": names})
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "schedules": station_schedule_choices(
+                        self.schedule_directory, self.station_suffix
+                    )
+                },
+            )
             return
         if self.path == "/api/metadata":
-            self._json(HTTPStatus.OK, editor_metadata())
+            self._json(HTTPStatus.OK, editor_metadata(self.hostname))
             return
         prefix = "/api/schedules/"
         if self.path.startswith(prefix):
             try:
-                filename = normalize_schedule_name(unquote(self.path[len(prefix) :]))
+                requested = unquote(self.path[len(prefix) :])
+                friendly_schedule_name(requested, self.station_suffix)
+                filename = normalize_schedule_name(requested)
                 path = self.schedule_directory / filename
                 self._json(
                     HTTPStatus.OK,
-                    {"name": filename, "rows": load_schedule_rows(path)},
+                    {
+                        "name": filename,
+                        "display_name": friendly_schedule_name(
+                            filename, self.station_suffix
+                        ),
+                        "rows": load_schedule_rows(path),
+                    },
                 )
             except FileNotFoundError:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "schedule not found"})
@@ -295,7 +368,9 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             if self.path == "/api/save":
                 destination, summary = save_schedule(
                     self.schedule_directory,
-                    str(request.get("name", "")),
+                    station_schedule_filename(
+                        str(request.get("name", "")), self.station_suffix
+                    ),
                     request.get("rows"),
                 )
                 self._json(
@@ -325,10 +400,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    hostname = socket.gethostname()
+    station_suffix = station_suffix_from_hostname(hostname)
     handler = type(
         "ConfiguredScheduleGuiHandler",
         (ScheduleGuiHandler,),
-        {"schedule_directory": args.schedule_directory},
+        {
+            "schedule_directory": args.schedule_directory,
+            "hostname": hostname,
+            "station_suffix": station_suffix,
+        },
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"SCHEDULE_GUI_READY http://{args.host}:{args.port}")

@@ -387,8 +387,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _create_run_directory(results_root: Path, requested_id: str | None) -> Path:
-    run_id = requested_id or f"run_{pacific_filename_timestamp()}"
+def _create_run_directory(
+    results_root: Path,
+    requested_id: str | None,
+    master_schedule: Path,
+) -> Path:
+    schedule_name = safe_identifier(master_schedule.stem)
+    run_id = requested_id or f"{schedule_name}_{pacific_filename_timestamp()}"
     run_directory = (results_root / run_id).resolve()
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
@@ -457,7 +462,9 @@ def run_hardware_test(
         load_sensor_configuration(args.sensor_configuration)
 
     run_directory = _create_run_directory(
-        station_results_directory(args.results_root), args.run_id
+        station_results_directory(args.results_root),
+        args.run_id,
+        args.master_schedule,
     )
     if args.master_schedule.suffix.lower() == ".xlsx":
         shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")

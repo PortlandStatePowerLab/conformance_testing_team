@@ -1,0 +1,3 @@
+enabled,event_id,time_after_start,phase,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes,advanced_efficiency
+TRUE,advanced_load_up_1,00:00:00,pre_event,cta,advanced_load_up,unknown,500,1_wh,3|6,,,,7
+TRUE,test_end,0:02:00,recovery,test,end,,,,,,,,

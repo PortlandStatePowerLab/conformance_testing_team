@@ -133,7 +133,7 @@ The timeline retains each approximately one-minute operational-state reading.
 Regenerate the workbook for an existing run with:
 
 ```bash
-make report RUN_DIRECTORY=saved_data/conformance_runs/WH-1/run_YYYY_MM_DD_HHMMSS_PDT
+make report RUN_DIRECTORY=saved_data/conformance_runs/WH-1/SCHEDULE_NAME_YYYY_MM_DD_HHMMSS_PDT
 ```
 If the hostname does not identify a configured station, the run falls back to
 `saved_data/conformance_runs/`.
