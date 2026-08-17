@@ -62,6 +62,11 @@ validating and saving a schedule, the GUI can run the existing hardware
 preflight checks. It automatically selects water preflight when the saved
 schedule contains an enabled water draw.
 
+The GUI exits after 24 hours without a GET or POST request. Decimal-hour
+overrides are supported for shorter sessions or testing; for example,
+`python3 -m software.schedule_gui --idle-timeout-hours 0.2` uses a 12-minute
+idle timeout.
+
 Validate the schedule without accessing hardware:
 
 ```bash

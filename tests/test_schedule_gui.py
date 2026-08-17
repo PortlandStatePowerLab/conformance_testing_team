@@ -1,3 +1,4 @@
+import argparse
 import csv
 import json
 import tempfile
@@ -15,9 +16,11 @@ from software.schedule_gui import (
     friendly_schedule_name,
     load_schedule_rows,
     normalize_schedule_name,
+    positive_hours,
     save_schedule,
     schedule_uses_water,
     ScheduleGuiHandler,
+    serve_until_idle,
     station_schedule_choices,
     station_schedule_filename,
     station_suffix_from_hostname,
@@ -36,6 +39,41 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_idle_timeout_accepts_decimal_hours(self):
+        self.assertEqual(positive_hours("0.2"), 0.2)
+        for invalid in ("0", "-1", "inf", "not-a-number"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    positive_hours(invalid)
+
+    def test_idle_server_loop_exits_and_honors_activity_reset(self):
+        class Clock:
+            value = 0.0
+
+            def __call__(self):
+                return self.value
+
+        class Server:
+            def __init__(self, clock):
+                self.clock = clock
+                self.calls = 0
+                self.timeout = None
+
+            def handle_request(self):
+                self.calls += 1
+                self.clock.value += 4.0
+                if self.calls == 1:
+                    self.last_http_activity = self.clock()
+
+        clock = Clock()
+        server = Server(clock)
+
+        self.assertTrue(
+            serve_until_idle(server, 10.0, monotonic=clock)
+        )
+        self.assertEqual(server.calls, 4)
+        self.assertLessEqual(server.timeout, 1.0)
+
     def test_metadata_comes_from_existing_python_definitions(self):
         metadata = editor_metadata("WH-station3")
         actions = {item["action"]: item for item in metadata["actions"]}

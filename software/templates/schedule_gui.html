@@ -303,6 +303,13 @@ function show(result, valid) {
   else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
 }
 
+function resetPreflightDisplay() {
+  preflightStatus.className = "status";
+  preflightHeading.textContent = "Hardware preflight not yet run.";
+  preflightLines.textContent = "Validate and save this schedule before running preflight.";
+  preflightFailures.textContent = "";
+}
+
 async function refreshSchedules(selected = "") {
   const result = await fetch("/api/schedules").then(response => response.json());
   const saved = document.querySelector("#saved");
@@ -371,6 +378,7 @@ document.querySelector("#load").onclick = async () => {
     savedFilename = result.name;
     messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
     status.className = "status";
+    resetPreflightDisplay();
     updateWorkflowState();
   } catch (error) { show(error, false); }
 };

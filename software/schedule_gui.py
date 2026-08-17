@@ -11,6 +11,7 @@ import re
 import socket
 import tempfile
 import threading
+import time
 from collections import Counter
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -55,6 +56,7 @@ SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
 STATION_SUFFIX = re.compile(r"_WH_(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
+DEFAULT_IDLE_TIMEOUT_HOURS = 24.0
 
 
 def station_suffix_from_hostname(hostname: str) -> str:
@@ -306,6 +308,9 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
     station_suffix = ""
     preflight_lock = threading.Lock()
 
+    def _record_http_activity(self) -> None:
+        self.server.last_http_activity = time.monotonic()
+
     def _json(self, status: HTTPStatus, payload: Any) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
@@ -394,6 +399,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             self.preflight_lock.release()
 
     def do_GET(self) -> None:
+        self._record_http_activity()
         if self.path == "/":
             body = self.editor_path.read_bytes()
             self.send_response(HTTPStatus.OK)
@@ -440,6 +446,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
     def do_POST(self) -> None:
+        self._record_http_activity()
         try:
             request = self._request_json()
             if self.path == "/api/validate":
@@ -477,9 +484,44 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument(
+        "--idle-timeout-hours",
+        type=positive_hours,
+        default=DEFAULT_IDLE_TIMEOUT_HOURS,
+        help="exit after this many hours without a GET or POST request",
+    )
+    parser.add_argument(
         "--schedule-directory", type=Path, default=DEFAULT_SCHEDULE_DIRECTORY
     )
     return parser
+
+
+def positive_hours(value: str) -> float:
+    """Parse a positive hour count, including decimal values."""
+    try:
+        hours = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive number of hours") from exc
+    if not hours > 0 or hours == float("inf"):
+        raise argparse.ArgumentTypeError("must be a finite number greater than zero")
+    return hours
+
+
+def serve_until_idle(
+    server: ThreadingHTTPServer,
+    idle_timeout_seconds: float,
+    *,
+    monotonic=time.monotonic,
+) -> bool:
+    """Handle requests until inactivity expires; return True on idle timeout."""
+    server.last_http_activity = monotonic()
+    while True:
+        remaining = idle_timeout_seconds - (
+            monotonic() - server.last_http_activity
+        )
+        if remaining <= 0:
+            return True
+        server.timeout = min(1.0, remaining)
+        server.handle_request()
 
 
 def main() -> int:
@@ -497,12 +539,21 @@ def main() -> int:
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"SCHEDULE_GUI_READY http://{args.host}:{args.port}")
+    timed_out = False
     try:
-        server.serve_forever()
+        timed_out = serve_until_idle(
+            server, args.idle_timeout_hours * 60 * 60
+        )
     except KeyboardInterrupt:
-        print("\nSCHEDULE_GUI_STOPPED")
+        print()
     finally:
         server.server_close()
+    if timed_out:
+        print(
+            "SCHEDULE_GUI_IDLE_TIMEOUT No GET or POST requests for "
+            f"{args.idle_timeout_hours:g} hours"
+        )
+    print("SCHEDULE_GUI_STOPPED")
     return 0
 
 
