@@ -282,7 +282,7 @@ class ScheduleGuiTests(unittest.TestCase):
         expected = {
             "timestamp_pacific": "2026-08-17T12:34:56.000-07:00",
             "bitmap": "0x00000141",
-            "raw_bitmap": "0x41010000",
+            "raw_bitmap": "0x00000141",
             "capabilities": [
                 {"bit": 0, "name": "Cycling"},
                 {"bit": 6, "name": "Advanced Load Up"},

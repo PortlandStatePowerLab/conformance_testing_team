@@ -19,10 +19,20 @@ DEVICE_INFORMATION_COLUMNS = (
 class WaterHeaterInformationTests(unittest.TestCase):
     def test_capability_bits_are_decoded_across_protocol_bytes(self):
         self.assertEqual(
-            decode_capabilities("41010000"),
+            decode_capabilities("00000141"),
             [
                 {"bit": 0, "name": "Cycling"},
                 {"bit": 6, "name": "Advanced Load Up"},
+                {"bit": 8, "name": "SGD Efficiency Level"},
+            ],
+        )
+
+    def test_wh3_bitmap_keeps_recorded_hex_order(self):
+        self.assertEqual(
+            decode_capabilities("000001C0"),
+            [
+                {"bit": 6, "name": "Advanced Load Up"},
+                {"bit": 7, "name": "Price Stream"},
                 {"bit": 8, "name": "SGD Efficiency Level"},
             ],
         )
@@ -43,7 +53,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
                             "timestamp_pacific": "2026-08-17T12:34:56.000-07:00",
                             "response_code": "0",
                             "response_name": "success",
-                            "capability_bitmap_hex": "41010000",
+                            "capability_bitmap_hex": "00000141",
                         }
                     )
                 return subprocess.CompletedProcess(command, 0, "", "")
@@ -55,7 +65,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
                 )
 
         self.assertEqual(result["bitmap"], "0x00000141")
-        self.assertEqual(result["raw_bitmap"], "0x41010000")
+        self.assertEqual(result["raw_bitmap"], "0x00000141")
         self.assertEqual([item["bit"] for item in result["capabilities"]], [0, 6, 8])
 
     def test_timeout_is_reported_concisely(self):

@@ -28,18 +28,18 @@ CAPABILITY_NAMES = {
 
 
 def decode_capabilities(raw_hex: str) -> list[dict[str, object]]:
-    """Return supported, non-reserved capabilities from four protocol bytes."""
+    """Return supported, non-reserved capabilities from a 32-bit bitmap."""
     normalized = raw_hex.strip().removeprefix("0x").removeprefix("0X")
     if len(normalized) != 8:
         raise ValueError(f"invalid 32-bit capability bitmap: {raw_hex!r}")
     try:
-        bitmap_bytes = bytes.fromhex(normalized)
+        bitmap = int(normalized, 16)
     except ValueError as exc:
         raise ValueError(f"invalid capability bitmap: {raw_hex!r}") from exc
     return [
         {"bit": bit, "name": name}
         for bit, name in CAPABILITY_NAMES.items()
-        if bitmap_bytes[bit // 8] & (1 << (bit % 8))
+        if bitmap & (1 << bit)
     ]
 
 
@@ -104,7 +104,7 @@ def read_wh_information(
         )
     raw_bitmap = row.get("capability_bitmap_hex", "")
     capabilities = decode_capabilities(raw_bitmap)
-    logical_bitmap = int.from_bytes(bytes.fromhex(raw_bitmap), byteorder="little")
+    logical_bitmap = int(raw_bitmap, 16)
     return {
         "timestamp_pacific": row.get("timestamp_pacific", ""),
         "bitmap": f"0x{logical_bitmap:08X}",
