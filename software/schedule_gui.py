@@ -25,6 +25,7 @@ try:
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
         EXTENDED_SCHEDULE_COLUMNS,
+        MAX_DURATION,
         ScheduleValidationError,
         load_schedule,
     )
@@ -39,6 +40,7 @@ except ImportError:
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
         EXTENDED_SCHEDULE_COLUMNS,
+        MAX_DURATION,
         ScheduleValidationError,
         load_schedule,
     )
@@ -222,6 +224,8 @@ def derive_rows(value: Any) -> list[dict[str, str]]:
         row["expected_operational_states"] = "|".join(
             str(state) for state in details["expected_operational_states"]
         )
+        if row["event_duration_minutes"].strip().lower() == MAX_DURATION:
+            row["event_duration_minutes"] = MAX_DURATION
     return rows
 
 

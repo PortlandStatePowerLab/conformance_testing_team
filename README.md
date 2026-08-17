@@ -12,9 +12,10 @@ states from the action instead of relying on Excel to calculate formulas.
 `phase` is optional descriptive information.
 
 For Basic DR commands, `event_duration_minutes` accepts a whole number from
-1 through 2150, or `unknown`. The compiler rounds a numeric duration up to the
+1 through 2150, or `max`. The compiler rounds a numeric duration up to the
 next CTA-2045 duration-byte value so the encoded event does not expire early.
-For Advanced Load Up, the GUI also offers an optional suggested efficiency:
+For Advanced Load Up, numeric durations are direct minutes and `max` compiles
+to the unsigned 16-bit maximum of 65535 minutes. The GUI also offers an optional suggested efficiency:
 blank omits the optional payload byte, while values 0 through 10 include it.
 Zero means off, 1 is least efficient, 9 is most efficient, and 10 requests
 vacation mode (which an SGD is not required to support). Existing XLSX and CSV

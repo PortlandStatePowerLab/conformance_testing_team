@@ -181,7 +181,7 @@ function addCta(source = {}) {
   const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
   cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "pre_event"), "phase");
   const command = cell(row, selectControl(actionDefinitions.filter(item => item.event_type === "cta").map(item => item.action), source.action || "load_up"), "action");
-  cell(row, inputControl(source.event_duration_minutes || "unknown"), "event_duration_minutes");
+  cell(row, inputControl(source.event_duration_minutes || "max", {placeholder:"1-2150 or max"}), "event_duration_minutes");
   cell(row, inputControl(source.advanced_value || "", {type:"number", min:"1", max:"65534", step:"1"}), "advanced_value");
   cell(row, selectControl(["", ...units], source.advanced_units || ""), "advanced_units");
   cell(row, efficiencyControl(source.advanced_efficiency), "advanced_efficiency");
@@ -277,7 +277,10 @@ function updateView() {
     const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
     let details = row.phase || "";
     if (row.action === "water_draw") details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
-    else if (row.event_type === "cta") details = `duration ${row.event_duration_minutes || "?"} min${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
+    else if (row.event_type === "cta") {
+      const duration = row.event_duration_minutes || "?";
+      details = `duration ${duration}${duration.toLowerCase() === "max" ? "" : " min"}${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
+    }
     return {...row, id, details, sourceIndex};
   }).sort((a,b) => elapsedSeconds(a.time_after_start) - elapsedSeconds(b.time_after_start) || a.sourceIndex - b.sourceIndex);
   document.querySelector("#preview").innerHTML = previewRows.map(row => `<tr><td>${escapeHtml(row.time_after_start)}</td><td>${escapeHtml(row.event_type)}</td><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.details)}</td></tr>`).join("");
@@ -455,7 +458,7 @@ async function initialize() {
   actionDefinitions = metadata.actions;
   units = metadata.advanced_units;
   efficiencies = metadata.advanced_efficiencies;
-  addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"unknown"});
+  addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"max"});
   updateView();
   await refreshSchedules();
 }

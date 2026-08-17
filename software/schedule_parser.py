@@ -49,7 +49,7 @@ ADVANCED_UNIT_CODES = {
 EVENT_TYPES = {"cta", "water_draw", "test"}
 TRUE_VALUES = {"true", "yes", "1"}
 FALSE_VALUES = {"false", "no", "0"}
-UNKNOWN_DURATION = "unknown"
+MAX_DURATION = "max"
 OUTSIDE_COMMUNICATION_LEAD_SECONDS = 15
 OUTSIDE_COMMUNICATION_REFRESH_SECONDS = 13 * 60 + 30
 MAX_FINITE_DURATION_BYTE = 0xFE
@@ -131,9 +131,9 @@ def parse_elapsed_time(value: str) -> int:
 
 
 def encode_event_duration(value: str) -> EncodedDuration:
-    """Encode whole minutes or ``unknown`` into a CTA Basic DR duration byte."""
+    """Encode whole minutes or ``max`` into a CTA Basic DR duration byte."""
     normalized = value.strip().lower()
-    if normalized == UNKNOWN_DURATION:
+    if normalized == MAX_DURATION:
         return EncodedDuration(normalized, 0x00, None, None)
 
     try:
@@ -141,12 +141,12 @@ def encode_event_duration(value: str) -> EncodedDuration:
     except ValueError as exc:
         raise ValueError(
             "event_duration_minutes must be a whole number from 1 to "
-            f"{MAX_EVENT_DURATION_MINUTES}, or '{UNKNOWN_DURATION}'"
+            f"{MAX_EVENT_DURATION_MINUTES}, or '{MAX_DURATION}'"
         ) from exc
     if not 1 <= requested_minutes <= MAX_EVENT_DURATION_MINUTES:
         raise ValueError(
             "event_duration_minutes must be a whole number from 1 to "
-            f"{MAX_EVENT_DURATION_MINUTES}, or '{UNKNOWN_DURATION}'"
+            f"{MAX_EVENT_DURATION_MINUTES}, or '{MAX_DURATION}'"
         )
 
     requested_seconds = requested_minutes * 60
@@ -236,8 +236,8 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
                     "advanced_load_up requires event_duration_minutes, advanced_value, and advanced_units"
                 )
             advanced_duration = (
-                0
-                if duration_text.lower() == UNKNOWN_DURATION
+                0xFFFF
+                if duration_text.lower() == MAX_DURATION
                 else _parse_bounded_integer(
                     duration_text,
                     "event_duration_minutes",

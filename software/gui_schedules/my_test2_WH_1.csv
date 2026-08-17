@@ -1,5 +1,5 @@
 enabled,event_id,time_after_start,phase,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,notes
-TRUE,load_up_1,00:00:00,pre_event,cta,load_up,unknown,,,3|6,,,
-TRUE,advanced_load_up_1,01:00:00,event,cta,advanced_load_up,unknown,500,1_wh,3|6,,,
-TRUE,run_normal_1,01:30:00,recovery,cta,run_normal,unknown,,,0|1,,,
+TRUE,load_up_1,00:00:00,pre_event,cta,load_up,max,,,3|6,,,
+TRUE,advanced_load_up_1,01:00:00,event,cta,advanced_load_up,max,500,1_wh,3|6,,,
+TRUE,run_normal_1,01:30:00,recovery,cta,run_normal,max,,,0|1,,,
 TRUE,test_end,01:40:00,recovery,test,end,,,,,,,
