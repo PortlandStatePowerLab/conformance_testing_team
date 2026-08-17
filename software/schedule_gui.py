@@ -34,6 +34,7 @@ try:
         build_parser as build_preflight_parser,
         run_preflight,
     )
+    from .wh_information import read_wh_information
 except ImportError:
     from cta_operational_states import EXPECTED_STATES_BY_ACTION
     from schedule_parser import (
@@ -49,6 +50,7 @@ except ImportError:
         build_parser as build_preflight_parser,
         run_preflight,
     )
+    from wh_information import read_wh_information
 
 
 SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
@@ -311,6 +313,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
     hostname = socket.gethostname()
     station_suffix = ""
     preflight_lock = threading.Lock()
+    wh_information_lock = threading.Lock()
 
     def _record_http_activity(self) -> None:
         self.server.last_http_activity = time.monotonic()
@@ -473,10 +476,22 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             if self.path == "/api/preflight":
                 self._stream_preflight(str(request.get("filename", "")))
                 return
+            if self.path == "/api/wh-information":
+                if not self.wh_information_lock.acquire(blocking=False):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {"error": "a water-heater information request is already running"},
+                    )
+                    return
+                try:
+                    self._json(HTTPStatus.OK, read_wh_information())
+                finally:
+                    self.wh_information_lock.release()
+                return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         except ScheduleValidationError as exc:
             self._json(HTTPStatus.BAD_REQUEST, {"errors": list(exc.errors)})
-        except (OSError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def log_message(self, format: str, *args: Any) -> None:

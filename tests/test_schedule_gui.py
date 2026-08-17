@@ -266,6 +266,46 @@ class ScheduleGuiTests(unittest.TestCase):
         self.assertEqual(events[-1]["type"], "summary")
         self.assertEqual(events[-1]["failed"], 1)
 
+    def test_wh_information_endpoint_returns_decoded_result(self):
+        handler = type(
+            "TestScheduleGuiHandler",
+            (ScheduleGuiHandler,),
+            {
+                "hostname": "WH-station1",
+                "station_suffix": "WH_1",
+                "log_message": lambda *args: None,
+            },
+        )
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        expected = {
+            "timestamp_pacific": "2026-08-17T12:34:56.000-07:00",
+            "bitmap": "0x00000141",
+            "raw_bitmap": "0x41010000",
+            "capabilities": [
+                {"bit": 0, "name": "Cycling"},
+                {"bit": 6, "name": "Advanced Load Up"},
+                {"bit": 8, "name": "SGD Efficiency Level"},
+            ],
+        }
+        try:
+            request = Request(
+                f"http://127.0.0.1:{server.server_port}/api/wh-information",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with patch("software.schedule_gui.read_wh_information", return_value=expected):
+                with urlopen(request, timeout=5) as response:
+                    result = json.load(response)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
+        self.assertEqual(result, expected)
+
     def test_unknown_browser_fields_are_rejected(self):
         rows = master_rows()
         rows[0]["unexpected"] = "value"
