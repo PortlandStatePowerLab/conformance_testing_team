@@ -3,7 +3,7 @@ import io
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from software.conformance_test_runner import (
     DEFAULT_MASTER_SCHEDULE,
@@ -17,6 +17,7 @@ from software.conformance_test_runner import (
     prepare_master_schedule,
     safe_identifier,
     schedule_summary,
+    stop_water_draw_at_test_end,
 )
 from software.schedule_parser import load_schedule
 from pathlib import Path
@@ -27,6 +28,29 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_test_end_stops_active_water_draw_as_hard_boundary(self):
+        active_draw = SimpleNamespace(event_id="water_draw_1")
+        logger = Mock()
+
+        with patch("software.conformance_test_runner.stop_process") as stop_process:
+            stop_water_draw_at_test_end(
+                active_draw,
+                timeout_seconds=30.0,
+                logger=logger,
+            )
+
+        stop_process.assert_called_once_with(
+            active_draw,
+            timeout_seconds=30.0,
+            logger=logger,
+        )
+        logger.record.assert_called_once_with(
+            "water_draw_test_end_cutoff",
+            "stopped",
+            event_id="water_draw_1",
+            details={"reason": "test_end_reached"},
+        )
+
     def test_default_master_schedule_remains_xlsx(self):
         self.assertEqual(
             build_parser().parse_args([]).master_schedule,

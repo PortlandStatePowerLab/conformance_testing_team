@@ -391,6 +391,23 @@ def stop_process(
     managed.close_log()
 
 
+def stop_water_draw_at_test_end(
+    active_draw: ManagedProcess,
+    *,
+    timeout_seconds: float,
+    logger: RunEventLogger,
+) -> None:
+    """Close an active draw when the test reaches its hard end boundary."""
+    event_id = active_draw.event_id
+    stop_process(active_draw, timeout_seconds=timeout_seconds, logger=logger)
+    logger.record(
+        "water_draw_test_end_cutoff",
+        "stopped",
+        event_id=event_id,
+        details={"reason": "test_end_reached"},
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -674,6 +691,17 @@ def run_hardware_test(
                 if return_code != 0:
                     raise RuntimeError(f"water draw failed with code {return_code}")
 
+            if elapsed >= test_end.offset_seconds:
+                if active_draw is not None:
+                    stop_water_draw_at_test_end(
+                        active_draw,
+                        timeout_seconds=args.shutdown_timeout_seconds,
+                        logger=logger,
+                    )
+                    active_draw = None
+                outcome = "completed"
+                break
+
             while (
                 next_draw_index < len(draws)
                 and elapsed >= draws[next_draw_index].offset_seconds
@@ -704,9 +732,6 @@ def run_hardware_test(
                     },
                 )
 
-            if elapsed >= test_end.offset_seconds and active_draw is None:
-                outcome = "completed"
-                break
             time.sleep(0.2)
 
     except KeyboardInterrupt:
