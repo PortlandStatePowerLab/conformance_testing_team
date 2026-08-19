@@ -165,6 +165,28 @@ def _shift(timestamp: datetime, actual_start: datetime, display_start: datetime)
     return display_start + (timestamp - actual_start)
 
 
+def _duck_curve_display_start(
+    actual_start: datetime,
+    phases,
+    *,
+    scenario_start: time | None = None,
+    event_end: time = time(21, 10),
+    fallback_start: time = time(15, 30),
+) -> datetime:
+    """Align the end of the final Shed/CP/GE block to the evening peak."""
+    if scenario_start is not None:
+        return datetime.combine(actual_start.date(), scenario_start)
+    event_names = {"Shed", "CP", "GE"}
+    boundary: datetime | None = None
+    for index, phase in enumerate(phases[:-1]):
+        if phase.name in event_names and phases[index + 1].name not in event_names:
+            boundary = phases[index + 1].timestamp
+    if boundary is None:
+        return datetime.combine(actual_start.date(), fallback_start)
+    desired_boundary = datetime.combine(actual_start.date(), event_end)
+    return desired_boundary - (boundary - actual_start)
+
+
 def _without_startup_spikes(samples: tuple[Sample, ...]) -> tuple[Sample, ...]:
     """Remove isolated, one-sample compressor inrush transients."""
     filtered: list[Sample] = []
@@ -201,7 +223,7 @@ def _without_startup_spikes(samples: tuple[Sample, ...]) -> tuple[Sample, ...]:
 def plot_run(
     run_directory: Path | str,
     *,
-    scenario_start: time = time(15, 30),
+    scenario_start: time | None = None,
     output_path: Path | str | None = None,
     show: bool = False,
     suppress_startup_spikes: bool = True,
@@ -212,11 +234,8 @@ def plot_run(
     data = load_run_plot_data(directory)
     actual_start = min(data.energy[0].timestamp, data.power[0].timestamp)
     actual_end = max(data.energy[-1].timestamp, data.power[-1].timestamp)
-    display_start = actual_start.replace(
-        hour=scenario_start.hour,
-        minute=scenario_start.minute,
-        second=scenario_start.second,
-        microsecond=0,
+    display_start = _duck_curve_display_start(
+        actual_start, data.phases, scenario_start=scenario_start
     )
 
     energy_times = [_shift(x.timestamp, actual_start, display_start) for x in data.energy]
@@ -345,7 +364,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--start", default="15:30", help="scenario start in HH:MM")
+    parser.add_argument(
+        "--start",
+        help="override automatic 9:10 PM event-end alignment with start time HH:MM",
+    )
     parser.add_argument("--show", action="store_true")
     parser.add_argument(
         "--include-startup-spikes",
@@ -354,7 +376,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        start = time.fromisoformat(args.start)
+        start = time.fromisoformat(args.start) if args.start else None
         output = args.output or args.run_directory / PLOT_FILENAME
         _, destination = plot_run(
             args.run_directory,

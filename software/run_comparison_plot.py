@@ -15,7 +15,13 @@ import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
 from .phase_summary_plot import summarize_run_phases
-from .run_plot import RunPlotData, _shift, _without_startup_spikes, load_run_plot_data
+from .run_plot import (
+    RunPlotData,
+    _duck_curve_display_start,
+    _shift,
+    _without_startup_spikes,
+    load_run_plot_data,
+)
 from .state_verification_plot import ExpectedPhase, load_verification_data
 
 
@@ -94,7 +100,7 @@ def _validate_compatible(runs: tuple[ComparisonRun, ...], tolerance_seconds: flo
 def plot_run_comparison(
     run_directories: tuple[Path | str, ...] | list[Path | str],
     *,
-    scenario_start: time = time(15, 30),
+    scenario_start: time | None = None,
     timing_tolerance_seconds: float = 120,
     grace_seconds: float = 60,
     output_path: Path | str | None = None,
@@ -105,7 +111,11 @@ def plot_run_comparison(
         raise ValueError("timing_tolerance_seconds cannot be negative")
     runs = _comparison_runs(tuple(run_directories), grace_seconds)
     _validate_compatible(runs, timing_tolerance_seconds)
-    display_start = datetime.combine(datetime(2000, 1, 1).date(), scenario_start)
+    reference = runs[0]
+    reference_anchor = reference.phases[0].timestamp
+    display_start = _duck_curve_display_start(
+        reference_anchor, reference.phases, scenario_start=scenario_start
+    ).replace(year=2000, month=1, day=1)
 
     aligned_ends = []
     for run in runs:
@@ -142,8 +152,6 @@ def plot_run_comparison(
         energy_axis.plot(energy_times, energy_values, color=color, linestyle=style, linewidth=1.7, label=label)
         power_axis.plot(power_times, power_values, color=color, linestyle=style, linewidth=1.2, label=label)
 
-    reference = runs[0]
-    reference_anchor = reference.phases[0].timestamp
     shifted_phases = tuple(
         ExpectedPhase(_shift(phase.timestamp, reference_anchor, display_start), phase.name, phase.expected_states)
         for phase in reference.phases
@@ -190,7 +198,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directories", nargs="+", type=Path)
     parser.add_argument("--output", type=Path, default=Path(PLOT_FILENAME))
-    parser.add_argument("--start", default="15:30", help="scenario command-anchor time in HH:MM")
+    parser.add_argument(
+        "--start",
+        help="override automatic 9:10 PM event-end alignment with start time HH:MM",
+    )
     parser.add_argument("--timing-tolerance-seconds", type=float, default=120)
     parser.add_argument("--grace-seconds", type=float, default=60)
     parser.add_argument("--show", action="store_true")
@@ -198,7 +209,7 @@ def main() -> int:
     try:
         _, destination = plot_run_comparison(
             args.run_directories,
-            scenario_start=time.fromisoformat(args.start),
+            scenario_start=time.fromisoformat(args.start) if args.start else None,
             timing_tolerance_seconds=args.timing_tolerance_seconds,
             grace_seconds=args.grace_seconds,
             output_path=args.output,

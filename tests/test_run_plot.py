@@ -8,7 +8,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.run_plot import Sample, _without_startup_spikes, load_run_plot_data, plot_run
+from software.run_plot import (
+    Phase,
+    Sample,
+    _duck_curve_display_start,
+    _without_startup_spikes,
+    load_run_plot_data,
+    plot_run,
+)
 from software.energy_take_change_plot import plot_energy_take_change
 
 
@@ -20,6 +27,36 @@ def write_csv(path, columns, rows):
 
 
 class RunPlotTests(unittest.TestCase):
+    def test_aligns_end_of_shed_cp_or_ge_to_nine_ten_pm(self):
+        from datetime import datetime, timedelta
+
+        actual_start = datetime(2026, 8, 5, 12, 0)
+        for event_name in ("Shed", "CP", "GE"):
+            phases = (
+                Phase(actual_start, "Load Up"),
+                Phase(actual_start + timedelta(hours=1.5), event_name),
+                Phase(actual_start + timedelta(hours=4, minutes=40), "Load Up"),
+            )
+            display_start = _duck_curve_display_start(actual_start, phases)
+            displayed_end = display_start + (phases[-1].timestamp - actual_start)
+            self.assertEqual(displayed_end.time(), time(21, 10))
+
+    def test_explicit_start_overrides_event_end_alignment(self):
+        from datetime import datetime, timedelta
+
+        actual_start = datetime(2026, 8, 5, 12, 0)
+        phases = (
+            Phase(actual_start, "Load Up"),
+            Phase(actual_start + timedelta(hours=1), "CP"),
+            Phase(actual_start + timedelta(hours=2), "Load Up"),
+        )
+        self.assertEqual(
+            _duck_curve_display_start(
+                actual_start, phases, scenario_start=time(14, 0)
+            ).time(),
+            time(14, 0),
+        )
+
     def test_suppresses_only_isolated_compressor_startup_spike(self):
         from datetime import datetime, timedelta
 

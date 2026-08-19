@@ -13,7 +13,14 @@ from pathlib import Path
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
-from .run_plot import _command_phases, _phase_name, _read_csv, _shift, _timestamp
+from .run_plot import (
+    _command_phases,
+    _duck_curve_display_start,
+    _phase_name,
+    _read_csv,
+    _shift,
+    _timestamp,
+)
 
 
 PLOT_FILENAME = "operational_state_verification.png"
@@ -158,7 +165,7 @@ def _segments(items, key, end: datetime):
 def plot_state_verification(
     run_directory: Path | str,
     *,
-    scenario_start: time = time(15, 30),
+    scenario_start: time | None = None,
     grace_seconds: float = 60,
     output_path: Path | str | None = None,
     show: bool = False,
@@ -170,11 +177,8 @@ def plot_state_verification(
     data = load_verification_data(directory)
     actual_start = min(data.reports[0].timestamp, data.phases[0].timestamp)
     actual_end = max(data.reports[-1].timestamp, data.phases[-1].timestamp)
-    display_start = actual_start.replace(
-        hour=scenario_start.hour,
-        minute=scenario_start.minute,
-        second=scenario_start.second,
-        microsecond=0,
+    display_start = _duck_curve_display_start(
+        actual_start, data.phases, scenario_start=scenario_start
     )
     display_end = _shift(actual_end, actual_start, display_start)
 
@@ -320,7 +324,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--start", default="15:30", help="scenario start in HH:MM")
+    parser.add_argument(
+        "--start",
+        help="override automatic 9:10 PM event-end alignment with start time HH:MM",
+    )
     parser.add_argument("--grace-seconds", type=float, default=60)
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
@@ -328,7 +335,7 @@ def main() -> int:
         output = args.output or args.run_directory / PLOT_FILENAME
         _, destination = plot_state_verification(
             args.run_directory,
-            scenario_start=time.fromisoformat(args.start),
+            scenario_start=time.fromisoformat(args.start) if args.start else None,
             grace_seconds=args.grace_seconds,
             output_path=output,
             show=args.show,

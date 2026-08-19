@@ -19,7 +19,7 @@ PLOT_FILENAME = "energy_take_change_power.png"
 def plot_energy_take_change(
     run_directory: Path | str,
     *,
-    scenario_start: time = time(15, 30),
+    scenario_start: time | None = None,
     output_path: Path | str | None = None,
     show: bool = False,
     suppress_startup_spikes: bool = True,
@@ -39,7 +39,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--start", default="15:30", help="scenario start in HH:MM")
+    parser.add_argument(
+        "--start",
+        help="override automatic 9:10 PM event-end alignment with start time HH:MM",
+    )
     parser.add_argument("--show", action="store_true")
     parser.add_argument(
         "--include-startup-spikes",
@@ -51,7 +54,7 @@ def main() -> int:
         output = args.output or args.run_directory / PLOT_FILENAME
         _, destination = plot_energy_take_change(
             args.run_directory,
-            scenario_start=time.fromisoformat(args.start),
+            scenario_start=time.fromisoformat(args.start) if args.start else None,
             output_path=output,
             show=args.show,
             suppress_startup_spikes=not args.include_startup_spikes,
