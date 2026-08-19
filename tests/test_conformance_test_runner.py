@@ -12,6 +12,7 @@ from software.conformance_test_runner import (
     _launch_water_draw,
     build_parser,
     clock_text,
+    generate_final_outputs,
     progress_text,
     prepare_master_schedule,
     safe_identifier,
@@ -183,6 +184,43 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         configuration_index = command.index("--sensor-configuration")
         self.assertEqual(command[configuration_index + 1], str(configuration))
         self.assertIn("--enable-output", command)
+
+    def test_final_outputs_attempt_every_artifact_independently(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        run_directory = Path("run")
+        with (
+            patch(
+                "software.conformance_test_runner.generate_conformance_report",
+                return_value=run_directory / "conformance_test_report.xlsx",
+            ) as report,
+            patch(
+                "software.conformance_test_runner._generate_energy_take_plot",
+                return_value=run_directory / "energy_take_power.png",
+            ) as energy_plot,
+            patch(
+                "software.conformance_test_runner._generate_state_verification_plot",
+                side_effect=ValueError("no states"),
+            ) as state_plot,
+            patch(
+                "software.conformance_test_runner._generate_phase_summary",
+                return_value=run_directory / "phase_summary.png",
+            ) as phase_summary,
+        ):
+            generate_final_outputs(
+                run_directory,
+                output_stream=output,
+                error_stream=errors,
+            )
+
+        report.assert_called_once_with(run_directory)
+        energy_plot.assert_called_once()
+        state_plot.assert_called_once()
+        phase_summary.assert_called_once()
+        self.assertIn("CONFORMANCE_REPORT run", output.getvalue())
+        self.assertIn("ENERGY_TAKE_PLOT run", output.getvalue())
+        self.assertIn("PHASE_SUMMARY run", output.getvalue())
+        self.assertIn("STATE_VERIFICATION_PLOT_ERROR ValueError: no states", errors.getvalue())
 
 
 if __name__ == "__main__":

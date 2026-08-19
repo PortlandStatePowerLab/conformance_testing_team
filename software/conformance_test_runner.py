@@ -58,6 +58,69 @@ DEFAULT_CTA_BINARY = (
 DEFAULT_CTA_SCHEDULE = DEFAULT_CTA_DIRECTORY / "schedule.csv"
 DEFAULT_PRESTART_SECONDS = 15.0
 
+
+def _generate_energy_take_plot(run_directory: Path) -> Path | None:
+    from software.run_plot import plot_run
+
+    return plot_run(
+        run_directory,
+        output_path=run_directory / "energy_take_power.png",
+    )[1]
+
+
+def _generate_state_verification_plot(run_directory: Path) -> Path | None:
+    from software.state_verification_plot import plot_state_verification
+
+    return plot_state_verification(
+        run_directory,
+        output_path=run_directory / "operational_state_verification.png",
+    )[1]
+
+
+def _generate_phase_summary(run_directory: Path) -> Path | None:
+    from software.phase_summary_plot import plot_phase_summary
+
+    return plot_phase_summary(
+        run_directory,
+        output_path=run_directory / "phase_summary.png",
+    )[1]
+
+
+def generate_final_outputs(
+    run_directory: Path,
+    *,
+    output_stream: IO[str] | None = None,
+    error_stream: IO[str] | None = None,
+) -> None:
+    """Generate independent report artifacts after all run files are closed."""
+    output_stream = output_stream or sys.stdout
+    error_stream = error_stream or sys.stderr
+    tasks = (
+        ("CONFORMANCE_REPORT", lambda: generate_conformance_report(run_directory)),
+        (
+            "ENERGY_TAKE_PLOT",
+            lambda: _generate_energy_take_plot(run_directory),
+        ),
+        (
+            "STATE_VERIFICATION_PLOT",
+            lambda: _generate_state_verification_plot(run_directory),
+        ),
+        (
+            "PHASE_SUMMARY",
+            lambda: _generate_phase_summary(run_directory),
+        ),
+    )
+    for label, generate in tasks:
+        try:
+            path = generate()
+            print(f"{label} {path}", file=output_stream, flush=True)
+        except Exception as artifact_error:
+            print(
+                f"{label}_ERROR {type(artifact_error).__name__}: {artifact_error}",
+                file=error_stream,
+                flush=True,
+            )
+
 RUN_EVENT_COLUMNS = (
     "timestamp_pacific",
     "test_elapsed_seconds",
@@ -708,16 +771,7 @@ def run_hardware_test(
 
         logger.record("run_finished", outcome)
         logger.close()
-        try:
-            report_path = generate_conformance_report(run_directory)
-            print(f"CONFORMANCE_REPORT {report_path}", flush=True)
-        except Exception as report_error:
-            print(
-                "CONFORMANCE_REPORT_ERROR "
-                f"{type(report_error).__name__}: {report_error}",
-                file=sys.stderr,
-                flush=True,
-            )
+        generate_final_outputs(run_directory)
     return run_directory
 
 
