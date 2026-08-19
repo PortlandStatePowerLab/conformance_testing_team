@@ -13,7 +13,7 @@ from pathlib import Path
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
-from .run_plot import _phase_name, _read_csv, _shift, _timestamp
+from .run_plot import _command_phases, _phase_name, _read_csv, _shift, _timestamp
 
 
 PLOT_FILENAME = "operational_state_verification.png"
@@ -24,6 +24,8 @@ class ExpectedPhase:
     timestamp: datetime
     name: str
     expected_states: frozenset[int]
+    accepted: bool = True
+    result: str = ""
 
 
 @dataclass(frozen=True)
@@ -76,16 +78,9 @@ def load_verification_data(run_directory: Path | str) -> VerificationData:
 
     phases: list[ExpectedPhase] = []
     reports: list[StateReport] = []
-    for row in _read_csv(directory / "cta_events.csv"):
+    event_rows = _read_csv(directory / "cta_events.csv")
+    for row in event_rows:
         command = row.get("command", "").strip().lower()
-        if _acknowledged(row) and scheduled[command]:
-            phases.append(
-                ExpectedPhase(
-                    _timestamp(row["timestamp_pacific"]),
-                    _phase_name(command) or command,
-                    scheduled[command].popleft(),
-                )
-            )
         if row.get("event", "").strip().lower() == "operational_state":
             raw_code = row.get("operational_state", "").strip()
             if raw_code:
@@ -96,6 +91,18 @@ def load_verification_data(run_directory: Path | str) -> VerificationData:
                         row.get("operational_state_name", "").strip() or f"State {raw_code}",
                     )
                 )
+
+    for phase in _command_phases(event_rows):
+        if scheduled[phase.command]:
+            phases.append(
+                ExpectedPhase(
+                    phase.timestamp,
+                    phase.name,
+                    scheduled[phase.command].popleft(),
+                    phase.accepted,
+                    phase.result,
+                )
+            )
 
     if not phases:
         raise ValueError("no acknowledged scheduled CTA phases found")
@@ -126,7 +133,9 @@ def verification_status(
     if phase is None:
         return "No expectation"
     if report.code in phase.expected_states:
-        return "Pass"
+        return "Pass" if phase.accepted else "Fail"
+    if not phase.accepted:
+        return "Fail"
     if (report.timestamp - phase.timestamp).total_seconds() <= grace_seconds:
         return "Grace"
     return "Fail"
@@ -174,6 +183,8 @@ def plot_state_verification(
             _shift(item.timestamp, actual_start, display_start),
             item.name,
             item.expected_states,
+            item.accepted,
+            item.result,
         )
         for item in data.phases
     )
@@ -184,7 +195,10 @@ def plot_state_verification(
         for item in data.reports
     )
     if (phases[0].timestamp - display_start).total_seconds() <= grace_seconds:
-        phases = (ExpectedPhase(display_start, phases[0].name, phases[0].expected_states),) + phases[1:]
+        first = phases[0]
+        phases = (ExpectedPhase(
+            display_start, first.name, first.expected_states, first.accepted, first.result
+        ),) + phases[1:]
 
     if show:
         import matplotlib.pyplot as plt
@@ -202,8 +216,16 @@ def plot_state_verification(
 
     phase_colors = {"ALU": "#cfe8cf", "Load Up": "#cfe8cf", "Shed": "#f8d58a", "CP": "#f8d58a", "GE": "#efaaaa", "Normal": "#dbe6ef"}
     total_seconds = max((display_end - display_start).total_seconds(), 1)
-    for start, end, phase in _segments(phases, lambda item: (item.name, item.expected_states), display_end):
-        command_axis.axvspan(start, end, color=phase_colors.get(phase.name, "#eeeeee"))
+    for start, end, phase in _segments(
+        phases,
+        lambda item: (item.name, item.expected_states, item.accepted, item.result),
+        display_end,
+    ):
+        command_axis.axvspan(
+            start,
+            end,
+            facecolor=phase_colors.get(phase.name, "#eeeeee") if phase.accepted else "white",
+        )
         command_axis.axvline(start, color="#666666", linewidth=0.8)
         codes = sorted(phase.expected_states)
         segment_fraction = (end - start).total_seconds() / total_seconds
@@ -221,7 +243,9 @@ def plot_state_verification(
             expected_fontsize = 8
         midpoint = start + (end - start) / 2
         command_axis.text(
-            midpoint, 0.6, phase.name, ha="center", va="center",
+            midpoint, 0.6,
+            phase.name if phase.accepted else f"{phase.name}\nRejected: {phase.result}",
+            ha="center", va="center",
             fontweight="bold", fontsize=phase_fontsize, clip_on=True
         )
         command_axis.text(

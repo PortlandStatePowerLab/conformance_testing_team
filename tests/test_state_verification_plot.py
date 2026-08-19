@@ -87,6 +87,30 @@ class StateVerificationPlotTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             self.assertEqual(len(figure.axes), 3)
 
+    def test_rejected_scheduled_phase_is_preserved_and_fails_immediately(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.create_run(directory)
+            write_csv(
+                directory / "master_schedule.csv",
+                ["enabled", "event_id", "event_type", "action", "expected_operational_states"],
+                [
+                    ["TRUE", "alu_1", "cta", "advanced_load_up", "3|6"],
+                    ["TRUE", "shed_1", "cta", "shed", "2|4"],
+                    ["TRUE", "alu_2", "cta", "advanced_load_up", "3|6"],
+                    ["TRUE", "normal_1", "cta", "run_normal", "0|1"],
+                ],
+            )
+            with (directory / "cta_events.csv").open("a", encoding="utf-8", newline="") as handle:
+                csv.writer(handle).writerows([
+                    ["2026-08-17T15:45:00-07:00", "command_completed", "advanced_load_up", "bad_value", "", ""],
+                ])
+            data = load_verification_data(directory)
+            rejected = [phase for phase in data.phases if not phase.accepted]
+            self.assertEqual([(phase.name, phase.result) for phase in rejected], [("ALU", "bad_value")])
+            report = StateReport(rejected[0].timestamp, 3, "Running Heightened")
+            self.assertEqual(verification_status(report, data.phases), "Fail")
+
 
 if __name__ == "__main__":
     unittest.main()

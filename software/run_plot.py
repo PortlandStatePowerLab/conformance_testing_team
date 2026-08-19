@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot EnergyTake, real power, and acknowledged phases for one test run."""
+"""Plot EnergyTake, real power, and attempted CTA phases for one test run."""
 
 from __future__ import annotations
 
@@ -28,6 +28,9 @@ class Sample:
 class Phase:
     timestamp: datetime
     name: str
+    command: str = ""
+    accepted: bool = True
+    result: str = ""
 
 
 @dataclass(frozen=True)
@@ -92,8 +95,10 @@ def _phase_name(command: str) -> str | None:
     }.get(command.strip().lower())
 
 
-def _acknowledged_phases(rows: Iterable[dict[str, str]]) -> tuple[Phase, ...]:
+def _command_phases(rows: Iterable[dict[str, str]]) -> tuple[Phase, ...]:
+    """Return accepted implementations and terminally rejected command attempts."""
     phases: list[Phase] = []
+    accepted_commands: set[str] = set()
     for row in rows:
         event = row.get("event", "").strip().lower()
         result = row.get("result", "").strip().lower()
@@ -104,13 +109,32 @@ def _acknowledged_phases(rows: Iterable[dict[str, str]]) -> tuple[Phase, ...]:
         ) or (
             event == "intermediate_response" and result == "success"
         )
-        if name is None or not acknowledged:
+        rejected = event == "command_completed" and result not in {"", "ok", "success"}
+        if name is None or not (acknowledged or rejected):
             continue
-        phase = Phase(_timestamp(row["timestamp_pacific"]), name)
-        if phases and phases[-1].name == phase.name:
+        if acknowledged:
+            accepted_commands.add(command)
+        phase = Phase(
+            _timestamp(row["timestamp_pacific"]),
+            name,
+            command,
+            acknowledged,
+            "" if acknowledged else result,
+        )
+        if (
+            phases
+            and phases[-1].name == phase.name
+            and phases[-1].accepted == phase.accepted
+            and phases[-1].result == phase.result
+        ):
             continue
         phases.append(phase)
     return tuple(sorted(phases, key=lambda phase: phase.timestamp))
+
+
+def _acknowledged_phases(rows: Iterable[dict[str, str]]) -> tuple[Phase, ...]:
+    """Backward-compatible accepted-only view used by older callers."""
+    return tuple(phase for phase in _command_phases(rows) if phase.accepted)
 
 
 def load_run_plot_data(run_directory: Path | str) -> RunPlotData:
@@ -120,8 +144,11 @@ def load_run_plot_data(run_directory: Path | str) -> RunPlotData:
         raise NotADirectoryError(f"run directory not found: {directory}")
 
     event_rows = _read_csv(directory / "cta_events.csv")
-    phases = _acknowledged_phases(event_rows)
-    advanced = any(phase.name == "ALU" for phase in phases)
+    phases = _command_phases(event_rows)
+    advanced = any(
+        row.get("command", "").strip().lower() == "advanced_load_up"
+        for row in event_rows
+    )
     energy_column = (
         "advanced_present_energy_storage_Wh"
         if advanced
@@ -225,13 +252,22 @@ def plot_run(
 
     plot_end = _shift(actual_end, actual_start, display_start)
     shifted_phases = [
-        Phase(_shift(phase.timestamp, actual_start, display_start), phase.name)
+        Phase(
+            _shift(phase.timestamp, actual_start, display_start),
+            phase.name,
+            phase.command,
+            phase.accepted,
+            phase.result,
+        )
         for phase in data.phases
         if actual_start <= phase.timestamp <= actual_end
     ]
     # A startup command acknowledged within the first minute defines the opening phase.
     if shifted_phases and (shifted_phases[0].timestamp - display_start).total_seconds() <= 60:
-        shifted_phases[0] = Phase(display_start, shifted_phases[0].name)
+        first = shifted_phases[0]
+        shifted_phases[0] = Phase(
+            display_start, first.name, first.command, first.accepted, first.result
+        )
 
     phase_colors = {
         "ALU": "#cfe8cf",
@@ -245,17 +281,24 @@ def plot_run(
         phase_end = shifted_phases[index + 1].timestamp if index + 1 < len(shifted_phases) else plot_end
         if phase_end <= phase.timestamp:
             continue
-        color = phase_colors.get(phase.name, "#eeeeee")
+        color = phase_colors.get(phase.name, "#eeeeee") if phase.accepted else "white"
         energy_axis.axvspan(
             phase.timestamp, phase_end, color=color, alpha=0.22, zorder=0
         )
         energy_axis.axvline(phase.timestamp, color="#666666", linewidth=0.8, alpha=0.65)
-        phase_axis.axvspan(phase.timestamp, phase_end, color=color, alpha=1.0)
+        phase_axis.axvspan(
+            phase.timestamp,
+            phase_end,
+            facecolor=color,
+            alpha=1.0,
+        )
         phase_axis.axvline(phase.timestamp, color="#777777", linewidth=0.8)
         midpoint = phase.timestamp + (phase_end - phase.timestamp) / 2
         phase_axis.text(
-            midpoint, 0.5, phase.name,
-            ha="center", va="center", fontsize=10, fontweight="bold"
+            midpoint, 0.5,
+            phase.name if phase.accepted else f"{phase.name}\nRejected: {phase.result}",
+            ha="center", va="center", fontsize=10 if phase.accepted else 8,
+            fontweight="bold", linespacing=0.9, clip_on=True,
         )
     if shifted_phases:
         phase_axis.axvline(plot_end, color="#777777", linewidth=0.8)

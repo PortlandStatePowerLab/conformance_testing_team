@@ -100,6 +100,19 @@ class RunPlotTests(unittest.TestCase):
                 ["ALU", "CP", "GE", "Shed", "ALU", "Normal"],
             )
 
+    def test_rejected_alu_is_white_phase_and_still_uses_advanced_energy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.create_run(directory)
+            with (directory / "cta_events.csv").open("a", encoding="utf-8", newline="") as handle:
+                csv.writer(handle).writerows([
+                    ["2026-08-17T18:40:03-07:00", "command_completed", "advanced_load_up", "bad_value"],
+                ])
+            data = load_run_plot_data(directory)
+            rejected = [phase for phase in data.phases if not phase.accepted]
+            self.assertEqual(data.energy_column, "advanced_present_energy_storage_Wh")
+            self.assertEqual([(phase.name, phase.result) for phase in rejected], [("ALU", "bad_value")])
+
     def test_saves_plot(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
