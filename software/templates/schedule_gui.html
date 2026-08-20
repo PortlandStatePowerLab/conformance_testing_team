@@ -644,7 +644,7 @@ async function initialize() {
   const equipment = document.querySelector("#station-equipment");
   if (metadata.equipment) {
     const item = metadata.equipment;
-    equipment.textContent = `Water Heater: ${item.manufacturer} ${item.model_number}\n${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
+    equipment.textContent = `${item.manufacturer} ${item.model_number}\n${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
   } else {
     equipment.textContent = metadata.equipment_error || "Water-heater information not configured.";
   }
