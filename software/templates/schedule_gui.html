@@ -80,7 +80,7 @@
   </div>
 
   <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
-  <div id="preflight-status" class="status">
+  <div id="preflight-status" class="status" hidden>
     <strong id="preflight-heading">Hardware preflight not yet run.</strong>
     <div id="preflight-lines" class="muted"></div>
     <div id="preflight-failures"></div>
@@ -363,6 +363,7 @@ function show(result, valid) {
 }
 
 function resetPreflightDisplay() {
+  preflightStatus.hidden = false;
   preflightPassed = false;
   preflightStatus.className = "status";
   preflightHeading.textContent = "Hardware preflight not yet run.";
@@ -398,6 +399,7 @@ document.querySelector("#add-cta").onclick = () => addCta();
 document.querySelector("#add-water").onclick = () => addWater();
 for (const id of ["end-time", "end-phase", "end-notes"]) document.querySelector(`#${id}`).oninput = updateView;
 document.querySelector("#validate").onclick = async () => {
+  if (preflightStatus.hidden) resetPreflightDisplay();
   try {
     const result = await request("/api/validate", {rows:scheduleRows()});
     validatedSignature = draftSignature();
@@ -471,6 +473,7 @@ function showPreflightEvent(event, rollingLines, failures) {
 
 preflightButton.onclick = async () => {
   if (!savedFilename || savedSignature !== draftSignature()) return;
+  preflightStatus.hidden = false;
   preflightRunning = true;
   preflightPassed = false;
   updateWorkflowState();
