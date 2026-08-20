@@ -42,6 +42,7 @@
     .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
     #countdown { font-size: 2rem; font-weight: 700; text-align: center; margin: 1rem; }
     .server-status { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
+    #station-equipment { white-space: pre-line; }
     #wh-information { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: .35rem 1.25rem; min-width: 0; }
     #wh-information-row { display: flex; flex-wrap: wrap; align-items: start; gap: .5rem 1.25rem; }
     #wh-information-summary { display: grid; gap: .25rem; }
@@ -643,7 +644,7 @@ async function initialize() {
   const equipment = document.querySelector("#station-equipment");
   if (metadata.equipment) {
     const item = metadata.equipment;
-    equipment.textContent = `Water Heater: ${item.manufacturer} ${item.model_number} · ${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
+    equipment.textContent = `Water Heater: ${item.manufacturer} ${item.model_number}\n${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
   } else {
     equipment.textContent = metadata.equipment_error || "Water-heater information not configured.";
   }
