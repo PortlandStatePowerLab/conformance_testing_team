@@ -226,11 +226,14 @@ class ScheduleGuiTests(unittest.TestCase):
             runs = root / "runs"
             schedule, _ = save_schedule(schedules, "safe_WH_1", master_rows())
             fake_process = unittest.mock.Mock()
-            with patch("software.schedule_gui.subprocess.Popen", return_value=fake_process):
+            with patch("software.schedule_gui.subprocess.Popen", return_value=fake_process) as popen:
                 launched = launch_run(runs, schedule, water=True)
                 snapshot = Path(launched["schedule_snapshot"])
                 self.assertEqual(snapshot.read_bytes(), schedule.read_bytes())
                 self.assertEqual(current_run(runs)["state"], "launching")
+                self.assertEqual(launched["result_name"], "safe")
+                command = popen.call_args.args[0]
+                self.assertEqual(command[command.index("--result-name") + 1], "safe")
                 with self.assertRaisesRegex(RuntimeError, "already active"):
                     launch_run(runs, schedule, water=True)
 

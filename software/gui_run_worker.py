@@ -16,6 +16,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .schedule_parser import load_schedule
+from .pacific_time import pacific_filename_timestamp
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
@@ -52,6 +53,7 @@ def run(args: argparse.Namespace) -> int:
     command = [
         sys.executable, "-m", "software.conformance_test_runner", "--run-hardware",
         "--master-schedule", str(args.schedule),
+        "--run-id", f"{args.result_name}_{pacific_filename_timestamp()}",
     ]
     if args.water:
         command.append("--enable-water-output")
@@ -95,6 +97,7 @@ def main() -> int:
     parser.add_argument("--run-directory", type=Path, required=True)
     parser.add_argument("--schedule", type=Path, required=True)
     parser.add_argument("--repository-root", type=Path, required=True)
+    parser.add_argument("--result-name", required=True)
     parser.add_argument("--water", action="store_true")
     return run(parser.parse_args())
 

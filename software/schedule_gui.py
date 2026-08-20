@@ -117,10 +117,12 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
     directory.mkdir(parents=True, exist_ok=False)
     snapshot = directory / "schedule.csv"
     shutil.copy2(schedule, snapshot)
+    result_name = STATION_SUFFIX.sub("", schedule.stem)
     events = load_schedule(snapshot)
     duration = next(event.offset_seconds for event in events if event.event_type == "test")
     status = {
         "run_id": run_id, "state": "launching", "schedule": schedule.name,
+        "result_name": result_name,
         "schedule_snapshot": str(snapshot), "water_output_enabled": water,
         "requested_at": now.isoformat(), "duration_seconds": duration,
         "last_heartbeat_at": now.isoformat(),
@@ -129,7 +131,8 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
     _atomic_json(run_directory / "current.json", {"run_id": run_id})
     command = [sys.executable, "-m", "software.gui_run_worker",
                "--run-directory", str(directory), "--schedule", str(snapshot),
-               "--repository-root", str(SOFTWARE_DIRECTORY.parent)]
+               "--repository-root", str(SOFTWARE_DIRECTORY.parent),
+               "--result-name", result_name]
     if water:
         command.append("--water")
     worker_log = (directory / "worker.log").open("a", encoding="utf-8")
