@@ -9,6 +9,9 @@ import json
 import os
 import re
 import socket
+import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -17,6 +20,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from urllib.parse import unquote
 
 try:
@@ -60,7 +65,86 @@ SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
 STATION_SUFFIX = re.compile(r"_WH_(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
-DEFAULT_IDLE_TIMEOUT_HOURS = 24.0
+DEFAULT_IDLE_TIMEOUT_HOURS = 48.0
+DEFAULT_RUN_DIRECTORY = SOFTWARE_DIRECTORY.parent / "runtime_logs" / "gui_runs"
+PACIFIC = ZoneInfo("America/Los_Angeles")
+PREFLIGHT_MAX_AGE_SECONDS = 300
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def current_run(run_directory: Path) -> dict[str, Any] | None:
+    pointer = run_directory / "current.json"
+    if not pointer.is_file():
+        return None
+    try:
+        run_id = str(_read_json(pointer)["run_id"])
+        status = _read_json(run_directory / run_id / "status.json")
+        heartbeat = status.get("last_heartbeat_at")
+        if heartbeat and status.get("state") in {"launching", "initializing", "running"}:
+            age = (datetime.now(PACIFIC) - datetime.fromisoformat(heartbeat)).total_seconds()
+            status["status_age_seconds"] = max(0, int(age))
+            status["stale"] = age > 90
+        return status
+    except (KeyError, OSError, ValueError, json.JSONDecodeError):
+        return {"state": "unknown", "error": "run status could not be read"}
+
+
+def _atomic_json(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent,
+                                         prefix=".run.", suffix=".tmp", delete=False) as handle:
+            temporary = Path(handle.name)
+            json.dump(value, handle, sort_keys=True)
+            handle.write("\n")
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str, Any]:
+    active = current_run(run_directory)
+    if active and active.get("state") in {"launching", "initializing", "running", "stopping"}:
+        raise RuntimeError("a conformance test is already active on this station")
+    now = datetime.now(PACIFIC)
+    run_id = f"gui_{now.strftime('%Y_%m_%d_%H%M%S_%f_%Z')}"
+    directory = run_directory / run_id
+    directory.mkdir(parents=True, exist_ok=False)
+    snapshot = directory / "schedule.csv"
+    shutil.copy2(schedule, snapshot)
+    events = load_schedule(snapshot)
+    duration = next(event.offset_seconds for event in events if event.event_type == "test")
+    status = {
+        "run_id": run_id, "state": "launching", "schedule": schedule.name,
+        "schedule_snapshot": str(snapshot), "water_output_enabled": water,
+        "requested_at": now.isoformat(), "duration_seconds": duration,
+        "last_heartbeat_at": now.isoformat(),
+    }
+    _atomic_json(directory / "status.json", status)
+    _atomic_json(run_directory / "current.json", {"run_id": run_id})
+    command = [sys.executable, "-m", "software.gui_run_worker",
+               "--run-directory", str(directory), "--schedule", str(snapshot),
+               "--repository-root", str(SOFTWARE_DIRECTORY.parent)]
+    if water:
+        command.append("--water")
+    worker_log = (directory / "worker.log").open("a", encoding="utf-8")
+    try:
+        subprocess.Popen(command, cwd=SOFTWARE_DIRECTORY.parent, stdin=subprocess.DEVNULL,
+                         stdout=worker_log, stderr=subprocess.STDOUT,
+                         start_new_session=True, close_fds=True)
+    except Exception as exc:
+        status.update(state="failed", error=f"worker launch failed: {exc}",
+                      finished_at=datetime.now(PACIFIC).isoformat())
+        _atomic_json(directory / "status.json", status)
+        raise
+    finally:
+        worker_log.close()
+    return status
 
 
 def station_suffix_from_hostname(hostname: str) -> str:
@@ -314,6 +398,9 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
     station_suffix = ""
     preflight_lock = threading.Lock()
     wh_information_lock = threading.Lock()
+    run_lock = threading.Lock()
+    run_directory = DEFAULT_RUN_DIRECTORY
+    preflight_receipts: dict[str, float] = {}
 
     def _record_http_activity(self) -> None:
         self.server.last_http_activity = time.monotonic()
@@ -398,6 +485,8 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                         "water": water,
                     }
                 )
+                if failures == 0:
+                    self.preflight_receipts[filename] = time.monotonic()
             except (BrokenPipeError, ConnectionResetError):
                 return
             except Exception as exc:
@@ -427,6 +516,9 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/metadata":
             self._json(HTTPStatus.OK, editor_metadata(self.hostname))
+            return
+        if self.path == "/api/runs/current":
+            self._json(HTTPStatus.OK, {"run": current_run(self.run_directory)})
             return
         prefix = "/api/schedules/"
         if self.path.startswith(prefix):
@@ -472,9 +564,24 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                     HTTPStatus.OK,
                     {"saved": destination.name, "summary": summary},
                 )
+                self.preflight_receipts.pop(destination.name, None)
                 return
             if self.path == "/api/preflight":
                 self._stream_preflight(str(request.get("filename", "")))
+                return
+            if self.path == "/api/runs":
+                filename = str(request.get("filename", ""))
+                friendly_schedule_name(filename, self.station_suffix)
+                path = self.schedule_directory / normalize_schedule_name(filename)
+                receipt = self.preflight_receipts.get(filename)
+                if receipt is None or time.monotonic() - receipt > PREFLIGHT_MAX_AGE_SECONDS:
+                    raise RuntimeError("preflight must pass within five minutes before starting")
+                with self.run_lock:
+                    result = launch_run(
+                        self.run_directory, path, water=schedule_uses_water(path)
+                    )
+                self.preflight_receipts.pop(filename, None)
+                self._json(HTTPStatus.ACCEPTED, {"run": result})
                 return
             if self.path == "/api/wh-information":
                 if not self.wh_information_lock.acquire(blocking=False):
@@ -508,6 +615,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_IDLE_TIMEOUT_HOURS,
         help="exit after this many hours without a GET or POST request",
     )
+    parser.add_argument("--run-directory", type=Path, default=DEFAULT_RUN_DIRECTORY)
     parser.add_argument(
         "--schedule-directory", type=Path, default=DEFAULT_SCHEDULE_DIRECTORY
     )
@@ -554,6 +662,7 @@ def main() -> int:
             "schedule_directory": args.schedule_directory,
             "hostname": hostname,
             "station_suffix": station_suffix,
+            "run_directory": args.run_directory,
         },
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)

@@ -11,10 +11,13 @@ from unittest.mock import patch
 
 from software.hardware_preflight import PreflightCheck
 from software.schedule_gui import (
+    DEFAULT_IDLE_TIMEOUT_HOURS,
+    current_run,
     derive_rows,
     editor_metadata,
     friendly_schedule_name,
     load_schedule_rows,
+    launch_run,
     normalize_schedule_name,
     positive_hours,
     save_schedule,
@@ -39,6 +42,9 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_default_idle_timeout_is_48_hours(self):
+        self.assertEqual(DEFAULT_IDLE_TIMEOUT_HOURS, 48.0)
+
     def test_idle_timeout_accepts_decimal_hours(self):
         self.assertEqual(positive_hours("0.2"), 0.2)
         for invalid in ("0", "-1", "inf", "not-a-number"):
@@ -212,6 +218,21 @@ class ScheduleGuiTests(unittest.TestCase):
 
             self.assertTrue(schedule_uses_water(water_path))
             self.assertFalse(schedule_uses_water(dry_path))
+
+    def test_launch_run_snapshots_schedule_and_rejects_duplicate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            schedules = root / "schedules"
+            runs = root / "runs"
+            schedule, _ = save_schedule(schedules, "safe_WH_1", master_rows())
+            fake_process = unittest.mock.Mock()
+            with patch("software.schedule_gui.subprocess.Popen", return_value=fake_process):
+                launched = launch_run(runs, schedule, water=True)
+                snapshot = Path(launched["schedule_snapshot"])
+                self.assertEqual(snapshot.read_bytes(), schedule.read_bytes())
+                self.assertEqual(current_run(runs)["state"], "launching")
+                with self.assertRaisesRegex(RuntimeError, "already active"):
+                    launch_run(runs, schedule, water=True)
 
     def test_preflight_endpoint_streams_checks_and_summary(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -34,6 +34,13 @@
     #preflight-lines, #preflight-failures { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .9rem; }
     #preflight-lines { min-height: 2.8rem; }
     #preflight-failures { color: #b42318; margin-top: .5rem; }
+    #run-status { border-left: .4rem solid #0969da; }
+    #run-status.failed { border-left-color: #cf222e; }
+    #run-status.completed { border-left-color: #238636; }
+    dialog { border: 0; border-radius: .75rem; padding: 1.5rem; max-width: 34rem; box-shadow: 0 8px 30px #0005; }
+    dialog::backdrop { background: #0008; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
+    #countdown { font-size: 2rem; font-weight: 700; text-align: center; margin: 1rem; }
     .server-status { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
     #wh-information { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; min-width: 0; }
     #wh-information-result { white-space: nowrap; }
@@ -62,6 +69,7 @@
     <button id="validate" type="button">Validate schedule</button>
     <button id="save" type="button">Save validated CSV</button>
     <button id="preflight" type="button" disabled>Run preflight</button>
+    <button id="start-test" type="button" disabled>Start Test</button>
   </div>
 
   <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
@@ -69,6 +77,11 @@
     <strong id="preflight-heading">Hardware preflight not yet run.</strong>
     <div id="preflight-lines" class="muted"></div>
     <div id="preflight-failures"></div>
+  </div>
+  <div id="run-status" class="status" hidden>
+    <strong id="run-heading">No active test.</strong>
+    <div id="run-details" class="muted"></div>
+    <button id="refresh-run" type="button">Refresh status</button>
   </div>
 
   <div class="cards">
@@ -118,6 +131,16 @@
   </div>
 
 </main>
+<dialog id="start-dialog">
+  <h2>Start hardware test?</h2>
+  <div id="start-review"></div>
+  <p><strong>This test controls real hardware.</strong> The schedule shown here will be copied and cannot change during the run.</p>
+  <div id="countdown" hidden></div>
+  <div class="dialog-actions">
+    <button id="cancel-start" type="button">Cancel</button>
+    <button id="begin-countdown" type="button">Begin 10-second countdown</button>
+  </div>
+</dialog>
 <script>
 const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes","advanced_efficiency"];
 const status = document.querySelector("#status");
@@ -134,10 +157,19 @@ const preflightStatus = document.querySelector("#preflight-status");
 const preflightHeading = document.querySelector("#preflight-heading");
 const preflightLines = document.querySelector("#preflight-lines");
 const preflightFailures = document.querySelector("#preflight-failures");
+const startButton = document.querySelector("#start-test");
+const startDialog = document.querySelector("#start-dialog");
+const countdown = document.querySelector("#countdown");
+const runStatus = document.querySelector("#run-status");
+const runHeading = document.querySelector("#run-heading");
+const runDetails = document.querySelector("#run-details");
 let validatedSignature = null;
 let savedSignature = null;
 let savedFilename = "";
 let preflightRunning = false;
+let preflightPassed = false;
+let countdownTimer = null;
+let activeRun = null;
 const whInformationButton = document.querySelector("#get-wh-information");
 const whInformationResult = document.querySelector("#wh-information-result");
 const whCapabilities = document.querySelector("#wh-capabilities");
@@ -253,6 +285,7 @@ function updateWorkflowState() {
   const signature = draftSignature();
   saveButton.disabled = validatedSignature !== signature;
   preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
+  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || savedSignature !== signature || (activeRun && ["launching","initializing","running","stopping"].includes(activeRun.state));
 }
 
 function elapsedSeconds(value) {
@@ -321,6 +354,7 @@ function show(result, valid) {
 }
 
 function resetPreflightDisplay() {
+  preflightPassed = false;
   preflightStatus.className = "status";
   preflightHeading.textContent = "Hardware preflight not yet run.";
   preflightLines.textContent = "Validate and save this schedule before running preflight.";
@@ -415,6 +449,7 @@ function showPreflightEvent(event, rollingLines, failures) {
     }
   } else if (event.type === "summary") {
     const passed = event.failed === 0;
+    preflightPassed = passed;
     preflightStatus.className = `status ${passed ? "valid" : "invalid"}`;
     preflightHeading.textContent = `${passed ? "PREFLIGHT PASS" : "PREFLIGHT FAILED"} — ${event.passed} passed, ${event.failed} failed — ${event.water ? "water" : "standard"} mode`;
   } else if (event.type === "error") {
@@ -427,6 +462,7 @@ function showPreflightEvent(event, rollingLines, failures) {
 preflightButton.onclick = async () => {
   if (!savedFilename || savedSignature !== draftSignature()) return;
   preflightRunning = true;
+  preflightPassed = false;
   updateWorkflowState();
   preflightStatus.className = "status";
   preflightHeading.textContent = "Starting hardware preflight…";
@@ -466,6 +502,79 @@ preflightButton.onclick = async () => {
   }
 };
 
+function clockText(seconds) {
+  const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const secs = value % 60;
+  return [hours, minutes, secs].map(part => String(part).padStart(2, "0")).join(":");
+}
+
+function renderRun(run) {
+  activeRun = run;
+  if (!run) { runStatus.hidden = true; updateWorkflowState(); return; }
+  runStatus.hidden = false;
+  runStatus.className = `status ${run.state || ""}`;
+  runHeading.textContent = `${run.stale ? "STATUS STALE — " : ""}${String(run.state || "unknown").toUpperCase()} — ${run.schedule || run.run_id || "test"}`;
+  let remaining = run.remaining_seconds;
+  if (run.expected_end_at && ["initializing","running"].includes(run.state)) {
+    remaining = Math.max(0, (Date.parse(run.expected_end_at) - Date.now()) / 1000);
+  }
+  const heartbeat = run.last_heartbeat_at ? new Date(run.last_heartbeat_at).toLocaleString() : "not yet available";
+  runDetails.textContent = `Remaining ${clockText(remaining)} · expected finish ${run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating"} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
+  updateWorkflowState();
+}
+
+async function refreshRunStatus() {
+  try {
+    const response = await fetch("/api/runs/current", {cache:"no-store"});
+    const result = await response.json();
+    renderRun(result.run);
+  } catch (_) {
+    if (activeRun) runHeading.textContent = "CONNECTION LOST — TEST CONTINUES ON STATION";
+  }
+}
+
+document.querySelector("#refresh-run").onclick = refreshRunStatus;
+startButton.onclick = () => {
+  const duration = elapsedSeconds(document.querySelector("#end-time").value);
+  document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${clockText(duration)} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
+  countdown.hidden = true;
+  document.querySelector("#begin-countdown").hidden = false;
+  startDialog.showModal();
+};
+
+function cancelStart() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = null;
+  if (startDialog.open) startDialog.close();
+}
+document.querySelector("#cancel-start").onclick = cancelStart;
+startDialog.oncancel = event => { event.preventDefault(); cancelStart(); };
+document.querySelector("#begin-countdown").onclick = () => {
+  document.querySelector("#begin-countdown").hidden = true;
+  countdown.hidden = false;
+  let remaining = 10;
+  countdown.textContent = `Starting in ${remaining}…`;
+  countdownTimer = setInterval(async () => {
+    remaining -= 1;
+    countdown.textContent = `Starting in ${remaining}…`;
+    if (remaining > 0) return;
+    clearInterval(countdownTimer); countdownTimer = null;
+    countdown.textContent = "Requesting start…";
+    try {
+      const result = await request("/api/runs", {filename:savedFilename});
+      startDialog.close();
+      preflightPassed = false;
+      renderRun(result.run);
+      setTimeout(refreshRunStatus, 1000);
+    } catch (error) {
+      countdown.textContent = error.error || String(error);
+      document.querySelector("#begin-countdown").hidden = false;
+    }
+  }, 1000);
+};
+
 whInformationButton.onclick = async () => {
   whInformationButton.disabled = true;
   whInformationButton.textContent = "Getting WH Info…";
@@ -498,6 +607,9 @@ async function initialize() {
   addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"max"});
   updateView();
   await refreshSchedules();
+  await refreshRunStatus();
+  setInterval(refreshRunStatus, 60000);
+  setInterval(() => { if (activeRun) renderRun(activeRun); }, 1000);
 }
 document.querySelector("#name").oninput = updateWorkflowState;
 initialize().catch(error => show({error:`Could not initialize editor: ${error}`}, false));
