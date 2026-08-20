@@ -80,16 +80,34 @@ def current_run(run_directory: Path) -> dict[str, Any] | None:
     if not pointer.is_file():
         return None
     try:
-        run_id = str(_read_json(pointer)["run_id"])
+        current = _read_json(pointer)
+        if current.get("dismissed") is True:
+            return None
+        run_id = str(current["run_id"])
         status = _read_json(run_directory / run_id / "status.json")
         heartbeat = status.get("last_heartbeat_at")
-        if heartbeat and status.get("state") in {"launching", "initializing", "running"}:
+        if heartbeat and status.get("state") in {
+            "launching", "initializing", "running", "finalizing", "generating_outputs"
+        }:
             age = (datetime.now(PACIFIC) - datetime.fromisoformat(heartbeat)).total_seconds()
             status["status_age_seconds"] = max(0, int(age))
             status["stale"] = age > 90
         return status
     except (KeyError, OSError, ValueError, json.JSONDecodeError):
         return {"state": "unknown", "error": "run status could not be read"}
+
+
+def dismiss_current_run(run_directory: Path) -> None:
+    """Hide a terminal run from the operator dashboard without deleting it."""
+    pointer = run_directory / "current.json"
+    if not pointer.is_file():
+        return
+    current = _read_json(pointer)
+    run_id = str(current["run_id"])
+    status = _read_json(run_directory / run_id / "status.json")
+    if status.get("state") not in {"completed", "failed"}:
+        raise RuntimeError("an active test cannot be dismissed")
+    _atomic_json(pointer, {"run_id": run_id, "dismissed": True})
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -109,7 +127,10 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
 
 def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str, Any]:
     active = current_run(run_directory)
-    if active and active.get("state") in {"launching", "initializing", "running", "stopping"}:
+    if active and active.get("state") in {
+        "launching", "initializing", "running", "finalizing",
+        "generating_outputs", "stopping",
+    }:
         raise RuntimeError("a conformance test is already active on this station")
     now = datetime.now(PACIFIC)
     run_id = f"gui_{now.strftime('%Y_%m_%d_%H%M%S_%f_%Z')}"
@@ -585,6 +606,11 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                     )
                 self.preflight_receipts.pop(filename, None)
                 self._json(HTTPStatus.ACCEPTED, {"run": result})
+                return
+            if self.path == "/api/runs/current/dismiss":
+                with self.run_lock:
+                    dismiss_current_run(self.run_directory)
+                self._json(HTTPStatus.OK, {"dismissed": True})
                 return
             if self.path == "/api/wh-information":
                 if not self.wh_information_lock.acquire(blocking=False):

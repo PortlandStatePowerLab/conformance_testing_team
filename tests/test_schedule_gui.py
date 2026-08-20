@@ -13,6 +13,7 @@ from software.hardware_preflight import PreflightCheck
 from software.schedule_gui import (
     DEFAULT_IDLE_TIMEOUT_HOURS,
     current_run,
+    dismiss_current_run,
     derive_rows,
     editor_metadata,
     friendly_schedule_name,
@@ -237,6 +238,24 @@ class ScheduleGuiTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "already active"):
                     launch_run(runs, schedule, water=True)
 
+    def test_only_terminal_run_can_be_dismissed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            run = runs / "run_one"
+            run.mkdir()
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            (run / "status.json").write_text(
+                '{"run_id":"run_one","state":"running"}', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(RuntimeError, "active test"):
+                dismiss_current_run(runs)
+            (run / "status.json").write_text(
+                '{"run_id":"run_one","state":"completed"}', encoding="utf-8"
+            )
+            dismiss_current_run(runs)
+            self.assertIsNone(current_run(runs))
+            self.assertTrue((run / "status.json").is_file())
+
     def test_preflight_endpoint_streams_checks_and_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             schedule_directory = Path(directory)
@@ -305,6 +324,7 @@ class ScheduleGuiTests(unittest.TestCase):
         thread.start()
         expected = {
             "timestamp_pacific": "2026-08-17T12:34:56.000-07:00",
+            "cta2045_version": "B",
             "bitmap": "0x00000141",
             "raw_bitmap": "0x00000141",
             "capabilities": [

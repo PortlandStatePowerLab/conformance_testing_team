@@ -42,7 +42,9 @@
     .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
     #countdown { font-size: 2rem; font-weight: 700; text-align: center; margin: 1rem; }
     .server-status { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
-    #wh-information { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; min-width: 0; }
+    #wh-information { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: .35rem 1.25rem; min-width: 0; }
+    #wh-information-details { display: grid; gap: .35rem; }
+    #wh-information-row { display: flex; flex-wrap: wrap; align-items: start; gap: .5rem 1.25rem; }
     #wh-information-result { white-space: nowrap; }
     #wh-capabilities { display: grid; gap: .25rem; }
     .empty { padding: 1rem; text-align: center; color: #596579; border: 1px dashed #b7c0cf; }
@@ -57,8 +59,13 @@
     <div>Schedule server: <strong id="station-hostname">loading…</strong></div>
     <div id="wh-information">
       <button id="get-wh-information" type="button">Get WH Info</button>
-      <div id="wh-information-result" class="muted">Water-heater information not yet requested.</div>
-      <div id="wh-capabilities"></div>
+      <div id="wh-information-details">
+        <div id="wh-version" class="muted">CTA-2045 version: not yet requested</div>
+        <div id="wh-information-row">
+          <div id="wh-information-result" class="muted">Bitmap: not yet requested.</div>
+          <div id="wh-capabilities"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -163,6 +170,7 @@ const countdown = document.querySelector("#countdown");
 const runStatus = document.querySelector("#run-status");
 const runHeading = document.querySelector("#run-heading");
 const runDetails = document.querySelector("#run-details");
+const refreshRunButton = document.querySelector("#refresh-run");
 let validatedSignature = null;
 let savedSignature = null;
 let savedFilename = "";
@@ -172,6 +180,7 @@ let countdownTimer = null;
 let activeRun = null;
 const whInformationButton = document.querySelector("#get-wh-information");
 const whInformationResult = document.querySelector("#wh-information-result");
+const whVersion = document.querySelector("#wh-version");
 const whCapabilities = document.querySelector("#wh-capabilities");
 
 function selectControl(values, selected) {
@@ -285,7 +294,7 @@ function updateWorkflowState() {
   const signature = draftSignature();
   saveButton.disabled = validatedSignature !== signature;
   preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
-  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || savedSignature !== signature || (activeRun && ["launching","initializing","running","stopping"].includes(activeRun.state));
+  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || savedSignature !== signature || (activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state));
 }
 
 function elapsedSeconds(value) {
@@ -430,6 +439,7 @@ document.querySelector("#load").onclick = async () => {
     messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
     status.className = "status";
     resetPreflightDisplay();
+    await dismissTerminalRun();
     updateWorkflowState();
   } catch (error) { show(error, false); }
 };
@@ -515,13 +525,16 @@ function renderRun(run) {
   if (!run) { runStatus.hidden = true; updateWorkflowState(); return; }
   runStatus.hidden = false;
   runStatus.className = `status ${run.state || ""}`;
-  runHeading.textContent = `${run.stale ? "STATUS STALE — " : ""}${String(run.state || "unknown").toUpperCase()} — ${run.schedule || run.run_id || "test"}`;
+  const stateLabel = String(run.state || "unknown").replaceAll("_", " ").toUpperCase();
+  runHeading.textContent = `${run.stale ? "STATUS STALE — " : ""}${stateLabel} — ${run.schedule || run.run_id || "test"}`;
   let remaining = run.remaining_seconds;
   if (run.expected_end_at && ["initializing","running"].includes(run.state)) {
     remaining = Math.max(0, (Date.parse(run.expected_end_at) - Date.now()) / 1000);
   }
   const heartbeat = run.last_heartbeat_at ? new Date(run.last_heartbeat_at).toLocaleString() : "not yet available";
-  runDetails.textContent = `Remaining ${clockText(remaining)} · expected finish ${run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating"} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
+  const lifecycle = run.message ? `${run.message} · ` : "";
+  runDetails.textContent = `${lifecycle}Remaining ${clockText(remaining)} · expected finish ${run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating"} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
+  refreshRunButton.textContent = ["completed", "failed"].includes(run.state) ? "Dismiss completed test" : "Refresh status";
   updateWorkflowState();
 }
 
@@ -535,7 +548,19 @@ async function refreshRunStatus() {
   }
 }
 
-document.querySelector("#refresh-run").onclick = refreshRunStatus;
+async function dismissTerminalRun() {
+  if (!activeRun || !["completed", "failed"].includes(activeRun.state)) return;
+  await request("/api/runs/current/dismiss", {});
+  renderRun(null);
+}
+
+refreshRunButton.onclick = async () => {
+  if (activeRun && ["completed", "failed"].includes(activeRun.state)) {
+    await dismissTerminalRun();
+  } else {
+    await refreshRunStatus();
+  }
+};
 startButton.onclick = () => {
   const duration = elapsedSeconds(document.querySelector("#end-time").value);
   document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${clockText(duration)} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
@@ -579,9 +604,11 @@ whInformationButton.onclick = async () => {
   whInformationButton.disabled = true;
   whInformationButton.textContent = "Getting WH Info…";
   whInformationResult.textContent = "Requesting information from the water heater…";
+  whVersion.textContent = "CTA-2045 version: requesting…";
   whCapabilities.replaceChildren();
   try {
     const result = await request("/api/wh-information", {});
+    whVersion.textContent = `CTA-2045 version: ${result.cta2045_version || "Unknown"}`;
     whInformationResult.textContent = `Bitmap: ${result.bitmap} — Read ${result.timestamp_pacific}`;
     if (result.capabilities.length === 0) {
       whCapabilities.append(Object.assign(document.createElement("div"), {textContent:"No supported capabilities reported."}));
@@ -591,6 +618,7 @@ whInformationButton.onclick = async () => {
       }
     }
   } catch (error) {
+    whVersion.textContent = "CTA-2045 version: unavailable";
     whInformationResult.textContent = error.error || String(error);
   } finally {
     whInformationButton.disabled = false;
@@ -608,7 +636,7 @@ async function initialize() {
   updateView();
   await refreshSchedules();
   await refreshRunStatus();
-  setInterval(refreshRunStatus, 60000);
+  setInterval(refreshRunStatus, 15000);
   setInterval(() => { if (activeRun) renderRun(activeRun); }, 1000);
 }
 document.querySelector("#name").oninput = updateWorkflowState;

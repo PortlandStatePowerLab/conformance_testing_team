@@ -57,6 +57,26 @@ DEFAULT_CTA_BINARY = (
 )
 DEFAULT_CTA_SCHEDULE = DEFAULT_CTA_DIRECTORY / "schedule.csv"
 DEFAULT_PRESTART_SECONDS = 15.0
+GUI_STAGE_PATH_ENV = "CONFORMANCE_GUI_STAGE_PATH"
+
+
+def _write_gui_stage(state: str, message: str) -> None:
+    """Publish an optional GUI lifecycle marker without coupling to the GUI."""
+    configured = os.environ.get(GUI_STAGE_PATH_ENV)
+    if not configured:
+        return
+    path = Path(configured)
+    temporary = path.with_suffix(".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            json.dumps({"state": state, "message": message}) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
+    except OSError as exc:
+        print(f"GUI_STAGE_WARNING {exc}", file=sys.stderr)
+        temporary.unlink(missing_ok=True)
 
 
 def _generate_energy_take_plot(run_directory: Path) -> Path | None:
@@ -746,6 +766,10 @@ def run_hardware_test(
         )
         raise
     finally:
+        _write_gui_stage(
+            "finalizing",
+            "Scheduled test complete; returning hardware to normal and closing logs.",
+        )
         if progress is not None:
             progress.finish(
                 test_end.offset_seconds if outcome == "completed" else last_elapsed,
@@ -796,6 +820,10 @@ def run_hardware_test(
 
         logger.record("run_finished", outcome)
         logger.close()
+        _write_gui_stage(
+            "generating_outputs",
+            "Hardware shutdown complete; generating the report and PNG files.",
+        )
         generate_final_outputs(run_directory)
     return run_directory
 

@@ -12,6 +12,7 @@ DEVICE_INFORMATION_COLUMNS = (
     "timestamp_pacific",
     "response_code",
     "response_name",
+    "cta2045_version",
     "capability_bitmap_hex",
 )
 
@@ -53,6 +54,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
                             "timestamp_pacific": "2026-08-17T12:34:56.000-07:00",
                             "response_code": "0",
                             "response_name": "success",
+                            "cta2045_version": "B",
                             "capability_bitmap_hex": "00000141",
                         }
                     )
@@ -65,6 +67,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
                 )
 
         self.assertEqual(result["bitmap"], "0x00000141")
+        self.assertEqual(result["cta2045_version"], "B")
         self.assertEqual(result["raw_bitmap"], "0x00000141")
         self.assertEqual([item["bit"] for item in result["capabilities"]], [0, 6, 8])
 

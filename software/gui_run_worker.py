@@ -58,30 +58,46 @@ def run(args: argparse.Namespace) -> int:
     if args.water:
         command.append("--enable-water-output")
     log_path = args.run_directory / "runner.log"
+    stage_path = args.run_directory / "runner_stage.json"
     return_code = 1
     try:
         with log_path.open("a", encoding="utf-8", buffering=1) as log:
+            environment = os.environ.copy()
+            environment["CONFORMANCE_GUI_STAGE_PATH"] = str(stage_path)
             process = subprocess.Popen(
                 command, cwd=args.repository_root, stdout=log,
-                stderr=subprocess.STDOUT, text=True,
+                stderr=subprocess.STDOUT, text=True, env=environment,
             )
             status.update(state="running", runner_pid=process.pid)
             atomic_json(status_path, status)
             while process.poll() is None:
                 now = datetime.now(PACIFIC)
                 elapsed = max(0, int((now - started).total_seconds()))
+                if stage_path.is_file():
+                    try:
+                        stage = json.loads(stage_path.read_text(encoding="utf-8"))
+                        status.update(state=stage["state"], message=stage["message"])
+                    except (KeyError, OSError, json.JSONDecodeError):
+                        pass
                 status.update(
                     last_heartbeat_at=now.isoformat(),
                     elapsed_seconds=min(elapsed, duration),
-                    remaining_seconds=max(0, duration - elapsed),
+                    remaining_seconds=(
+                        0 if status.get("state") in {"finalizing", "generating_outputs"}
+                        else max(0, duration - elapsed)
+                    ),
                 )
                 atomic_json(status_path, status)
-                time.sleep(30)
+                time.sleep(5)
             return_code = process.returncode
         status.update(
             state="completed" if return_code == 0 else "failed",
             finished_at=datetime.now(PACIFIC).isoformat(), return_code=return_code,
             remaining_seconds=0 if return_code == 0 else status.get("remaining_seconds"),
+            message=(
+                "Test complete; shutdown and final report generation finished."
+                if return_code == 0 else "The test runner exited before completion."
+            ),
         )
     except Exception as exc:
         status.update(

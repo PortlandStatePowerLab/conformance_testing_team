@@ -105,8 +105,10 @@ def read_wh_information(
     raw_bitmap = row.get("capability_bitmap_hex", "")
     capabilities = decode_capabilities(raw_bitmap)
     logical_bitmap = int(raw_bitmap, 16)
+    cta2045_version = (row.get("cta2045_version") or "").strip() or "Unknown"
     return {
         "timestamp_pacific": row.get("timestamp_pacific", ""),
+        "cta2045_version": cta2045_version,
         "bitmap": f"0x{logical_bitmap:08X}",
         "raw_bitmap": f"0x{raw_bitmap.upper()}",
         "capabilities": capabilities,
