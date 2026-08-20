@@ -56,7 +56,10 @@
   <h1>Conformance Test Schedule</h1>
   <div class="muted">Author CTA commands and water draws separately. Python combines and validates one canonical CSV.</div>
   <div class="status server-status">
-    <div>Schedule server: <strong id="station-hostname">loading…</strong></div>
+    <div>
+      <div>Station: <strong id="station-hostname">loading…</strong></div>
+      <div id="station-equipment" class="muted">Water-heater information loading…</div>
+    </div>
     <div id="wh-information">
       <button id="get-wh-information" type="button">Get WH Info</button>
       <div id="wh-information-row">
@@ -637,6 +640,13 @@ whInformationButton.onclick = async () => {
 async function initialize() {
   const metadata = await fetch("/api/metadata").then(response => response.json());
   document.querySelector("#station-hostname").textContent = metadata.hostname;
+  const equipment = document.querySelector("#station-equipment");
+  if (metadata.equipment) {
+    const item = metadata.equipment;
+    equipment.textContent = `Water Heater: ${item.manufacturer} ${item.model_number} · ${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
+  } else {
+    equipment.textContent = metadata.equipment_error || "Water-heater information not configured.";
+  }
   actionDefinitions = metadata.actions;
   units = metadata.advanced_units;
   efficiencies = metadata.advanced_efficiencies;

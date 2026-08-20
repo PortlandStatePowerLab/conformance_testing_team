@@ -67,12 +67,47 @@ STATION_SUFFIX = re.compile(r"_WH_(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
 DEFAULT_IDLE_TIMEOUT_HOURS = 48.0
 DEFAULT_RUN_DIRECTORY = SOFTWARE_DIRECTORY.parent / "runtime_logs" / "gui_runs"
+DEFAULT_EQUIPMENT_DIRECTORY = SOFTWARE_DIRECTORY.parent / "saved_data" / "equipment"
 PACIFIC = ZoneInfo("America/Los_Angeles")
 PREFLIGHT_MAX_AGE_SECONDS = 300
+EQUIPMENT_FIELDS = {
+    "manufacturer": str, "model_number": str, "year": int, "voltage": str,
+    "capacity_gallons": int, "station_id": str, "date_added": str,
+}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_station_equipment(
+    hostname: str, directory: Path = DEFAULT_EQUIPMENT_DIRECTORY
+) -> dict[str, Any]:
+    """Load descriptive equipment data selected by the actual Pi hostname."""
+    station_suffix_from_hostname(hostname)
+    try:
+        value = _read_json(directory / f"{hostname}.json")
+    except FileNotFoundError as exc:
+        raise ValueError(f"equipment information not configured for {hostname}") from exc
+    if not isinstance(value, dict):
+        raise ValueError("equipment information must be a JSON object")
+    missing = sorted(set(EQUIPMENT_FIELDS).difference(value))
+    extra = sorted(set(value).difference(EQUIPMENT_FIELDS))
+    if missing or extra:
+        raise ValueError(
+            f"equipment fields invalid; missing={missing}, unexpected={extra}"
+        )
+    for field, expected_type in EQUIPMENT_FIELDS.items():
+        if not isinstance(value[field], expected_type) or isinstance(value[field], bool):
+            raise ValueError(f"equipment field {field} must be {expected_type.__name__}")
+    if value["station_id"] != hostname:
+        raise ValueError(
+            f"equipment station_id {value['station_id']!r} does not match "
+            f"Pi hostname {hostname!r}"
+        )
+    if value["year"] < 1900 or value["capacity_gallons"] <= 0:
+        raise ValueError("equipment year and capacity must be positive")
+    return value
 
 
 def current_run(run_directory: Path) -> dict[str, Any] | None:
@@ -264,11 +299,20 @@ def editor_metadata(hostname: str | None = None) -> dict[str, Any]:
     )
     resolved_hostname = hostname or socket.gethostname()
     station_match = STATION_HOSTNAME.fullmatch(resolved_hostname.strip())
+    equipment = None
+    equipment_error = None
+    if station_match:
+        try:
+            equipment = load_station_equipment(resolved_hostname)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            equipment_error = str(exc)
     return {
         "hostname": resolved_hostname,
         "station_suffix": (
             station_suffix_from_hostname(resolved_hostname) if station_match else ""
         ),
+        "equipment": equipment,
+        "equipment_error": equipment_error,
         "actions": actions,
         "advanced_units": list(ADVANCED_UNIT_CODES),
         "advanced_efficiencies": [

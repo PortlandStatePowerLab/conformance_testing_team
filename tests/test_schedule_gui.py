@@ -17,6 +17,7 @@ from software.schedule_gui import (
     derive_rows,
     editor_metadata,
     friendly_schedule_name,
+    load_station_equipment,
     load_schedule_rows,
     launch_run,
     normalize_schedule_name,
@@ -43,6 +44,27 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_station_equipment_is_selected_and_validated_by_hostname(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "WH-station1.json"
+            equipment = {
+                "manufacturer": "AO Smith",
+                "model_number": "HP10-50H",
+                "year": 2017,
+                "voltage": "240 VAC",
+                "capacity_gallons": 50,
+                "station_id": "WH-station1",
+                "date_added": "2026-08-20",
+            }
+            path.write_text(json.dumps(equipment), encoding="utf-8")
+            self.assertEqual(
+                load_station_equipment("WH-station1", Path(directory)), equipment
+            )
+            equipment["station_id"] = "WH-station2"
+            path.write_text(json.dumps(equipment), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                load_station_equipment("WH-station1", Path(directory))
+
     def test_default_idle_timeout_is_48_hours(self):
         self.assertEqual(DEFAULT_IDLE_TIMEOUT_HOURS, 48.0)
 
