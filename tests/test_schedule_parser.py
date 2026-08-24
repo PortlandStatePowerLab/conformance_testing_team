@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from software.schedule_parser import (
+    EXTENDED_SCHEDULE_COLUMNS,
     SCHEDULE_COLUMNS,
     ScheduleValidationError,
     encode_event_duration,
@@ -22,7 +23,7 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 class DurationEncodingTests(unittest.TestCase):
     def test_special_duration_values(self):
-        self.assertEqual(encode_event_duration("unknown").byte_value, 0x00)
+        self.assertEqual(encode_event_duration("max").byte_value, 0x00)
 
     def test_finite_duration_rounds_up(self):
         duration = encode_event_duration("90")
@@ -36,8 +37,8 @@ class DurationEncodingTests(unittest.TestCase):
         self.assertEqual(duration.requested_seconds, 3600)
         self.assertEqual(duration.represented_seconds, 3698)
 
-    def test_duration_must_be_minutes_or_unknown(self):
-        for invalid in ("01:00:00", "longer_than_representable", "0", "2151"):
+    def test_duration_must_be_minutes_or_max(self):
+        for invalid in ("01:00:00", "unknown", "0", "2151"):
             with self.subTest(invalid=invalid):
                 with self.assertRaisesRegex(ValueError, "1 to 2150"):
                     encode_event_duration(invalid)
@@ -96,9 +97,9 @@ class MasterScheduleTests(unittest.TestCase):
         self.assertEqual(event.advanced_units, 0x02)
         self.assertEqual(event.expected_operational_states, (3, 6))
 
-    def test_advanced_load_up_unknown_duration_uses_zero(self):
+    def test_advanced_load_up_max_duration_uses_unsigned_16_bit_maximum(self):
         rows = [
-            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "unknown", "5", "100_wh", "3|6", "", "", ""],
+            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "max", "5", "100_wh", "3|6", "", "", ""],
             ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:
@@ -108,7 +109,39 @@ class MasterScheduleTests(unittest.TestCase):
                 writer.writerow(SCHEDULE_COLUMNS)
                 writer.writerows(rows)
             event = load_schedule(path)[0]
-        self.assertEqual(event.advanced_duration_minutes, 0)
+        self.assertEqual(event.advanced_duration_minutes, 0xFFFF)
+
+    def test_optional_advanced_efficiency_accepts_zero_through_ten(self):
+        for efficiency in ("0", "5", "10"):
+            with self.subTest(efficiency=efficiency), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "schedule.csv"
+                rows = [
+                    ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", "", efficiency],
+                    ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+                ]
+                with path.open("w", encoding="utf-8", newline="") as handle:
+                    writer = csv.writer(handle)
+                    writer.writerow(EXTENDED_SCHEDULE_COLUMNS)
+                    writer.writerows(rows)
+
+                event = load_schedule(path)[0]
+
+                self.assertEqual(event.advanced_efficiency, int(efficiency))
+
+    def test_reserved_advanced_efficiency_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            rows = [
+                ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", "", "11"],
+                ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+            ]
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+
+            with self.assertRaisesRegex(ScheduleValidationError, "between 0 and 10"):
+                load_schedule(path)
 
     def test_empty_trailing_spreadsheet_column_is_accepted(self):
         expected_count = len(load_schedule(MASTER_SCHEDULE))

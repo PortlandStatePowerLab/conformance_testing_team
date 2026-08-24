@@ -12,8 +12,14 @@ states from the action instead of relying on Excel to calculate formulas.
 `phase` is optional descriptive information.
 
 For Basic DR commands, `event_duration_minutes` accepts a whole number from
-1 through 2150, or `unknown`. The compiler rounds a numeric duration up to the
+1 through 2150, or `max`. The compiler rounds a numeric duration up to the
 next CTA-2045 duration-byte value so the encoded event does not expire early.
+For Advanced Load Up, numeric durations are direct minutes and `max` compiles
+to the unsigned 16-bit maximum of 65535 minutes. The GUI also offers an optional suggested efficiency:
+blank omits the optional payload byte, while values 0 through 10 include it.
+Zero means off, 1 is least efficient, 9 is most efficient, and 10 requests
+vacation mode (which an SGD is not required to support). Existing XLSX and CSV
+schedules without this optional column retain the original 7-byte request.
 Beginning with the first CTA command prerequisite, the compiler automatically
 refreshes outside communication every 13 minutes 30 seconds for the entire
 test, including run-normal periods. The heartbeat stops at test end. These
@@ -29,6 +35,45 @@ make run-water HEARTBEAT=false
 ```
 
 `make run` and `make run-water` without the variable use `HEARTBEAT=true`.
+
+All Make commands continue to use the XLSX schedule by default. To validate,
+preflight, or run an existing canonical CSV instead, pass the same optional
+`SCHEDULE` variable:
+
+```bash
+make validate SCHEDULE=software/gui_schedules/my_test.csv
+make preflight-water SCHEDULE=software/gui_schedules/my_test.csv
+make run-water SCHEDULE=software/gui_schedules/my_test.csv
+```
+
+For run targets, the selected CSV is passed to both preflight and the test
+runner so the schedule checked is the schedule executed.
+
+Start the local browser schedule editor with:
+
+```bash
+make schedule-gui
+```
+
+It listens on `127.0.0.1:5000` by default and saves validated canonical CSV
+files under `software/gui_schedules`. From another computer, use an SSH tunnel
+to the test station and open `http://127.0.0.1:5000` locally. The editor does
+not read or modify the XLSX workbook and does not launch hardware tests. After
+validating and saving a schedule, the GUI can run the existing hardware
+preflight checks. It automatically selects water preflight when the saved
+schedule contains an enabled water draw.
+
+The GUI exits after 48 hours without a GET or POST request. Decimal-hour
+overrides are supported for shorter sessions or testing; for example,
+`python3 -m software.schedule_gui --idle-timeout-hours 0.2` uses a 12-minute
+idle timeout.
+
+After a saved schedule passes hardware preflight, the GUI offers a Start Test
+review dialog with a cancelable 10-second countdown. The schedule is copied to
+a private immutable launch directory before a detached worker starts the test.
+Refreshing or closing the browser does not stop that worker; reopening the GUI
+restores the current run status. Only one active GUI-launched test is permitted
+per station, and preflight approval expires after five minutes.
 
 Validate the schedule without accessing hardware:
 
@@ -95,7 +140,17 @@ hostname and creates a unique directory under
 `saved_data/conformance_runs/WH-n/`, where `n` is the station number. It
 contains the archived master and generated
 CTA schedules, controller event and commodity CSVs, power data, water-draw CSVs,
-orchestrator events, and process logs.
+orchestrator events, process logs, and a human-readable
+`conformance_test_report.xlsx` workbook. The workbook is generated when the run
+closes and contains Event Timeline, Device Information, Master Schedule, and
+Commodity Summary sheets. The detailed source CSV files remain unchanged.
+The timeline retains each approximately one-minute operational-state reading.
+
+Regenerate the workbook for an existing run with:
+
+```bash
+make report RUN_DIRECTORY=saved_data/conformance_runs/WH-1/SCHEDULE_NAME_YYYY_MM_DD_HHMMSS_PDT
+```
 If the hostname does not identify a configured station, the run falls back to
 `saved_data/conformance_runs/`.
 Automatic run-directory names and all human-readable recorded timestamps use

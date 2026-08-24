@@ -115,7 +115,13 @@ class WaterDrawTests(unittest.TestCase):
             sensor_session.close.assert_called_once_with()
             with output.open("r", encoding="utf-8", newline="") as handle:
                 rows = list(csv.DictReader(handle))
-            self.assertEqual(rows[0]["flow_gpm"], "1.0")
+            self.assertEqual(rows[0]["flow_gpm"], "1.000000")
+            self.assertEqual(rows[0]["hot_temp_c"], "50.00")
+            self.assertEqual(rows[0]["hot_temp_f"], "122.00")
+            self.assertEqual(rows[0]["cold_temp_c"], "20.00")
+            self.assertEqual(rows[0]["cold_temp_f"], "68.00")
+            self.assertEqual(rows[0]["ambient_temp_c"], "22.00")
+            self.assertEqual(rows[0]["ambient_temp_f"], "71.60")
             self.assertEqual(rows[-1]["stop_reason"], "target_reached")
 
 

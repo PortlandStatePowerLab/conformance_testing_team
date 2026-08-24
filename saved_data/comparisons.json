@@ -1,0 +1,44 @@
+{
+  "data_root": "../../jeff_conformance_test_saved_data_2026",
+  "comparisons": {
+    "ALU-Shed-Recovery-SLE1": [
+      "WH-2/ALU-Shed-Recovery-SLE1_2026_08_16_023459_PDT",
+      "WH-3/ALU-Shed-Recovery-SLE1_2026_08_16_023036_PDT",
+      "WH-4/ALU-Shed-Recovery-SLE1_2026_08_17_125906_PDT"
+    ],
+    "ALU-Shed-Recovery-SLE9": [
+      "WH-2/ALU-Shed-Recovery-SLE9_2026_08_14_223103_PDT",
+      "WH-3/ALU-Shed-Recovery-SLE9_2026_08_14_222614_PDT",
+      "WH-4/ALU-Shed-Recovery-SLE9_WH_4_2026_08_18_210951_PDT"
+    ],
+    "ALU-Shed-Recovery-SLENS": [
+      "WH-2/ALU-Shed-Recovery-SLENS_2026_08_13_161421_PDT",
+      "WH-3/ALU-Shed-Recovery-SLENS_WH_3_2026_08_19_134331_PDT",
+      "WH-4/ALU-Shed-Recovery-SLENS_2026_08_13_170426_PDT"
+    ],
+    "LU-CPE-Recovery": [
+      "WH-1/LU-CPE-Recovery_2026_08_05_123955_PDT",
+      "WH-2/LU-CPE-Recovery_2026_08_05_124440_PDT",
+      "WH-3/LU-CPE-Recovery_2026_08_05_124911_PDT",
+      "WH-4/LU-CPE-Recovery_WH_4_2026_08_19_131212_PDT"
+    ],
+    "LU-GE-Recovery": [
+      "WH-1/LU-GE-Recovery_2026_08_09_130858_PDT",
+      "WH-2/LU-GE-Recovery_2026_08_09_131858_PDT",
+      "WH-3/LU-GE-Recovery_2026_08_09_131008_PDT",
+      "WH-4/LU-GE-Recovery_2026_08_09_131419_PDT"
+    ],
+    "LU-Normal-Recovery": [
+      "WH-1/LU-Normal-Recovery_2026_08_03_181257_PDT",
+      "WH-2/LU-Normal-Recovery_2026_08_03_181901_PDT",
+      "WH-3/LU-Normal-Recovery_2026_08_03_182454_PDT",
+      "WH-4/LU-Normal-Recovery_2026_08_02_101334_PDT"
+    ],
+    "LU-Shed-Recovery": [
+      "WH-1/LU-Shed-Recovery_2026_08_04_161229_PDT",
+      "WH-2/LU-Shed-Recovery_2026_08_04_161732_PDT",
+      "WH-3/LU-Shed-Recovery_2026_08_04_163018_PDT",
+      "WH-4/LU-Shed-Recovery_2026_08_04_163456_PDT"
+    ]
+  }
+}

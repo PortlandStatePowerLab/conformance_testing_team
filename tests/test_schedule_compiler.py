@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from software.schedule_compiler import compile_cta_schedule, parse_test_start
-from software.schedule_parser import SCHEDULE_COLUMNS, load_schedule
+from software.schedule_parser import (
+    EXTENDED_SCHEDULE_COLUMNS,
+    SCHEDULE_COLUMNS,
+    load_schedule,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +45,7 @@ class ScheduleCompilerTests(unittest.TestCase):
             machine_lines = machine_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(
                 machine_lines[0],
-                "# time,command,argument,event_id,value,units",
+                "# time,command,argument,event_id,value,units,efficiency",
             )
             first_cta = next(
                 event
@@ -51,7 +55,7 @@ class ScheduleCompilerTests(unittest.TestCase):
             self.assertEqual(
                 machine_lines[1],
                 f"{int(test_start.timestamp()) + first_cta.offset_seconds - 15},"
-                f"o,,auto_outside_comm_for_{first_cta.event_id},,",
+                f"o,,auto_outside_comm_for_{first_cta.event_id},,,",
             )
 
             with preview_path.open("r", encoding="utf-8", newline="") as handle:
@@ -87,15 +91,67 @@ class ScheduleCompilerTests(unittest.TestCase):
                 preview_output=preview_path,
             )
             machine_lines = machine_path.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(machine_lines[2], "1784746800,a,60,advanced_1,5,2")
+            self.assertEqual(machine_lines[2], "1784746800,a,60,advanced_1,5,2,")
             with preview_path.open("r", encoding="utf-8", newline="") as handle:
                 preview = list(csv.DictReader(handle))
             self.assertEqual(preview[1]["expected_operational_states"], "3|6")
 
+    def test_advanced_load_up_max_compiles_as_65535_minutes(self):
+        rows = [
+            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "max", "5", "100_wh", "3|6", "", "", ""],
+            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            output_directory = Path(directory)
+            master_path = output_directory / "master.csv"
+            with master_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            machine_path = output_directory / "schedule.csv"
+            compile_cta_schedule(
+                master_path,
+                test_start=datetime(2026, 7, 22, 19, 0, 0, tzinfo=timezone.utc),
+                controller_output=machine_path,
+                preview_output=output_directory / "preview.csv",
+            )
+
+            machine_lines = machine_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(machine_lines[2], "1784746800,a,65535,advanced_1,5,2,")
+
+    def test_advanced_efficiency_zero_is_compiled_as_present(self):
+        rows = [
+            ["true", "advanced_1", "00:00:00", "event", "cta", "advanced_load_up", "60", "5", "100_wh", "3|6", "", "", "", "0"],
+            ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            output_directory = Path(directory)
+            master_path = output_directory / "master.csv"
+            with master_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            machine_path = output_directory / "schedule.csv"
+            preview_path = output_directory / "preview.csv"
+            compile_cta_schedule(
+                master_path,
+                test_start=datetime(2026, 7, 22, 19, 0, 0, tzinfo=timezone.utc),
+                controller_output=machine_path,
+                preview_output=preview_path,
+            )
+
+            machine_lines = machine_path.read_text(encoding="utf-8").splitlines()
+            with preview_path.open("r", encoding="utf-8", newline="") as handle:
+                preview = list(csv.DictReader(handle))
+
+        self.assertEqual(machine_lines[2], "1784746800,a,60,advanced_1,5,2,0")
+        self.assertEqual(preview[1]["advanced_efficiency"], "0")
+
     def test_outside_communication_heartbeat_continues_through_run_normal(self):
         rows = [
             ["true", "shed_1", "00:00:00", "event", "cta", "shed", "1", "", "", "4|5", "", "", ""],
-            ["true", "normal_1", "00:30:00", "event", "cta", "run_normal", "unknown", "", "", "0|1", "", "", ""],
+            ["true", "normal_1", "00:30:00", "event", "cta", "run_normal", "max", "", "", "0|1", "", "", ""],
             ["true", "test_end", "01:00:00", "event", "test", "end", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:
@@ -136,7 +192,7 @@ class ScheduleCompilerTests(unittest.TestCase):
     def test_heartbeat_can_be_disabled_without_removing_prerequisites(self):
         rows = [
             ["true", "load_up_1", "00:00:00", "event", "cta", "load_up", "20", "", "", "3|6", "", "", ""],
-            ["true", "normal_1", "00:25:00", "event", "cta", "run_normal", "unknown", "", "", "0|1", "", "", ""],
+            ["true", "normal_1", "00:25:00", "event", "cta", "run_normal", "max", "", "", "0|1", "", "", ""],
             ["true", "test_end", "00:27:00", "event", "test", "end", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:

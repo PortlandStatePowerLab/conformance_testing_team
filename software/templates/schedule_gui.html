@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conformance Test Schedule</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #172033; background: #f3f5f8; }
+    body { margin: 0; padding: 1.5rem; }
+    main { max-width: 1500px; margin: auto; }
+    h1, h2 { margin-top: 0; }
+    h2 { margin-bottom: .25rem; }
+    input, select, button { font: inherit; padding: .45rem; box-sizing: border-box; }
+    button { cursor: pointer; }
+    label { display: grid; gap: .25rem; font-size: .85rem; }
+    .toolbar, .card, .status { background: white; padding: 1rem; border-radius: .65rem; margin: 1rem 0; box-shadow: 0 1px 4px #0002; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
+    .cards { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .card { margin: 0; }
+    .card-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .8rem; }
+    .muted { color: #596579; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { border: 1px solid #d8dde7; padding: .35rem; vertical-align: top; }
+    th { background: #e8edf5; white-space: nowrap; text-align: left; }
+    td input, td select { width: 8.5rem; }
+    td .notes { width: 13rem; }
+    td.irrelevant > * { display: none; }
+    td.irrelevant::after { content: "—"; color: #8b949e; }
+    .end-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .7rem; max-width: 50rem; }
+    .valid { border-left: .4rem solid #238636; }
+    .invalid { border-left: .4rem solid #cf222e; }
+    #messages { white-space: pre-wrap; }
+    #preflight-lines, #preflight-failures { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .9rem; }
+    #preflight-lines { min-height: 2.8rem; }
+    #preflight-failures { color: #b42318; margin-top: .5rem; }
+    #run-status { border-left: .4rem solid #0969da; }
+    #run-status.failed { border-left-color: #cf222e; }
+    #run-status.completed { border-left-color: #238636; }
+    dialog { border: 0; border-radius: .75rem; padding: 1.5rem; max-width: 34rem; box-shadow: 0 8px 30px #0005; }
+    dialog::backdrop { background: #0008; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
+    #countdown { font-size: 2rem; font-weight: 700; text-align: center; margin: 1rem; }
+    .server-status { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
+    #station-equipment { white-space: pre-line; }
+    #wh-information { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: .35rem 1.25rem; min-width: 0; }
+    #wh-information-row { display: flex; flex-wrap: wrap; align-items: start; gap: .5rem 1.25rem; }
+    #wh-information-summary { display: grid; gap: .25rem; }
+    #wh-information-result { white-space: nowrap; }
+    #wh-capabilities { display: grid; gap: .25rem; }
+    .empty { padding: 1rem; text-align: center; color: #596579; border: 1px dashed #b7c0cf; }
+    @media (min-width: 1000px) { .cards { grid-template-columns: 1fr 1fr; } .wide-card { grid-column: 1 / -1; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Conformance Test Schedule</h1>
+  <div class="muted">Author CTA commands and water draws separately. Python combines and validates one canonical CSV.</div>
+  <div class="status server-status">
+    <div>
+      <div>Station: <strong id="station-hostname">loading…</strong></div>
+      <div id="station-equipment" class="muted">Water-heater information loading…</div>
+    </div>
+    <div id="wh-information">
+      <button id="get-wh-information" type="button">Get WH Info</button>
+      <div id="wh-information-row">
+        <div id="wh-information-summary">
+          <div id="wh-information-result" class="muted">Bitmap: not yet requested.</div>
+          <div id="wh-version" class="muted">CTA-2045 version: not yet requested</div>
+        </div>
+        <div id="wh-capabilities"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label>Schedule name<input id="name" maxlength="75" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
+    <label>Saved schedule<select id="saved"><option value="">New schedule</option></select></label>
+    <button id="load" type="button">Load</button>
+    <button id="validate" type="button">Validate schedule</button>
+    <button id="save" type="button">Save validated CSV</button>
+    <button id="preflight" type="button" disabled>Run preflight</button>
+    <button id="start-test" type="button" disabled>Start Test</button>
+  </div>
+
+  <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
+  <div id="preflight-status" class="status" hidden>
+    <strong id="preflight-heading">Hardware preflight not yet run.</strong>
+    <div id="preflight-lines" class="muted"></div>
+    <div id="preflight-failures"></div>
+  </div>
+  <div id="run-status" class="status" hidden>
+    <strong id="run-heading">No active test.</strong>
+    <div id="run-details" class="muted"></div>
+    <button id="refresh-run" type="button">Refresh status</button>
+  </div>
+
+  <div class="cards">
+    <section class="card wide-card">
+      <div class="card-heading">
+        <div><h2>CTA Commands</h2><span class="muted">Demand-response commands sent to the CTA-2045 device.</span></div>
+        <button id="add-cta" type="button">Add CTA command</button>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Efficiency (optional)</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="cta-rows"></tbody>
+        </table>
+      </div>
+      <div id="cta-empty" class="empty" hidden>No CTA commands scheduled.</div>
+    </section>
+
+    <section class="card wide-card">
+      <div class="card-heading">
+        <div><h2>Water Draws</h2><span class="muted">Scheduled valve events with an estimated duration.</span></div>
+        <button id="add-water" type="button">Add water draw</button>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="water-rows"></tbody>
+        </table>
+      </div>
+      <div id="water-empty" class="empty" hidden>No water draws scheduled.</div>
+    </section>
+
+    <section class="card">
+      <div class="card-heading"><div><h2>Test End</h2><span class="muted">Exactly one enabled end event is required.</span></div></div>
+      <div class="end-fields">
+        <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]"></label>
+        <label>Phase<select id="end-phase"><option>pre_event</option><option>event</option><option selected>recovery</option></select></label>
+        <label>Notes<input id="end-notes"></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-heading"><div><h2>Chronological Preview</h2><span class="muted">Combined view of the CSV schedule that Python will validate.</span></div></div>
+      <div class="scroll">
+        <table><thead><tr><th>Time</th><th>Type</th><th>Event</th><th>Details</th></tr></thead><tbody id="preview"></tbody></table>
+      </div>
+    </section>
+  </div>
+
+</main>
+<dialog id="start-dialog">
+  <h2>Start hardware test?</h2>
+  <div id="start-review"></div>
+  <p><strong>This test controls real hardware.</strong> The schedule shown here will be copied and cannot change during the run.</p>
+  <div id="countdown" hidden></div>
+  <div class="dialog-actions">
+    <button id="cancel-start" type="button">Cancel</button>
+    <button id="begin-countdown" type="button">Begin 10-second countdown</button>
+  </div>
+</dialog>
+<script>
+const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes","advanced_efficiency"];
+const status = document.querySelector("#status");
+const messages = document.querySelector("#messages");
+const ctaBody = document.querySelector("#cta-rows");
+const waterBody = document.querySelector("#water-rows");
+let actionDefinitions = [];
+let units = [];
+let efficiencies = [];
+const phases = ["pre_event", "event", "recovery"];
+const saveButton = document.querySelector("#save");
+const preflightButton = document.querySelector("#preflight");
+const preflightStatus = document.querySelector("#preflight-status");
+const preflightHeading = document.querySelector("#preflight-heading");
+const preflightLines = document.querySelector("#preflight-lines");
+const preflightFailures = document.querySelector("#preflight-failures");
+const startButton = document.querySelector("#start-test");
+const startDialog = document.querySelector("#start-dialog");
+const countdown = document.querySelector("#countdown");
+const runStatus = document.querySelector("#run-status");
+const runHeading = document.querySelector("#run-heading");
+const runDetails = document.querySelector("#run-details");
+const refreshRunButton = document.querySelector("#refresh-run");
+let validatedSignature = null;
+let savedSignature = null;
+let savedFilename = "";
+let preflightRunning = false;
+let preflightPassed = false;
+let countdownTimer = null;
+let activeRun = null;
+const whInformationButton = document.querySelector("#get-wh-information");
+const whInformationResult = document.querySelector("#wh-information-result");
+const whVersion = document.querySelector("#wh-version");
+const whCapabilities = document.querySelector("#wh-capabilities");
+
+function selectControl(values, selected) {
+  const select = document.createElement("select");
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    option.selected = value === selected;
+    select.append(option);
+  }
+  return select;
+}
+
+function inputControl(value = "", options = {}) {
+  const input = document.createElement("input");
+  input.value = value;
+  Object.assign(input, options);
+  return input;
+}
+
+function efficiencyControl(selected) {
+  const select = document.createElement("select");
+  select.append(new Option("Not included", ""));
+  for (const item of efficiencies) {
+    select.append(new Option(item.label, String(item.value)));
+  }
+  select.value = selected === null || selected === undefined ? "" : String(selected);
+  return select;
+}
+
+function cell(row, control, field) {
+  const td = document.createElement("td");
+  td.dataset.field = field;
+  td.append(control);
+  row.append(td);
+  return td;
+}
+
+function removeCell(row, body) {
+  const td = document.createElement("td");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Remove";
+  button.onclick = () => { row.remove(); updateView(); };
+  td.append(button);
+  row.append(td);
+}
+
+function addCta(source = {}) {
+  const row = document.createElement("tr");
+  cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
+  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
+  cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "pre_event"), "phase");
+  const command = cell(row, selectControl(actionDefinitions.filter(item => item.event_type === "cta").map(item => item.action), source.action || "load_up"), "action");
+  cell(row, inputControl(source.event_duration_minutes || "max", {placeholder:"1-2150 or max"}), "event_duration_minutes");
+  cell(row, inputControl(source.advanced_value || "", {type:"number", min:"1", max:"65534", step:"1"}), "advanced_value");
+  cell(row, selectControl(["", ...units], source.advanced_units || ""), "advanced_units");
+  cell(row, efficiencyControl(source.advanced_efficiency), "advanced_efficiency");
+  const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
+  removeCell(row, ctaBody);
+  ctaBody.append(row);
+  command.firstElementChild.onchange = updateView;
+  time.firstElementChild.oninput = updateView;
+  row.oninput = updateView;
+  updateView();
+}
+
+function addWater(source = {}) {
+  const row = document.createElement("tr");
+  cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
+  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
+  cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "event"), "phase");
+  cell(row, inputControl(source.target_volume_gal || "", {type:"number", min:"0.000001", step:"any"}), "target_volume_gal");
+  cell(row, inputControl(source.expected_flow_gpm || "", {type:"number", min:"0.000001", step:"any"}), "expected_flow_gpm");
+  const estimate = document.createElement("span"); cell(row, estimate, "estimate");
+  const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
+  removeCell(row, waterBody);
+  waterBody.append(row);
+  time.firstElementChild.oninput = updateView;
+  row.oninput = updateView;
+  updateView();
+}
+
+function rowValue(row, field) {
+  const control = row.querySelector(`[data-field="${field}"] > *`);
+  return !control || control.disabled ? "" : control.value;
+}
+
+function blankCanonicalRow() {
+  return Object.fromEntries(canonicalColumns.map(column => [column, ""]));
+}
+
+function scheduleRows() {
+  const rows = [];
+  for (const row of ctaBody.rows) {
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"cta", action:rowValue(row,"action"), event_duration_minutes:rowValue(row,"event_duration_minutes"), advanced_value:rowValue(row,"advanced_value"), advanced_units:rowValue(row,"advanced_units"), advanced_efficiency:rowValue(row,"advanced_efficiency"), notes:rowValue(row,"notes")});
+  }
+  for (const row of waterBody.rows) {
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), notes:rowValue(row,"notes")});
+  }
+  rows.push({...blankCanonicalRow(), enabled:"TRUE", time_after_start:document.querySelector("#end-time").value, phase:document.querySelector("#end-phase").value, event_type:"test", action:"end", notes:document.querySelector("#end-notes").value});
+  return rows;
+}
+
+function draftSignature() {
+  return JSON.stringify({name:document.querySelector("#name").value, rows:scheduleRows()});
+}
+
+function updateWorkflowState() {
+  const signature = draftSignature();
+  saveButton.disabled = validatedSignature !== signature;
+  preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
+  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || savedSignature !== signature || (activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state));
+}
+
+function elapsedSeconds(value) {
+  const parts = value.split(":");
+  if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) return Number.POSITIVE_INFINITY;
+  return Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2]);
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds % 60);
+  return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function updateView() {
+  for (const row of ctaBody.rows) {
+    const action = rowValue(row, "action");
+    const advanced = action === "advanced_load_up";
+    for (const field of ["advanced_value", "advanced_units", "advanced_efficiency"]) {
+      const td = row.querySelector(`[data-field="${field}"]`);
+      td.classList.toggle("irrelevant", !advanced);
+      td.firstElementChild.disabled = !advanced;
+    }
+  }
+  for (const row of waterBody.rows) {
+    const volume = Number(rowValue(row, "target_volume_gal"));
+    const flow = Number(rowValue(row, "expected_flow_gpm"));
+    row.querySelector('[data-field="estimate"] span').textContent = formatDuration((volume / flow) * 60);
+  }
+  document.querySelector("#cta-empty").hidden = ctaBody.rows.length !== 0;
+  document.querySelector("#water-empty").hidden = waterBody.rows.length !== 0;
+  const counts = {};
+  const previewRows = scheduleRows().map((row, sourceIndex) => {
+    counts[row.action] = (counts[row.action] || 0) + 1;
+    const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
+    let details = row.phase || "";
+    if (row.action === "water_draw") details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    else if (row.event_type === "cta") {
+      const duration = row.event_duration_minutes || "?";
+      details = `duration ${duration}${duration.toLowerCase() === "max" ? "" : " min"}${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
+    }
+    return {...row, id, details, sourceIndex};
+  }).sort((a,b) => elapsedSeconds(a.time_after_start) - elapsedSeconds(b.time_after_start) || a.sourceIndex - b.sourceIndex);
+  document.querySelector("#preview").innerHTML = previewRows.map(row => `<tr><td>${escapeHtml(row.time_after_start)}</td><td>${escapeHtml(row.event_type)}</td><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.details)}</td></tr>`).join("");
+  updateWorkflowState();
+}
+
+function escapeHtml(value) {
+  const span = document.createElement("span");
+  span.textContent = value;
+  return span.innerHTML;
+}
+
+async function request(path, body) {
+  const response = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const result = await response.json();
+  if (!response.ok) throw result;
+  return result;
+}
+
+function show(result, valid) {
+  status.className = `status ${valid ? "valid" : "invalid"}`;
+  if (result.summary) messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${result.summary.duration_seconds} seconds.`;
+  else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
+}
+
+function resetPreflightDisplay() {
+  preflightStatus.hidden = false;
+  preflightPassed = false;
+  preflightStatus.className = "status";
+  preflightHeading.textContent = "Hardware preflight not yet run.";
+  preflightLines.textContent = "Validate and save this schedule before running preflight.";
+  preflightFailures.textContent = "";
+}
+
+async function refreshSchedules(selected = "") {
+  const result = await fetch("/api/schedules").then(response => response.json());
+  const saved = document.querySelector("#saved");
+  saved.replaceChildren(new Option("New schedule", ""), ...result.schedules.map(schedule => new Option(schedule.name, schedule.filename)));
+  saved.value = selected;
+}
+
+function loadRows(rows) {
+  ctaBody.replaceChildren();
+  waterBody.replaceChildren();
+  let end = null;
+  for (const row of rows) {
+    if (row.action === "water_draw") addWater(row);
+    else if (row.action === "end") end = row;
+    else addCta(row);
+  }
+  if (end) {
+    document.querySelector("#end-time").value = end.time_after_start;
+    document.querySelector("#end-phase").value = phases.includes(end.phase) ? end.phase : "recovery";
+    document.querySelector("#end-notes").value = end.notes;
+  }
+  updateView();
+}
+
+document.querySelector("#add-cta").onclick = () => addCta();
+document.querySelector("#add-water").onclick = () => addWater();
+for (const id of ["end-time", "end-phase", "end-notes"]) document.querySelector(`#${id}`).oninput = updateView;
+document.querySelector("#validate").onclick = async () => {
+  if (preflightStatus.hidden) resetPreflightDisplay();
+  try {
+    const result = await request("/api/validate", {rows:scheduleRows()});
+    validatedSignature = draftSignature();
+    show(result, true);
+  } catch (error) {
+    validatedSignature = null;
+    show(error, false);
+  }
+  updateWorkflowState();
+};
+document.querySelector("#save").onclick = async () => {
+  const name = document.querySelector("#name");
+  if (!name.reportValidity()) return;
+  if (validatedSignature !== draftSignature()) {
+    show({error:"Validate the current schedule before saving."}, false);
+    return;
+  }
+  try {
+    const result = await request("/api/save", {name:name.value, rows:scheduleRows()});
+    savedFilename = result.saved;
+    savedSignature = draftSignature();
+    show(result, true);
+    await refreshSchedules(result.saved);
+  } catch (error) { show(error, false); }
+  updateWorkflowState();
+};
+document.querySelector("#load").onclick = async () => {
+  const selected = document.querySelector("#saved").value;
+  if (!selected) return;
+  try {
+    const response = await fetch(`/api/schedules/${encodeURIComponent(selected)}`);
+    const result = await response.json();
+    if (!response.ok) throw result;
+    loadRows(result.rows);
+    document.querySelector("#name").value = result.display_name;
+    validatedSignature = null;
+    savedSignature = null;
+    savedFilename = result.name;
+    messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
+    status.className = "status";
+    resetPreflightDisplay();
+    await dismissTerminalRun();
+    updateWorkflowState();
+  } catch (error) { show(error, false); }
+};
+
+function showPreflightEvent(event, rollingLines, failures) {
+  if (event.type === "start") {
+    preflightHeading.textContent = `Hardware preflight running — ${event.water ? "water" : "standard"} mode — ${event.schedule}`;
+  } else if (event.type === "check") {
+    const line = `${event.passed ? "PASS" : "FAIL"} ${event.name}: ${event.details}`;
+    if (event.passed) {
+      rollingLines.push(line);
+      if (rollingLines.length > 2) rollingLines.shift();
+      preflightLines.textContent = rollingLines.join("\n");
+    } else {
+      failures.push(line);
+      preflightFailures.textContent = failures.join("\n");
+    }
+  } else if (event.type === "summary") {
+    const passed = event.failed === 0;
+    preflightPassed = passed;
+    preflightStatus.className = `status ${passed ? "valid" : "invalid"}`;
+    preflightHeading.textContent = `${passed ? "PREFLIGHT PASS" : "PREFLIGHT FAILED"} — ${event.passed} passed, ${event.failed} failed — ${event.water ? "water" : "standard"} mode`;
+  } else if (event.type === "error") {
+    preflightStatus.className = "status invalid";
+    preflightHeading.textContent = "PREFLIGHT ERROR";
+    preflightFailures.textContent = event.error;
+  }
+}
+
+preflightButton.onclick = async () => {
+  if (!savedFilename || savedSignature !== draftSignature()) return;
+  preflightStatus.hidden = false;
+  preflightRunning = true;
+  preflightPassed = false;
+  updateWorkflowState();
+  preflightStatus.className = "status";
+  preflightHeading.textContent = "Starting hardware preflight…";
+  preflightLines.textContent = "";
+  preflightFailures.textContent = "";
+  const rollingLines = [];
+  const failures = [];
+  try {
+    const response = await fetch("/api/preflight", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({filename:savedFilename}),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw error;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = "";
+    while (true) {
+      const {value, done} = await reader.read();
+      pending += decoder.decode(value || new Uint8Array(), {stream:!done});
+      const lines = pending.split("\n");
+      pending = lines.pop();
+      for (const line of lines) if (line) showPreflightEvent(JSON.parse(line), rollingLines, failures);
+      if (done) break;
+    }
+    if (pending.trim()) showPreflightEvent(JSON.parse(pending), rollingLines, failures);
+  } catch (error) {
+    preflightStatus.className = "status invalid";
+    preflightHeading.textContent = "PREFLIGHT ERROR";
+    preflightFailures.textContent = error.error || String(error);
+  } finally {
+    preflightRunning = false;
+    updateWorkflowState();
+  }
+};
+
+function clockText(seconds) {
+  const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const secs = value % 60;
+  return [hours, minutes, secs].map(part => String(part).padStart(2, "0")).join(":");
+}
+
+function renderRun(run) {
+  activeRun = run;
+  if (!run) { runStatus.hidden = true; updateWorkflowState(); return; }
+  runStatus.hidden = false;
+  runStatus.className = `status ${run.state || ""}`;
+  const stateLabel = String(run.state || "unknown").replaceAll("_", " ").toUpperCase();
+  runHeading.textContent = `${run.stale ? "STATUS STALE — " : ""}${stateLabel} — ${run.schedule || run.run_id || "test"}`;
+  let remaining = run.remaining_seconds;
+  if (run.expected_end_at && ["initializing","running"].includes(run.state)) {
+    remaining = Math.max(0, (Date.parse(run.expected_end_at) - Date.now()) / 1000);
+  }
+  const heartbeat = run.last_heartbeat_at ? new Date(run.last_heartbeat_at).toLocaleString() : "not yet available";
+  const lifecycle = run.message ? `${run.message} · ` : "";
+  runDetails.textContent = `${lifecycle}Remaining ${clockText(remaining)} · expected finish ${run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating"} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
+  refreshRunButton.textContent = ["completed", "failed"].includes(run.state) ? "Dismiss completed test" : "Refresh status";
+  updateWorkflowState();
+}
+
+async function refreshRunStatus({dismissTerminal = false} = {}) {
+  try {
+    const response = await fetch("/api/runs/current", {cache:"no-store"});
+    const result = await response.json();
+    if (dismissTerminal && result.run && ["completed", "failed"].includes(result.run.state)) {
+      activeRun = result.run;
+      await dismissTerminalRun();
+      return;
+    }
+    renderRun(result.run);
+  } catch (_) {
+    if (activeRun) runHeading.textContent = "CONNECTION LOST — TEST CONTINUES ON STATION";
+  }
+}
+
+async function dismissTerminalRun() {
+  if (!activeRun || !["completed", "failed"].includes(activeRun.state)) return;
+  await request("/api/runs/current/dismiss", {});
+  renderRun(null);
+}
+
+refreshRunButton.onclick = async () => {
+  if (activeRun && ["completed", "failed"].includes(activeRun.state)) {
+    await dismissTerminalRun();
+  } else {
+    await refreshRunStatus();
+  }
+};
+startButton.onclick = () => {
+  const duration = elapsedSeconds(document.querySelector("#end-time").value);
+  document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${clockText(duration)} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
+  countdown.hidden = true;
+  document.querySelector("#begin-countdown").hidden = false;
+  startDialog.showModal();
+};
+
+function cancelStart() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = null;
+  if (startDialog.open) startDialog.close();
+}
+document.querySelector("#cancel-start").onclick = cancelStart;
+startDialog.oncancel = event => { event.preventDefault(); cancelStart(); };
+document.querySelector("#begin-countdown").onclick = () => {
+  document.querySelector("#begin-countdown").hidden = true;
+  countdown.hidden = false;
+  let remaining = 10;
+  countdown.textContent = `Starting in ${remaining}…`;
+  countdownTimer = setInterval(async () => {
+    remaining -= 1;
+    countdown.textContent = `Starting in ${remaining}…`;
+    if (remaining > 0) return;
+    clearInterval(countdownTimer); countdownTimer = null;
+    countdown.textContent = "Requesting start…";
+    try {
+      const result = await request("/api/runs", {filename:savedFilename});
+      startDialog.close();
+      preflightPassed = false;
+      renderRun(result.run);
+      setTimeout(refreshRunStatus, 1000);
+    } catch (error) {
+      countdown.textContent = error.error || String(error);
+      document.querySelector("#begin-countdown").hidden = false;
+    }
+  }, 1000);
+};
+
+whInformationButton.onclick = async () => {
+  whInformationButton.disabled = true;
+  whInformationButton.textContent = "Getting WH Info…";
+  whInformationResult.textContent = "Requesting information from the water heater…";
+  whVersion.textContent = "CTA-2045 version: requesting…";
+  whCapabilities.replaceChildren();
+  try {
+    const result = await request("/api/wh-information", {});
+    whVersion.textContent = `CTA-2045 version: ${result.cta2045_version || "Unknown"}`;
+    whInformationResult.textContent = `Bitmap: ${result.bitmap} — Read ${result.timestamp_pacific}`;
+    if (result.capabilities.length === 0) {
+      whCapabilities.append(Object.assign(document.createElement("div"), {textContent:"No supported capabilities reported."}));
+    } else {
+      for (const capability of result.capabilities) {
+        whCapabilities.append(Object.assign(document.createElement("div"), {textContent:`✓ Bit ${capability.bit} — ${capability.name}`}));
+      }
+    }
+  } catch (error) {
+    whVersion.textContent = "CTA-2045 version: unavailable";
+    whInformationResult.textContent = error.error || String(error);
+  } finally {
+    whInformationButton.disabled = false;
+    whInformationButton.textContent = "Get WH Info";
+  }
+};
+
+async function initialize() {
+  const metadata = await fetch("/api/metadata").then(response => response.json());
+  document.querySelector("#station-hostname").textContent = metadata.hostname;
+  const equipment = document.querySelector("#station-equipment");
+  if (metadata.equipment) {
+    const item = metadata.equipment;
+    equipment.textContent = `${item.manufacturer} ${item.model_number}\n${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
+  } else {
+    equipment.textContent = metadata.equipment_error || "Water-heater information not configured.";
+  }
+  actionDefinitions = metadata.actions;
+  units = metadata.advanced_units;
+  efficiencies = metadata.advanced_efficiencies;
+  addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"max"});
+  updateView();
+  await refreshSchedules();
+  await refreshRunStatus({dismissTerminal:true});
+  setInterval(refreshRunStatus, 15000);
+  setInterval(() => { if (activeRun) renderRun(activeRun); }, 1000);
+}
+document.querySelector("#name").oninput = updateWorkflowState;
+initialize().catch(error => show({error:`Could not initialize editor: ${error}`}, false));
+</script>
+</body>
+</html>

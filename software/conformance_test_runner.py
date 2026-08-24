@@ -9,6 +9,7 @@ import json
 import math
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -22,6 +23,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
+    from .conformance_report import generate_conformance_report
     from .schedule_compiler import compile_cta_schedule
     from .schedule_parser import ScheduleEvent, load_schedule
     from .sensors.sensor_configuration_loader import (
@@ -29,6 +31,7 @@ try:
     )
     from .xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
+    from conformance_report import generate_conformance_report
     from schedule_compiler import compile_cta_schedule
     from schedule_parser import ScheduleEvent, load_schedule
     from sensors.sensor_configuration_loader import load_sensor_configuration
@@ -44,6 +47,7 @@ ROOT_DIRECTORY = CONFORMANCE_REPOSITORY.parent
 DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule_main.xlsx"
 DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule.csv"
 DEFAULT_RESULTS_ROOT = CONFORMANCE_REPOSITORY / "saved_data" / "conformance_runs"
+DEFAULT_EQUIPMENT_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "equipment"
 DEFAULT_CTA_DIRECTORY = ROOT_DIRECTORY / "cta_2045_controller" / "dcs" / "controller"
 DEFAULT_CTA_BINARY = (
     ROOT_DIRECTORY
@@ -55,6 +59,125 @@ DEFAULT_CTA_BINARY = (
 )
 DEFAULT_CTA_SCHEDULE = DEFAULT_CTA_DIRECTORY / "schedule.csv"
 DEFAULT_PRESTART_SECONDS = 15.0
+GUI_STAGE_PATH_ENV = "CONFORMANCE_GUI_STAGE_PATH"
+
+
+def _archive_station_equipment(
+    run_directory: Path,
+    *,
+    hostname: str | None = None,
+    equipment_directory: Path = DEFAULT_EQUIPMENT_DIRECTORY,
+) -> Path | None:
+    """Copy the active station equipment identity into a new run."""
+    active_hostname = hostname or socket.gethostname()
+    try:
+        from software.station.station_identity import station_number
+
+        number = station_number(active_hostname)
+    except ValueError:
+        return None
+    source = equipment_directory / f"WH-station{number}.json"
+    if not source.is_file():
+        return None
+    destination = run_directory / "equipment.json"
+    shutil.copy2(source, destination)
+    return destination
+
+
+def _write_gui_stage(state: str, message: str) -> None:
+    """Publish an optional GUI lifecycle marker without coupling to the GUI."""
+    configured = os.environ.get(GUI_STAGE_PATH_ENV)
+    if not configured:
+        return
+    path = Path(configured)
+    temporary = path.with_suffix(".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            json.dumps({"state": state, "message": message}) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
+    except OSError as exc:
+        print(f"GUI_STAGE_WARNING {exc}", file=sys.stderr)
+        temporary.unlink(missing_ok=True)
+
+
+def _generate_energy_take_plot(run_directory: Path) -> Path | None:
+    from software.run_plot import plot_run
+
+    return plot_run(
+        run_directory,
+        output_path=run_directory / "energy_take_power.png",
+    )[1]
+
+
+def _generate_state_verification_plot(run_directory: Path) -> Path | None:
+    from software.state_verification_plot import plot_state_verification
+
+    return plot_state_verification(
+        run_directory,
+        output_path=run_directory / "operational_state_verification.png",
+    )[1]
+
+
+def _generate_phase_summary(run_directory: Path) -> Path | None:
+    from software.phase_summary_plot import plot_phase_summary
+
+    return plot_phase_summary(
+        run_directory,
+        output_path=run_directory / "phase_summary.png",
+    )[1]
+
+
+def _generate_event_timeline(run_directory: Path) -> Path | None:
+    from software.event_timeline import plot_event_timeline
+
+    return plot_event_timeline(
+        run_directory,
+        output_path=run_directory / "event_timeline.png",
+        csv_output_path=run_directory / "event_timeline.csv",
+    )[1]
+
+
+def generate_final_outputs(
+    run_directory: Path,
+    *,
+    output_stream: IO[str] | None = None,
+    error_stream: IO[str] | None = None,
+) -> None:
+    """Generate independent report artifacts after all run files are closed."""
+    output_stream = output_stream or sys.stdout
+    error_stream = error_stream or sys.stderr
+    tasks = (
+        ("CONFORMANCE_REPORT", lambda: generate_conformance_report(run_directory)),
+        (
+            "ENERGY_TAKE_PLOT",
+            lambda: _generate_energy_take_plot(run_directory),
+        ),
+        (
+            "STATE_VERIFICATION_PLOT",
+            lambda: _generate_state_verification_plot(run_directory),
+        ),
+        (
+            "PHASE_SUMMARY",
+            lambda: _generate_phase_summary(run_directory),
+        ),
+        (
+            "EVENT_TIMELINE",
+            lambda: _generate_event_timeline(run_directory),
+        ),
+    )
+    for label, generate in tasks:
+        try:
+            path = generate()
+            print(f"{label} {path}", file=output_stream, flush=True)
+        except Exception as artifact_error:
+            print(
+                f"{label}_ERROR {type(artifact_error).__name__}: {artifact_error}",
+                file=error_stream,
+                flush=True,
+            )
 
 RUN_EVENT_COLUMNS = (
     "timestamp_pacific",
@@ -326,6 +449,23 @@ def stop_process(
     managed.close_log()
 
 
+def stop_water_draw_at_test_end(
+    active_draw: ManagedProcess,
+    *,
+    timeout_seconds: float,
+    logger: RunEventLogger,
+) -> None:
+    """Close an active draw when the test reaches its hard end boundary."""
+    event_id = active_draw.event_id
+    stop_process(active_draw, timeout_seconds=timeout_seconds, logger=logger)
+    logger.record(
+        "water_draw_test_end_cutoff",
+        "stopped",
+        event_id=event_id,
+        details={"reason": "test_end_reached"},
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -385,8 +525,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _create_run_directory(results_root: Path, requested_id: str | None) -> Path:
-    run_id = requested_id or f"run_{pacific_filename_timestamp()}"
+def _create_run_directory(
+    results_root: Path,
+    requested_id: str | None,
+    master_schedule: Path,
+) -> Path:
+    schedule_name = safe_identifier(master_schedule.stem)
+    run_id = requested_id or f"{schedule_name}_{pacific_filename_timestamp()}"
     run_directory = (results_root / run_id).resolve()
     run_directory.mkdir(parents=True, exist_ok=False)
     return run_directory
@@ -455,8 +600,13 @@ def run_hardware_test(
         load_sensor_configuration(args.sensor_configuration)
 
     run_directory = _create_run_directory(
-        station_results_directory(args.results_root), args.run_id
+        station_results_directory(args.results_root),
+        args.run_id,
+        args.master_schedule,
     )
+    archived_equipment = _archive_station_equipment(run_directory)
+    if archived_equipment is None:
+        print("EQUIPMENT_SNAPSHOT_WARNING station equipment not available", file=sys.stderr)
     if args.master_schedule.suffix.lower() == ".xlsx":
         shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")
     shutil.copy2(canonical_schedule, run_directory / "master_schedule.csv")
@@ -527,6 +677,9 @@ def run_hardware_test(
             {
                 "TZ": "America/Los_Angeles",
                 "CTA_EVENT_LOG_PATH": str(run_directory / "cta_events.csv"),
+                "CTA_RAW_MESSAGE_LOG_PATH": str(
+                    run_directory / "cta_raw_messages.csv"
+                ),
                 "CTA_COMMODITY_LOG_PATH": str(run_directory / "cta_commodity.csv"),
                 "CTA_DEVICE_INFO_LOG_PATH": str(
                     run_directory / "cta_device_information.csv"
@@ -599,6 +752,17 @@ def run_hardware_test(
                 if return_code != 0:
                     raise RuntimeError(f"water draw failed with code {return_code}")
 
+            if elapsed >= test_end.offset_seconds:
+                if active_draw is not None:
+                    stop_water_draw_at_test_end(
+                        active_draw,
+                        timeout_seconds=args.shutdown_timeout_seconds,
+                        logger=logger,
+                    )
+                    active_draw = None
+                outcome = "completed"
+                break
+
             while (
                 next_draw_index < len(draws)
                 and elapsed >= draws[next_draw_index].offset_seconds
@@ -629,9 +793,6 @@ def run_hardware_test(
                     },
                 )
 
-            if elapsed >= test_end.offset_seconds and active_draw is None:
-                outcome = "completed"
-                break
             time.sleep(0.2)
 
     except KeyboardInterrupt:
@@ -646,6 +807,10 @@ def run_hardware_test(
         )
         raise
     finally:
+        _write_gui_stage(
+            "finalizing",
+            "Scheduled test complete; returning hardware to normal and closing logs.",
+        )
         if progress is not None:
             progress.finish(
                 test_end.offset_seconds if outcome == "completed" else last_elapsed,
@@ -696,6 +861,11 @@ def run_hardware_test(
 
         logger.record("run_finished", outcome)
         logger.close()
+        _write_gui_stage(
+            "generating_outputs",
+            "Hardware shutdown complete; generating the report and PNG files.",
+        )
+        generate_final_outputs(run_directory)
     return run_directory
 
 

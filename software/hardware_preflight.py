@@ -15,7 +15,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -215,80 +215,90 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_preflight(args: argparse.Namespace) -> list[PreflightCheck]:
-    checks = [
-        _check("platform", _require_linux),
-        _check("Python smbus2", lambda: _require_module("smbus2")),
-        _check("CTA controller", lambda: _require_executable(args.cta_binary)),
-        _check("CTA serial port", lambda: _require_device_access(args.serial_port)),
-        _check(
+def run_preflight(
+    args: argparse.Namespace,
+    on_check: Callable[[PreflightCheck], None] | None = None,
+) -> list[PreflightCheck]:
+    actions = [
+        ("platform", _require_linux),
+        ("Python smbus2", lambda: _require_module("smbus2")),
+        ("CTA controller", lambda: _require_executable(args.cta_binary)),
+        ("CTA serial port", lambda: _require_device_access(args.serial_port)),
+        (
             "I2C bus",
             lambda: _require_device_access(
                 Path(f"/dev/i2c-{MAX1238_I2C_BUS}")
             ),
         ),
-        _check(
+        (
             "results directory",
             lambda: _require_results_write(
                 station_results_directory(args.results_root)
             ),
         ),
-        _check(
+        (
             "schedule",
             lambda: _schedule_details(args.schedule, args.water),
         ),
-        PreflightCheck(
+        (
             "outside communication heartbeat",
-            True,
-            (
+            lambda: (
                 "disabled; 15-second command prerequisites remain enabled"
                 if args.disable_outside_communication_heartbeat
                 else "enabled; refresh interval 13 minutes 30 seconds"
             ),
         ),
-        _check(
+        (
             "sensor configuration",
             lambda: _sensor_configuration_details(args.sensor_configuration),
         ),
-        _check(
+        (
             "power configuration",
             lambda: _power_configuration_details(args.power_configuration_dir),
         ),
-        _check(
+        (
             "MAX1238",
             lambda: _i2c_device_details(MAX1238_I2C_BUS, MAX1238_I2C_ADDR),
         ),
-        _check(
+        (
             "ACS37800",
             lambda: _i2c_device_details(MAX1238_I2C_BUS, ACS37800_I2C_ADDR),
         ),
     ]
     if args.water:
-        checks.extend(
+        actions.extend(
             [
-                _check("Python RPi.GPIO", lambda: _require_module("RPi.GPIO")),
-                _check(
+                ("Python RPi.GPIO", lambda: _require_module("RPi.GPIO")),
+                (
                     "station sensor snapshot",
                     lambda: _station_sensor_details(
                         args.sensor_configuration
                     ),
                 ),
-                _check("valve safety", _gpio_low_details),
+                ("valve safety", _gpio_low_details),
             ]
         )
+    checks = []
+    for name, action in actions:
+        check = _check(name, action)
+        checks.append(check)
+        if on_check is not None:
+            on_check(check)
     return checks
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    checks = run_preflight(args)
-    for check in checks:
+    def print_check(check: PreflightCheck) -> None:
         status = "PASS" if check.passed else "FAIL"
-        print(f"PREFLIGHT_{status} {check.name}: {check.details}")
+        print(f"PREFLIGHT_{status} {check.name}: {check.details}", flush=True)
+
+    checks = run_preflight(args, on_check=print_check)
     failures = sum(not check.passed for check in checks)
     print(
         f"PREFLIGHT_SUMMARY passed={len(checks) - failures} "
-        f"failed={failures} water={str(args.water).lower()}"
+        f"failed={failures} water={str(args.water).lower()}",
+        flush=True,
     )
     return 0 if failures == 0 else 1
 

@@ -19,7 +19,9 @@ except ImportError:
     from schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 
 
-MACHINE_COLUMNS = ("time", "command", "argument", "event_id", "value", "units")
+MACHINE_COLUMNS = (
+    "time", "command", "argument", "event_id", "value", "units", "efficiency"
+)
 PREVIEW_COLUMNS = (
     "event_id",
     "scheduled_pacific",
@@ -32,6 +34,7 @@ PREVIEW_COLUMNS = (
     "advanced_duration_minutes",
     "advanced_value",
     "advanced_units",
+    "advanced_efficiency",
     "expected_operational_states",
     "generated",
     "prerequisite_for",
@@ -136,6 +139,11 @@ def compile_cta_schedule(
                 "event_id": event.event_id,
                 "value": "" if event.advanced_value is None else event.advanced_value,
                 "units": "" if event.advanced_units is None else event.advanced_units,
+                "efficiency": (
+                    ""
+                    if event.advanced_efficiency is None
+                    else event.advanced_efficiency
+                ),
             }
         )
         preview_rows.append(
@@ -170,6 +178,11 @@ def compile_cta_schedule(
                 ),
                 "advanced_units": (
                     "" if event.advanced_units is None else event.advanced_units
+                ),
+                "advanced_efficiency": (
+                    ""
+                    if event.advanced_efficiency is None
+                    else event.advanced_efficiency
                 ),
                 "expected_operational_states": "|".join(
                     str(state) for state in event.expected_operational_states
