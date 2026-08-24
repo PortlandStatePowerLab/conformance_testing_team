@@ -1,4 +1,5 @@
 import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,7 +8,12 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.run_comparison_plot import plot_run_comparison
+from software.run_comparison_plot import (
+    comparison_names,
+    default_named_output,
+    load_named_comparison,
+    plot_run_comparison,
+)
 
 
 def write_csv(path, columns, rows):
@@ -18,6 +24,29 @@ def write_csv(path, columns, rows):
 
 
 class RunComparisonPlotTests(unittest.TestCase):
+    def test_named_comparison_defaults_to_comparison_plots_folder(self):
+        path = Path("saved_data/comparisons.json")
+        self.assertEqual(
+            default_named_output(path, "LU Normal"),
+            path.resolve().parent / "comparison_plots" / "LU_Normal_comparison.png",
+        )
+
+    def test_loads_named_comparison_relative_to_json(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "data" / "one").mkdir(parents=True)
+            (root / "data" / "two").mkdir()
+            path = root / "comparisons.json"
+            path.write_text(json.dumps({
+                "data_root": "data",
+                "comparisons": {"Example": ["one", "two"]},
+            }), encoding="utf-8")
+            self.assertEqual(comparison_names(path), ("Example",))
+            self.assertEqual(
+                load_named_comparison(path, "Example"),
+                ((root / "data" / "one").resolve(), (root / "data" / "two").resolve()),
+            )
+
     def create_run(self, directory, *, second_phase="shed", second_offset_hours=1):
         directory.mkdir()
         write_csv(
@@ -56,11 +85,19 @@ class RunComparisonPlotTests(unittest.TestCase):
             self.create_run(first)
             self.create_run(second)
             output = root / "comparison.png"
-            figure, destination = plot_run_comparison([first, second], output_path=output)
+            figure, destination = plot_run_comparison(
+                [first, second],
+                output_path=output,
+                comparison_name="LU-Shed-Recovery",
+            )
             self.assertEqual(destination, output.resolve())
             self.assertTrue(output.is_file())
             self.assertEqual(len(figure.axes), 3)
             self.assertEqual(list(figure.axes[1].lines[0].get_ydata()), [0.0, 0.8])
+            self.assertEqual(
+                figure._suptitle.get_text(),
+                "LU-Shed-Recovery\nEnergyTake and Real Power Comparison",
+            )
 
     def test_rejects_incompatible_phase_sequence(self):
         with tempfile.TemporaryDirectory() as temporary:

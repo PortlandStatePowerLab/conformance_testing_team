@@ -150,6 +150,22 @@ class RunPlotTests(unittest.TestCase):
             self.assertEqual(data.energy_column, "advanced_present_energy_storage_Wh")
             self.assertEqual([(phase.name, phase.result) for phase in rejected], [("ALU", "bad_value")])
 
+    def test_older_alu_device_falls_back_to_regular_energy_when_advanced_is_empty(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.create_run(directory)
+            write_csv(
+                directory / "cta_commodity.csv",
+                ["timestamp_pacific", "present_energy_storage_Wh", "advanced_present_energy_storage_Wh"],
+                [
+                    ["2026-08-17 12:59:00", "100", ""],
+                    ["2026-08-17 19:59:00", "200", ""],
+                ],
+            )
+            data = load_run_plot_data(directory)
+            self.assertEqual(data.energy_column, "present_energy_storage_Wh")
+            self.assertEqual([sample.value for sample in data.energy], [100.0, 200.0])
+
     def test_saves_plot(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

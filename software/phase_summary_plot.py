@@ -12,6 +12,8 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
+from .equipment_metadata import equipment_title_line
+
 from .run_plot import Sample, _without_startup_spikes, load_run_plot_data
 from .state_verification_plot import ExpectedPhase, StateReport, load_verification_data
 
@@ -264,7 +266,12 @@ def plot_phase_summary(
         table[(row_index, state_column)].set_facecolor(state_colors[item.state_result])
         table[(row_index, state_column)].set_text_props(fontweight="bold")
 
-    figure.suptitle(f"{directory.name}\nPhase Summary", fontsize=14, y=0.98)
+    equipment_line = equipment_title_line(directory)
+    title_lines = [directory.name]
+    if equipment_line:
+        title_lines.append(equipment_line)
+    title_lines.append("Phase Summary")
+    figure.suptitle("\n".join(title_lines), fontsize=14, y=0.98)
     figure.text(
         0.99,
         0.015,

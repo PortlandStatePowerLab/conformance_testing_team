@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from pathlib import Path
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
+from .equipment_metadata import equipment_title_line
 from .phase_summary_plot import summarize_run_phases
 from .run_plot import (
     RunPlotData,
@@ -26,6 +28,8 @@ from .state_verification_plot import ExpectedPhase, load_verification_data
 
 
 PLOT_FILENAME = "energy_take_comparison.png"
+DEFAULT_COMPARISON_FILE = Path(__file__).resolve().parents[1] / "saved_data" / "comparisons.json"
+COMPARISON_PLOT_DIRECTORY = "comparison_plots"
 
 
 @dataclass(frozen=True)
@@ -37,8 +41,68 @@ class ComparisonRun:
     state_failure: bool
 
 
+def load_named_comparison(
+    comparison_file: Path | str,
+    name: str,
+) -> tuple[Path, ...]:
+    """Load one named folder collection, resolving paths relative to its JSON."""
+    path = Path(comparison_file).resolve()
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"comparison file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid comparison JSON: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ValueError("comparison JSON must be an object")
+    comparisons = value.get("comparisons", value)
+    if not isinstance(comparisons, dict):
+        raise ValueError("comparisons must be a JSON object")
+    if name not in comparisons:
+        available = ", ".join(sorted(str(item) for item in comparisons))
+        raise ValueError(f"comparison {name!r} not found; available: {available}")
+    entries = comparisons[name]
+    if not isinstance(entries, list) or len(entries) < 2 or not all(
+        isinstance(entry, str) and entry.strip() for entry in entries
+    ):
+        raise ValueError(f"comparison {name!r} must contain at least two folder paths")
+    raw_root = value.get("data_root", ".")
+    if not isinstance(raw_root, str) or not raw_root.strip():
+        raise ValueError("data_root must be a nonempty path string")
+    root = (path.parent / raw_root).resolve()
+    directories = tuple((root / entry).resolve() for entry in entries)
+    missing = [str(directory) for directory in directories if not directory.is_dir()]
+    if missing:
+        raise ValueError("comparison folders not found: " + "; ".join(missing))
+    return directories
+
+
+def comparison_names(comparison_file: Path | str) -> tuple[str, ...]:
+    path = Path(comparison_file).resolve()
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read comparison file {path}: {exc}") from exc
+    comparisons = value.get("comparisons", value) if isinstance(value, dict) else None
+    if not isinstance(comparisons, dict):
+        raise ValueError("comparisons must be a JSON object")
+    return tuple(sorted(str(name) for name in comparisons))
+
+
+def default_named_output(comparison_file: Path | str, name: str) -> Path:
+    """Return the standard output path for a configured comparison."""
+    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")
+    if not safe_name:
+        raise ValueError("comparison name cannot produce an empty output filename")
+    return (
+        Path(comparison_file).resolve().parent
+        / COMPARISON_PLOT_DIRECTORY
+        / f"{safe_name}_comparison.png"
+    )
+
+
 def _base_label(directory: Path) -> str:
-    heater = directory.parent.name
+    heater = equipment_title_line(directory) or directory.parent.name
     match = re.search(r"(\d{4})_(\d{2})_(\d{2})_(\d{6})", directory.name)
     if match:
         date = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
@@ -105,6 +169,7 @@ def plot_run_comparison(
     grace_seconds: float = 60,
     output_path: Path | str | None = None,
     show: bool = False,
+    comparison_name: str | None = None,
 ) -> tuple[Figure, Path | None]:
     """Plot compatible runs on acknowledged-command-aligned shared axes."""
     if timing_tolerance_seconds < 0:
@@ -138,6 +203,7 @@ def plot_run_comparison(
     power_axis = figure.add_subplot(grid[2], sharex=phase_axis)
 
     colors = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e", "#17becf"]
+    mixed_energy_columns = len({run.plot_data.energy_column for run in runs}) > 1
     for index, run in enumerate(runs):
         color = colors[index % len(colors)]
         anchor = run.phases[0].timestamp
@@ -148,6 +214,13 @@ def plot_run_comparison(
         power_times = [_shift(sample.timestamp, anchor, display_start) for sample in power]
         power_values = [sample.value / 1000.0 for sample in power]
         label = run.label + (" (state failure)" if run.state_failure else "")
+        if mixed_energy_columns:
+            kind = (
+                "advanced EnergyTake"
+                if run.plot_data.energy_column == "advanced_present_energy_storage_Wh"
+                else "regular EnergyTake"
+            )
+            label += f" [{kind}]"
         style = "--" if run.state_failure else "-"
         energy_axis.plot(energy_times, energy_values, color=color, linestyle=style, linewidth=1.7, label=label)
         power_axis.plot(power_times, power_values, color=color, linestyle=style, linewidth=1.2, label=label)
@@ -181,7 +254,10 @@ def plot_run_comparison(
     power_axis.tick_params(axis="x", rotation=45)
     for axis in (phase_axis, energy_axis, power_axis):
         axis.set_xlim(display_start, display_end)
-    figure.suptitle("EnergyTake and Real Power Comparison", fontsize=15, y=0.97)
+    title = "EnergyTake and Real Power Comparison"
+    if comparison_name:
+        title = f"{comparison_name}\n{title}"
+    figure.suptitle(title, fontsize=15, y=0.97)
     figure.subplots_adjust(left=0.09, right=0.98, bottom=0.12, top=0.9)
 
     destination: Path | None = None
@@ -196,8 +272,16 @@ def plot_run_comparison(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_directories", nargs="+", type=Path)
-    parser.add_argument("--output", type=Path, default=Path(PLOT_FILENAME))
+    parser.add_argument("run_directories", nargs="*", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--comparison", help="named group from the comparison JSON")
+    parser.add_argument(
+        "--comparison-file",
+        type=Path,
+        default=DEFAULT_COMPARISON_FILE,
+        help=f"comparison JSON (default: {DEFAULT_COMPARISON_FILE})",
+    )
+    parser.add_argument("--list-comparisons", action="store_true")
     parser.add_argument(
         "--start",
         help="override automatic 9:10 PM event-end alignment with start time HH:MM",
@@ -207,13 +291,32 @@ def main() -> int:
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
     try:
+        if args.list_comparisons:
+            for name in comparison_names(args.comparison_file):
+                print(name)
+            return 0
+        if args.comparison and args.run_directories:
+            raise ValueError("use either --comparison or positional run folders, not both")
+        if args.comparison:
+            run_directories = load_named_comparison(
+                args.comparison_file, args.comparison
+            )
+            output = args.output or default_named_output(
+                args.comparison_file, args.comparison
+            )
+        else:
+            if len(args.run_directories) < 2:
+                raise ValueError("provide at least two run folders or use --comparison NAME")
+            run_directories = args.run_directories
+            output = args.output or Path(PLOT_FILENAME)
         _, destination = plot_run_comparison(
-            args.run_directories,
+            run_directories,
             scenario_start=time.fromisoformat(args.start) if args.start else None,
             timing_tolerance_seconds=args.timing_tolerance_seconds,
             grace_seconds=args.grace_seconds,
-            output_path=args.output,
+            output_path=output,
             show=args.show,
+            comparison_name=args.comparison,
         )
     except (OSError, ValueError, csv.Error) as exc:
         parser.exit(1, f"RUN_COMPARISON_ERROR {type(exc).__name__}: {exc}\n")

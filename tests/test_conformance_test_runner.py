@@ -9,6 +9,7 @@ from software.conformance_test_runner import (
     DEFAULT_MASTER_SCHEDULE,
     ProgressReporter,
     _create_run_directory,
+    _archive_station_equipment,
     _launch_water_draw,
     build_parser,
     clock_text,
@@ -28,6 +29,21 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_archives_station_equipment_for_future_plot_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run = root / "run"
+            equipment = root / "equipment"
+            run.mkdir()
+            equipment.mkdir()
+            source = equipment / "WH-station3.json"
+            source.write_text('{"manufacturer":"Example","model_number":"M3"}', encoding="utf-8")
+            archived = _archive_station_equipment(
+                run, hostname="WH-station3", equipment_directory=equipment
+            )
+            self.assertEqual(archived, run / "equipment.json")
+            self.assertEqual((run / "equipment.json").read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+
     def test_test_end_stops_active_water_draw_as_hard_boundary(self):
         active_draw = SimpleNamespace(event_id="water_draw_1")
         logger = Mock()
@@ -230,6 +246,10 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 "software.conformance_test_runner._generate_phase_summary",
                 return_value=run_directory / "phase_summary.png",
             ) as phase_summary,
+            patch(
+                "software.conformance_test_runner._generate_event_timeline",
+                return_value=run_directory / "event_timeline.png",
+            ) as event_timeline,
         ):
             generate_final_outputs(
                 run_directory,
@@ -241,6 +261,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         energy_plot.assert_called_once()
         state_plot.assert_called_once()
         phase_summary.assert_called_once()
+        event_timeline.assert_called_once()
         self.assertIn("CONFORMANCE_REPORT run", output.getvalue())
         self.assertIn("ENERGY_TAKE_PLOT run", output.getvalue())
         self.assertIn("PHASE_SUMMARY run", output.getvalue())

@@ -13,6 +13,8 @@ from pathlib import Path
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
+from .equipment_metadata import equipment_title_line
+
 from .run_plot import (
     _command_phases,
     _duck_curve_display_start,
@@ -307,7 +309,12 @@ def plot_state_verification(
     result_axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
     result_axis.set_xlabel("Duck-Curve Time")
     result_axis.tick_params(axis="x", rotation=45)
-    command_axis.set_title(f"{directory.name}\nOperational-State Verification", pad=10)
+    equipment_line = equipment_title_line(directory)
+    title_lines = [directory.name]
+    if equipment_line:
+        title_lines.append(equipment_line)
+    title_lines.append("Operational-State Verification")
+    command_axis.set_title("\n".join(title_lines), pad=10)
     figure.subplots_adjust(left=0.12, right=0.98, bottom=0.18, top=0.82, hspace=0.04)
 
     destination: Path | None = None

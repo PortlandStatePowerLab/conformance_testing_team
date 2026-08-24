@@ -9,6 +9,7 @@ import json
 import math
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -46,6 +47,7 @@ ROOT_DIRECTORY = CONFORMANCE_REPOSITORY.parent
 DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule_main.xlsx"
 DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule.csv"
 DEFAULT_RESULTS_ROOT = CONFORMANCE_REPOSITORY / "saved_data" / "conformance_runs"
+DEFAULT_EQUIPMENT_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "equipment"
 DEFAULT_CTA_DIRECTORY = ROOT_DIRECTORY / "cta_2045_controller" / "dcs" / "controller"
 DEFAULT_CTA_BINARY = (
     ROOT_DIRECTORY
@@ -58,6 +60,28 @@ DEFAULT_CTA_BINARY = (
 DEFAULT_CTA_SCHEDULE = DEFAULT_CTA_DIRECTORY / "schedule.csv"
 DEFAULT_PRESTART_SECONDS = 15.0
 GUI_STAGE_PATH_ENV = "CONFORMANCE_GUI_STAGE_PATH"
+
+
+def _archive_station_equipment(
+    run_directory: Path,
+    *,
+    hostname: str | None = None,
+    equipment_directory: Path = DEFAULT_EQUIPMENT_DIRECTORY,
+) -> Path | None:
+    """Copy the active station equipment identity into a new run."""
+    active_hostname = hostname or socket.gethostname()
+    try:
+        from software.station.station_identity import station_number
+
+        number = station_number(active_hostname)
+    except ValueError:
+        return None
+    source = equipment_directory / f"WH-station{number}.json"
+    if not source.is_file():
+        return None
+    destination = run_directory / "equipment.json"
+    shutil.copy2(source, destination)
+    return destination
 
 
 def _write_gui_stage(state: str, message: str) -> None:
@@ -106,6 +130,16 @@ def _generate_phase_summary(run_directory: Path) -> Path | None:
     )[1]
 
 
+def _generate_event_timeline(run_directory: Path) -> Path | None:
+    from software.event_timeline import plot_event_timeline
+
+    return plot_event_timeline(
+        run_directory,
+        output_path=run_directory / "event_timeline.png",
+        csv_output_path=run_directory / "event_timeline.csv",
+    )[1]
+
+
 def generate_final_outputs(
     run_directory: Path,
     *,
@@ -128,6 +162,10 @@ def generate_final_outputs(
         (
             "PHASE_SUMMARY",
             lambda: _generate_phase_summary(run_directory),
+        ),
+        (
+            "EVENT_TIMELINE",
+            lambda: _generate_event_timeline(run_directory),
         ),
     )
     for label, generate in tasks:
@@ -566,6 +604,9 @@ def run_hardware_test(
         args.run_id,
         args.master_schedule,
     )
+    archived_equipment = _archive_station_equipment(run_directory)
+    if archived_equipment is None:
+        print("EQUIPMENT_SNAPSHOT_WARNING station equipment not available", file=sys.stderr)
     if args.master_schedule.suffix.lower() == ".xlsx":
         shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")
     shutil.copy2(canonical_schedule, run_directory / "master_schedule.csv")

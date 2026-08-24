@@ -13,6 +13,8 @@ from typing import Iterable
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
+from .equipment_metadata import equipment_title_line
+
 
 PLOT_FILENAME = "energy_take_power.png"
 
@@ -154,7 +156,16 @@ def load_run_plot_data(run_directory: Path | str) -> RunPlotData:
         if advanced
         else "present_energy_storage_Wh"
     )
-    energy = _samples(_read_csv(directory / "cta_commodity.csv"), energy_column)
+    commodity_rows = _read_csv(directory / "cta_commodity.csv")
+    try:
+        energy = _samples(commodity_rows, energy_column)
+    except ValueError:
+        if energy_column != "advanced_present_energy_storage_Wh":
+            raise
+        # Older CEA-2045 devices can accept the test command but expose only
+        # regular EnergyTake commodity data.
+        energy_column = "present_energy_storage_Wh"
+        energy = _samples(commodity_rows, energy_column)
     power = _samples(
         _read_csv(directory / "power.csv"), "real_power", valid_status_only=True
     )
@@ -346,7 +357,10 @@ def plot_run(
     energy_axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
     energy_axis.grid(True, color="#b0b0b0", alpha=0.45)
     energy_axis.legend(handles=[energy_line, power_line], loc="upper left")
-    phase_axis.set_title(directory.name, pad=8)
+    equipment_line = equipment_title_line(directory)
+    phase_axis.set_title(
+        directory.name + (f"\n{equipment_line}" if equipment_line else ""), pad=8
+    )
     figure.autofmt_xdate(rotation=45, ha="right")
     figure.tight_layout()
 
