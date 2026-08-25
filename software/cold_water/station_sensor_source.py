@@ -24,6 +24,12 @@ from software.station.station_identity import station_number
 class SensorSnapshotReader(Protocol):
     def get_sensor_snapshot(self) -> SensorSnapshot: ...
 
+class CloseableResource(Protocol):
+    """Define the cleanup operation required or an owned resource."""
+
+    def close(self) -> None:
+        """Release the owned resource."""
+        ...
 
 class CompositeSensorReader:
     """Combine local station sensors with Pi 1's shared cold measurement."""
@@ -57,7 +63,7 @@ class StationSensorSession:
 
     reader: SensorSnapshotReader
     remote_client: SnapshotClient
-    adc: object | None = None
+    adc: CloseableResource | None = None
 
     def close(self) -> None:
         first_error: BaseException | None = None

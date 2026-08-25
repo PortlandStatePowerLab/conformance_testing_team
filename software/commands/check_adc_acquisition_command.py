@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from software.adc import adc_acquisition_diagnostic as diagnostic
 from software.adc.adc_acquisition_diagnostic import (
@@ -17,6 +18,9 @@ from software.adc import build_max1238
 
 #This file explicitly needs the internal `MAX1238_INTERNAL_REFERENCE_WAKEUP_S` constant from the max1238_builder module, but importing it directly from the builder module can create circular dependencies. By importing it here, we ensure that the necessary constant is available without causing import errors.
 from software.adc.max1238_builder import MAX1238_INTERNAL_REFERENCE_WAKEUP_S
+
+if TYPE_CHECKING:
+    from software.adc.max1238_driver import Max1238
 
 CH_HOT = diagnostic.CH_HOT
 CH_COLD = diagnostic.CH_COLD
@@ -48,7 +52,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def configure_clock_mode(adc: DiagnosticAdc, clock_mode: str) -> None:
+def configure_clock_mode(adc: Max1238, clock_mode: str) -> None:
     from software.adc.max1238_driver import ClockType, Polarity, ReferenceVoltage, ResetMode
 
     selected_clock = ClockType.Internal if clock_mode == "internal" else ClockType.External
