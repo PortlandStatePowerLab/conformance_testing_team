@@ -11,7 +11,7 @@ from software.adc.adc_raw_diagnostic import (
     DEFAULT_WATCH_INTERVAL_S,
     run_adc_raw_check,
 )
-from software.adc.max1238_builder import build_max1238
+from software.adc import build_max1238
 from software.station.station_hardware_map import MAX1238_I2C_ADDR, MAX1238_I2C_BUS
 
 time = diagnostic.time

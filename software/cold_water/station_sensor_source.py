@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
-from software.adc.max1238_builder import build_max1238
+from software.adc import build_max1238
 from software.cold_water.client import (
     DEFAULT_REMOTE_HOST,
     DEFAULT_REMOTE_USER,

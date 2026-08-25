@@ -6,7 +6,7 @@ import argparse
 from collections.abc import Sequence
 
 from software.sensors import sensor_diagnostic as diagnostic
-from software.adc.max1238_builder import build_max1238
+from software.adc import build_max1238
 from software.sensors.sensor_diagnostic import DEFAULT_WATCH_INTERVAL_S, run_sensor_check
 from software.sensors.sensor_reader import SensorReader, SensorSnapshot
 

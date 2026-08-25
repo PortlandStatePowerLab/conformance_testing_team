@@ -13,10 +13,10 @@ from software.adc.adc_acquisition_diagnostic import (
     DiagnosticAdc,
     run_comparison,
 )
-from software.adc.max1238_builder import (
-    MAX1238_INTERNAL_REFERENCE_WAKEUP_S,
-    build_max1238,
-)
+from software.adc import build_max1238
+
+#This file explicitly needs the internal `MAX1238_INTERNAL_REFERENCE_WAKEUP_S` constant from the max1238_builder module, but importing it directly from the builder module can create circular dependencies. By importing it here, we ensure that the necessary constant is available without causing import errors.
+from software.adc.max1238_builder import MAX1238_INTERNAL_REFERENCE_WAKEUP_S
 
 CH_HOT = diagnostic.CH_HOT
 CH_COLD = diagnostic.CH_COLD

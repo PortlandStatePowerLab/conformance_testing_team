@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from software.adc.max1238_builder import build_max1238
+from software.adc import build_max1238
 from software.cold_water.client import DEFAULT_SOCKET_PATH
 from software.cold_water.protocol import (
     encode_message,
