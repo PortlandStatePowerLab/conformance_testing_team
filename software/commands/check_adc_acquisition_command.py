@@ -14,7 +14,7 @@ from software.adc.adc_acquisition_diagnostic import (
     DiagnosticAdc,
     run_comparison,
 )
-from software.adc import build_max1238
+from software.station.station_adc_builder import build_station_adc
 
 #This file explicitly needs the internal `MAX1238_INTERNAL_REFERENCE_WAKEUP_S` constant from the max1238_builder module, but importing it directly from the builder module can create circular dependencies. By importing it here, we ensure that the necessary constant is available without causing import errors.
 from software.adc.max1238_builder import MAX1238_INTERNAL_REFERENCE_WAKEUP_S
@@ -67,7 +67,7 @@ def configure_clock_mode(adc: Max1238, clock_mode: str) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    adc = build_max1238()
+    adc = build_station_adc()
     try:
         configure_clock_mode(adc, args.clock_mode)
         print(f"Selected clock mode: {args.clock_mode}")

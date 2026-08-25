@@ -1,0 +1,91 @@
+---
+title: ADC Station Composition and Dependency Boundary
+---
+flowchart LR
+    subgraph STATION["STATION / COMPOSITION"]
+        direction TB
+
+        sensorCommand["software/commands/check_sensors_command.py"]
+        acquisitionCommand["software/commands/check_adc_acquisition_command.py"]
+        coldWaterService["software/cold_water/service.py"]
+        stationSensorSource["software/cold_water/station_sensor_source.py"]
+
+        stationBuilder["software/station/station_adc_builder.py<br/>build_station_adc()"]
+        hardwareMap["software/station/station_hardware_map.py<br/>MAX1238_I2C_BUS<br/>MAX1238_I2C_ADDR"]
+
+        rawCommand["software/commands/check_adc_raw_command.py<br/>Low-level operator diagnostic"]
+        overrides["Explicit operator overrides<br/>args.bus, args.address"]
+
+        sensorCommand --> stationBuilder
+        acquisitionCommand --> stationBuilder
+        coldWaterService --> stationBuilder
+        stationSensorSource --> stationBuilder
+
+        hardwareMap -->|"installed bus + address"| stationBuilder
+
+        rawCommand --> overrides
+    end
+
+    boundary["COMPOSITION BOUNDARY<br/>station-specific connection facts end here"]
+
+    subgraph ADC["GENERIC ADC DEVICE LAYER"]
+        direction TB
+
+        maxBuilder["software/adc/max1238_builder.py<br/>build_max1238(bus_num, address)"]
+        driver["software/adc/max1238_driver.py<br/>Concrete Max1238 driver"]
+        adcInterface["Configured Max1238 object<br/>SensorAdc-compatible read interface"]
+
+        maxBuilder -->|"constructs + configures"| driver
+        driver -->|"returned object"| adcInterface
+    end
+
+    subgraph APP["APPLICATION / SENSOR LAYER"]
+        direction TB
+
+        sensorReader["software/sensors/sensor_reader.py<br/>SensorReader"]
+        sensorDiagnostic["software/sensors/sensor_diagnostic.py"]
+        acquisitionDiagnostic["software/adc/adc_acquisition_diagnostic.py"]
+        coldWaterRuntime["Cold-water sensor/service logic"]
+
+        snapshotReader["SensorSnapshotReader<br/>snapshot capability"]
+
+        sensorDiagnostic -->|"depends on capability"| snapshotReader
+        sensorReader -.->|"satisfies structurally"| snapshotReader
+
+        coldWaterRuntime -->|"uses"| sensorReader
+        adcInterface -->|"injected ADC object"| sensorReader
+        adcInterface -->|"used directly"| acquisitionDiagnostic
+    end
+
+    subgraph HARDWARE["PHYSICAL HARDWARE"]
+        direction TB
+
+        i2c["smbus2 / Linux I2C"]
+        physicalAdc["Physical MAX1238 ADC"]
+
+        i2c <-->|"I2C transactions"| physicalAdc
+    end
+
+    stationBuilder --> boundary -->|"calls with mapped bus/address"| maxBuilder
+    overrides -->|"intentional direct low-level call"| maxBuilder
+
+    driver -->|"opens selected bus"| i2c
+
+    acquisitionCommand -.->|"runs"| acquisitionDiagnostic
+    sensorCommand -.->|"runs"| sensorDiagnostic
+    coldWaterService -.->|"uses"| coldWaterRuntime
+    stationSensorSource -.->|"uses"| coldWaterRuntime
+
+    classDef station fill:#d9ead3,stroke:#38761d,color:#000
+    classDef generic fill:#cfe2f3,stroke:#1155cc,color:#000
+    classDef app fill:#fff2cc,stroke:#bf9000,color:#000
+    classDef hardware fill:#ead1dc,stroke:#741b47,color:#000
+    classDef exception fill:#f4cccc,stroke:#990000,color:#000
+    classDef boundaryClass fill:#eeeeee,stroke:#666666,color:#000
+
+    class sensorCommand,acquisitionCommand,coldWaterService,stationSensorSource,stationBuilder,hardwareMap station
+    class maxBuilder,driver,adcInterface generic
+    class sensorReader,sensorDiagnostic,acquisitionDiagnostic,coldWaterRuntime app
+    class i2c,physicalAdc hardware
+    class rawCommand,overrides exception
+    class boundary boundaryClass

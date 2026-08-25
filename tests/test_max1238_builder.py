@@ -7,6 +7,7 @@ import types
 import unittest
 from enum import Enum
 from unittest.mock import patch
+from typing import cast
 
 from software.adc import max1238_builder
 
@@ -48,7 +49,7 @@ def make_fake_driver_module() -> types.ModuleType:
         "ResetMode": ("NoAction",),
     }.items():
         setattr(module, enum_name, Enum(enum_name, member_names))
-    module.Max1238 = FakeMax1238
+    setattr(module, "Max1238", FakeMax1238)
     return module
 
 
@@ -79,7 +80,10 @@ class Max1238BuilderTest(unittest.TestCase):
                 side_effect=lambda delay: events.append(("sleep", delay)),
             ),
         ):
-            adc = max1238_builder.build_max1238(bus_num=4, address=0x36)
+            adc = cast(
+                FakeMax1238,
+                max1238_builder.build_max1238(bus_num=4, address=0x36)
+            )
 
         self.assertIs(adc, FakeMax1238.instances[0])
         self.assertEqual((adc.bus_num, adc.address), (4, 0x36))
@@ -108,7 +112,7 @@ class Max1238BuilderTest(unittest.TestCase):
             patch.object(max1238_builder.time, "sleep") as sleep,
         ):
             with self.assertRaises(OSError) as raised:
-                max1238_builder.build_max1238()
+                max1238_builder.build_max1238(bus_num=1)
 
         self.assertIs(raised.exception, setup_error)
         self.assertEqual(FakeMax1238.instances[0].close_calls, 1)
@@ -123,7 +127,7 @@ class Max1238BuilderTest(unittest.TestCase):
 
         with patch.dict(sys.modules, {"software.adc.max1238_driver": fake_driver}):
             with self.assertRaises(OSError) as raised:
-                max1238_builder.build_max1238()
+                max1238_builder.build_max1238(bus_num=1)
 
         self.assertIs(raised.exception, setup_error)
         self.assertEqual(FakeMax1238.instances[0].close_calls, 1)

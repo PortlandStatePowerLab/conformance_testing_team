@@ -1,0 +1,82 @@
+---
+title: Broad Hardware Workflow and Dependency Graph
+---
+flowchart LR
+    hardware["software/station/station_hardware_map.py<br/>MAX1238 bus 1, address 0x35<br/>channels 0, 1, 2, 4<br/>valve GPIO 17"]
+    legacyHardware["software/helpers/hardware_map.py<br/>Duplicate hardware values"]
+
+    stationAdcBuilder["software/station/station_adc_builder.py<br/>Station ADC composition"]
+    adcBuilder["software/adc/max1238_builder.py<br/>Generic MAX1238 construction"]
+    sensorReader["software/sensors/sensor_reader.py"]
+    valveBuilder["software/valve/gpio_valve_builder.py"]
+    preflight["software/hardware_preflight.py"]
+    waterMonitor["software/water_draw_monitor.py"]
+    diagnostics["diagnostics/*"]
+    legacySensors["software/helpers/water_sensor_reader.py"]
+    powerMonitor["software/wh_power_monitor.py"]
+
+    adcDriver["software/adc/max1238_driver.py<br/>Max1238 implementation"]
+    adcDuplicate["software/adc/max1238.py<br/>Duplicate Max1238 implementation"]
+    adcLegacy["software/helpers/max1238_adc.py<br/>Legacy Max1238 implementation"]
+
+    conversion["software/sensors/sensor_conversion_math.py<br/>Flow range 0.2..10.0 GPM"]
+    legacyConversion["software/helpers/sensor_conversion.py<br/>Flow range 0.0..10.0 GPM"]
+    ambient["diagnostics/test_ambient_temp.py<br/>Local CH_COLD = 3<br/>ADC_MAX = 4095"]
+
+    workflow["software/runtime/controlled_water_draw_workflow.py<br/>5 min / 20 s / 0.5 s"]
+    runner["software/conformance_test_runner.py<br/>Hard-coded 0.5 s"]
+
+    protocol["software/cold_water/protocol.py"]
+    client["software/cold_water/client.py<br/>Local socket + restricted SSH snapshot clients"]
+    service["software/cold_water/service.py<br/>Pi 1 snapshot acquisition + broadcast service"]
+    stationSensorSource["software/cold_water/station_sensor_source.py<br/>Station-aware local/remote sensor composition"]
+    sensorCommand["software/commands/check_sensors_command.py"]
+    acquisitionCommand["software/commands/check_adc_acquisition_command.py"]
+    rawCommand["software/commands/check_adc_raw_command.py<br/>Explicit bus/address override"]
+    systemd["systemd/cold-water.socket + service"]
+
+    hardware -->|"ADC bus + address"| stationAdcBuilder
+    stationAdcBuilder -->|"composition boundary"| adcBuilder
+    adcBuilder -->|"constructs"| adcDriver
+
+    hardware -->|"channels"| sensorReader
+    hardware -->|"GPIO 17"| valveBuilder
+    hardware -->|"preflight values"| preflight
+    hardware -->|"VALVE_PIN"| waterMonitor
+
+    service -->|"uses station ADC"| stationAdcBuilder
+    stationSensorSource -->|"uses station ADC"| stationAdcBuilder
+    sensorCommand -->|"uses station ADC"| stationAdcBuilder
+    acquisitionCommand -->|"uses station ADC"| stationAdcBuilder
+    rawCommand -->|"intentional direct call<br/>build_max1238(bus,address)"| adcBuilder
+
+    legacyHardware -.->|"duplicate values"| diagnostics
+    legacyHardware -.->|"duplicate values"| legacySensors
+    legacyHardware -.->|"duplicate values"| powerMonitor
+    hardware -.->|"conflicts with CH_COLD = 3"| ambient
+
+    diagnostics -.->|"imports separate driver"| adcDuplicate
+    legacySensors -->|"uses"| adcLegacy
+
+    conversion -->|"converts readings"| sensorReader
+    legacyConversion -->|"converts readings"| legacySensors
+    ambient -.->|"local conversion"| legacyConversion
+
+    workflow -->|"defaults"| waterMonitor
+    runner -.->|"repeats 0.5 s"| waterMonitor
+    runner -->|"launches"| workflow
+
+    protocol -->|"wire contract"| client
+    protocol -->|"wire contract"| service
+    client -->|"connects to managed Unix socket"| systemd
+    systemd -->|"socket-activates / launches"| service
+
+    classDef authority fill:#d9ead3,stroke:#38761d,color:#000
+    classDef duplicate fill:#f4cccc,stroke:#990000,color:#000
+    classDef consumer fill:#cfe2f3,stroke:#1155cc,color:#000
+    classDef composition fill:#fff2cc,stroke:#bf9000,color:#000
+
+    class hardware,conversion,protocol authority
+    class legacyHardware,adcDuplicate,adcLegacy,legacyConversion,ambient duplicate
+    class adcBuilder,sensorReader,valveBuilder,preflight,waterMonitor,diagnostics,legacySensors,powerMonitor,workflow,runner,client,service,sensorCommand,acquisitionCommand,rawCommand,systemd consumer
+    class stationAdcBuilder,stationSensorSource composition

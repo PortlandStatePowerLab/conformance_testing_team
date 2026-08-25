@@ -15,7 +15,7 @@ from software.station.station_hardware_map import (
     CH_HOT,
 )
 from software.commands import check_sensors_command as sensor_check
-
+from software.sensors.sensor_reader import SensorSnapshot
 
 class FakeAdc:
     """Provide deterministic grouped counts without importing Pi hardware."""
@@ -49,11 +49,11 @@ class FakeAdc:
 class FakeReader:
     """Provide deterministic snapshots for watch-mode reporting tests."""
 
-    def __init__(self, snapshots: list[sensor_check.SensorSnapshot]) -> None:
+    def __init__(self, snapshots: list[SensorSnapshot]) -> None:
         self._snapshots = snapshots
         self.get_sensor_snapshot_calls = 0
 
-    def get_sensor_snapshot(self) -> sensor_check.SensorSnapshot:
+    def get_sensor_snapshot(self) -> SensorSnapshot:
         if self.get_sensor_snapshot_calls >= len(self._snapshots):
             raise KeyboardInterrupt
 
@@ -65,8 +65,8 @@ class FakeReader:
 class SensorCheckTest(unittest.TestCase):
     """Verify one-shot diagnostic assembly with a pure fake ADC."""
 
-    def make_snapshot(self, *, flow_raw_counts: int) -> sensor_check.SensorSnapshot:
-        return sensor_check.SensorSnapshot(
+    def make_snapshot(self, *, flow_raw_counts: int) -> SensorSnapshot:
+        return SensorSnapshot(
             hot_raw_counts=1000,
             cold_raw_counts=900,
             flow_raw_counts=flow_raw_counts,
@@ -87,15 +87,15 @@ class SensorCheckTest(unittest.TestCase):
         with (
             patch.object(
                 sensor_check,
-                "build_max1238",
+                "build_station_adc",
                 return_value=fake_adc,
-            ) as build_max1238,
+            ) as build_station_adc,
             contextlib.redirect_stdout(captured_output),
         ):
             exit_code = sensor_check.main([])
 
         self.assertEqual(exit_code, 0)
-        build_max1238.assert_called_once_with()
+        build_station_adc.assert_called_once_with()
         self.assertEqual(fake_adc.read_range_calls, 1)
         self.assertEqual(fake_adc.requested_range, (CH_HOT, CH_AMBIENT))
         self.assertTrue(fake_adc.closed)

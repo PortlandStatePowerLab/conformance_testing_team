@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
-from software.adc import build_max1238
+from software.station.station_adc_builder import build_station_adc
 from software.cold_water.client import (
     DEFAULT_REMOTE_HOST,
     DEFAULT_REMOTE_USER,
@@ -116,7 +116,7 @@ def build_station_sensor_session(
     )
     adc = None
     try:
-        adc = build_max1238()
+        adc = build_station_adc()
         local_reader = SensorReader(adc, configuration_path=configuration_path)
         reader = CompositeSensorReader(local_reader, client)
         return StationSensorSession(

@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from software.adc import build_max1238
+from software.station.station_adc_builder import build_station_adc
 from software.cold_water.client import DEFAULT_SOCKET_PATH
 from software.cold_water.protocol import (
     encode_message,
@@ -191,7 +191,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     inherited = systemd_listen_socket()
     listener = inherited or create_listen_socket(args.socket_path)
-    adc = build_max1238()
+    adc = build_station_adc()
     service = SnapshotService(
         listener,
         SensorReader(adc, configuration_path=args.sensor_configuration),
