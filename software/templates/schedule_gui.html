@@ -86,8 +86,8 @@
   </div>
 
   <div class="toolbar">
-    <label>Schedule name<input id="name" maxlength="75" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
-    <label>Saved schedule<select id="saved"><option value="">New schedule</option></select></label>
+    <label>Schedule name<input id="name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
+    <label>Shared saved schedule<select id="saved"><option value="">New schedule</option></select></label>
     <button id="load" type="button">Load</button>
     <button id="validate" type="button">Validate schedule</button>
     <button id="save" type="button">Save validated CSV</button>
@@ -191,6 +191,7 @@ const refreshRunButton = document.querySelector("#refresh-run");
 let validatedSignature = null;
 let savedSignature = null;
 let savedFilename = "";
+let knownScheduleFilenames = new Set();
 let preflightRunning = false;
 let preflightPassed = false;
 let countdownTimer = null;
@@ -410,6 +411,7 @@ function resetPreflightDisplay() {
 
 async function refreshSchedules(selected = "") {
   const result = await fetch("/api/schedules").then(response => response.json());
+  knownScheduleFilenames = new Set(result.schedules.map(schedule => schedule.filename.toLowerCase()));
   const saved = document.querySelector("#saved");
   saved.replaceChildren(new Option("New schedule", ""), ...result.schedules.map(schedule => new Option(schedule.name, schedule.filename)));
   saved.value = selected;
@@ -454,6 +456,8 @@ document.querySelector("#save").onclick = async () => {
     show({error:"Validate the current schedule before saving."}, false);
     return;
   }
+  const destination = `${name.value}.csv`.toLowerCase();
+  if (knownScheduleFilenames.has(destination) && !window.confirm(`Replace the shared schedule ${name.value}.csv for every water-heater station?`)) return;
   try {
     const result = await request("/api/save", {name:name.value, rows:scheduleRows()});
     savedFilename = result.saved;

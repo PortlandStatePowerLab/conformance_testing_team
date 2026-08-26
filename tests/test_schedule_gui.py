@@ -26,8 +26,8 @@ from software.schedule_gui import (
     schedule_uses_water,
     ScheduleGuiHandler,
     serve_until_idle,
-    station_schedule_choices,
-    station_schedule_filename,
+    shared_schedule_choices,
+    shared_schedule_filename,
     station_suffix_from_hostname,
     validate_rows,
 )
@@ -188,41 +188,37 @@ class ScheduleGuiTests(unittest.TestCase):
 
         self.assertEqual(normalize_schedule_name("test-one.csv"), "test-one.csv")
 
-    def test_station_schedule_names_are_automatic_and_reversible(self):
+    def test_schedule_names_are_shared_and_reversible(self):
         self.assertEqual(station_suffix_from_hostname("WH-station1"), "WH_1")
         self.assertEqual(
-            station_schedule_filename("alu_efficiency_test", "WH_1"),
-            "alu_efficiency_test_WH_1.csv",
+            shared_schedule_filename("alu_efficiency_test"),
+            "alu_efficiency_test.csv",
         )
         self.assertEqual(
-            station_schedule_filename("alu_efficiency_test_WH_1.csv", "WH_1"),
-            "alu_efficiency_test_WH_1.csv",
+            shared_schedule_filename("alu_efficiency_test.csv"),
+            "alu_efficiency_test.csv",
         )
         self.assertEqual(
-            friendly_schedule_name("alu_efficiency_test_WH_1.csv", "WH_1"),
+            friendly_schedule_name("alu_efficiency_test.csv"),
             "alu_efficiency_test",
         )
-        with self.assertRaisesRegex(ValueError, "belongs to WH-2"):
-            station_schedule_filename("alu_efficiency_test_WH_2", "WH_1")
 
-    def test_schedule_list_contains_only_current_station(self):
+    def test_schedule_list_contains_all_shared_schedules(self):
         with tempfile.TemporaryDirectory() as directory:
             schedule_directory = Path(directory)
             for filename in (
-                "alpha_WH_1.csv",
-                "beta_WH_1.csv",
-                "alpha_WH_2.csv",
-                "legacy.csv",
+                "alpha.csv",
+                "beta.csv",
             ):
                 (schedule_directory / filename).touch()
 
-            choices = station_schedule_choices(schedule_directory, "WH_1")
+            choices = shared_schedule_choices(schedule_directory)
 
         self.assertEqual(
             choices,
             [
-                {"filename": "alpha_WH_1.csv", "name": "alpha"},
-                {"filename": "beta_WH_1.csv", "name": "beta"},
+                {"filename": "alpha.csv", "name": "alpha"},
+                {"filename": "beta.csv", "name": "beta"},
             ],
         )
 
@@ -247,7 +243,7 @@ class ScheduleGuiTests(unittest.TestCase):
             root = Path(directory)
             schedules = root / "schedules"
             runs = root / "runs"
-            schedule, _ = save_schedule(schedules, "safe_WH_1", master_rows())
+            schedule, _ = save_schedule(schedules, "safe", master_rows())
             fake_process = unittest.mock.Mock()
             with patch("software.schedule_gui.subprocess.Popen", return_value=fake_process) as popen:
                 launched = launch_run(runs, schedule, water=True)
@@ -282,7 +278,7 @@ class ScheduleGuiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             schedule_directory = Path(directory)
             schedule_path, _ = save_schedule(
-                schedule_directory, "stream_test_WH_1", master_rows()
+                schedule_directory, "stream_test", master_rows()
             )
             handler = type(
                 "TestScheduleGuiHandler",

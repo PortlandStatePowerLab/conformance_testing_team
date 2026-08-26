@@ -64,7 +64,6 @@ DEFAULT_SCHEDULE_DIRECTORY = SOFTWARE_DIRECTORY / "gui_schedules"
 EDITOR_PATH = SOFTWARE_DIRECTORY / "templates" / "schedule_gui.html"
 SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
-STATION_SUFFIX = re.compile(r"_WH_(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
 DEFAULT_IDLE_TIMEOUT_HOURS = 48.0
 DEFAULT_RUN_DIRECTORY = SOFTWARE_DIRECTORY.parent / "runtime_logs" / "gui_runs"
@@ -181,7 +180,7 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
     directory.mkdir(parents=True, exist_ok=False)
     snapshot = directory / "schedule.csv"
     shutil.copy2(schedule, snapshot)
-    result_name = STATION_SUFFIX.sub("", schedule.stem)
+    result_name = schedule.stem
     events = load_schedule(snapshot)
     duration = next(event.offset_seconds for event in events if event.event_type == "test")
     status = {
@@ -224,43 +223,26 @@ def station_suffix_from_hostname(hostname: str) -> str:
     return f"WH_{int(match.group(1))}"
 
 
-def station_schedule_filename(name: str, station_suffix: str) -> str:
-    """Build the stored filename for a friendly schedule name and station."""
-    normalized = normalize_schedule_name(name)
-    stem = Path(normalized).stem
-    existing_suffix = STATION_SUFFIX.search(stem)
-    if existing_suffix is not None:
-        existing = f"WH_{int(existing_suffix.group(1))}"
-        if existing != station_suffix:
-            raise ValueError(
-                f"schedule name belongs to {existing.replace('_', '-')}, "
-                f"not {station_suffix.replace('_', '-')}"
-            )
-        stem = stem[: existing_suffix.start()]
-    if len(stem) + len(station_suffix) + 1 > 80:
-        raise ValueError("schedule name is too long after adding the station suffix")
-    return f"{stem}_{station_suffix}.csv"
+def shared_schedule_filename(name: str) -> str:
+    """Build a station-independent stored filename from a friendly name."""
+    return normalize_schedule_name(name)
 
 
-def friendly_schedule_name(filename: str, station_suffix: str) -> str:
-    """Return the browser-visible name of a station-owned schedule."""
-    normalized = normalize_schedule_name(filename)
-    expected = f"_{station_suffix}.csv"
-    if not normalized.lower().endswith(expected.lower()):
-        raise ValueError("schedule does not belong to this station")
-    return normalized[: -len(expected)]
+def friendly_schedule_name(filename: str) -> str:
+    """Return the browser-visible name of a shared schedule."""
+    return Path(normalize_schedule_name(filename)).stem
 
 
-def station_schedule_choices(directory: Path, station_suffix: str) -> list[dict[str, str]]:
-    """List only schedules owned by the current station."""
+def shared_schedule_choices(directory: Path) -> list[dict[str, str]]:
+    """List schedules shared by every water-heater station."""
     if not directory.is_dir():
         return []
     choices = []
-    for path in directory.glob(f"*_{station_suffix}.csv"):
+    for path in directory.glob("*.csv"):
         choices.append(
             {
                 "filename": path.name,
-                "name": friendly_schedule_name(path.name, station_suffix),
+                "name": friendly_schedule_name(path.name),
             }
         )
     return sorted(choices, key=lambda item: item["name"].lower())
@@ -508,7 +490,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         return value
 
     def _stream_preflight(self, filename: str) -> None:
-        friendly_schedule_name(filename, self.station_suffix)
+        friendly_schedule_name(filename)
         path = self.schedule_directory / normalize_schedule_name(filename)
         if not path.is_file():
             self._json(HTTPStatus.NOT_FOUND, {"error": "schedule not found"})
@@ -587,9 +569,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.OK,
                 {
-                    "schedules": station_schedule_choices(
-                        self.schedule_directory, self.station_suffix
-                    )
+                    "schedules": shared_schedule_choices(self.schedule_directory)
                 },
             )
             return
@@ -603,16 +583,14 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         if self.path.startswith(prefix):
             try:
                 requested = unquote(self.path[len(prefix) :])
-                friendly_schedule_name(requested, self.station_suffix)
+                friendly_schedule_name(requested)
                 filename = normalize_schedule_name(requested)
                 path = self.schedule_directory / filename
                 self._json(
                     HTTPStatus.OK,
                     {
                         "name": filename,
-                        "display_name": friendly_schedule_name(
-                            filename, self.station_suffix
-                        ),
+                        "display_name": friendly_schedule_name(filename),
                         "rows": load_schedule_rows(path),
                     },
                 )
@@ -634,9 +612,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             if self.path == "/api/save":
                 destination, summary = save_schedule(
                     self.schedule_directory,
-                    station_schedule_filename(
-                        str(request.get("name", "")), self.station_suffix
-                    ),
+                    shared_schedule_filename(str(request.get("name", ""))),
                     request.get("rows"),
                 )
                 self._json(
@@ -650,7 +626,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/runs":
                 filename = str(request.get("filename", ""))
-                friendly_schedule_name(filename, self.station_suffix)
+                friendly_schedule_name(filename)
                 path = self.schedule_directory / normalize_schedule_name(filename)
                 receipt = self.preflight_receipts.get(filename)
                 if receipt is None or time.monotonic() - receipt > PREFLIGHT_MAX_AGE_SECONDS:
