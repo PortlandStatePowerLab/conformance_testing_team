@@ -32,7 +32,7 @@ DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.5
 DEFAULT_MAX_RUN_MINUTES = 10.0
 DEFAULT_LOW_FLOW_GPM = 0.05
 DEFAULT_LOW_FLOW_TIMEOUT_SECONDS = 20.0
-TEMP_ARM_MARGIN_F = 10.0
+TEMP_ARM_FRACTION_OF_DROP = 2.0 / 3.0
 TEMP_CONFIRMATION_SAMPLES = 20
 MAX_INVALID_TEMP_SAMPLES = 20
 TEMPERATURE_COMPARISON_EPSILON_F = 1e-6
@@ -169,6 +169,11 @@ def default_output_path(event_id: str, directory: Path) -> Path:
 
 def integrate_volume_gallons(flow_gpm: float, elapsed_seconds: float) -> float:
     return max(flow_gpm, 0.0) * elapsed_seconds / 60.0
+
+
+def temperature_arm_threshold_f(temp_set_f: float, temp_drop_f: float) -> float:
+    """Return the unrounded temperature that arms Temp Drop shutdown logic."""
+    return temp_set_f - temp_drop_f * TEMP_ARM_FRACTION_OF_DROP
 
 
 def _row(
@@ -345,11 +350,23 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                             exit_code = EXIT_SENSOR_ERROR
                     else:
                         invalid_temp_count = 0
-                        arm_temp_f = args.temp_set_f - TEMP_ARM_MARGIN_F
+                        arm_temp_f = temperature_arm_threshold_f(
+                            args.temp_set_f, args.temp_drop_f
+                        )
                         stop_temp_f = args.temp_set_f - args.temp_drop_f
                         if not temperature_armed and hot_temp_f >= arm_temp_f:
                             temperature_armed = True
-                            print("WATER_DRAW_TEMP_ARMED " + json.dumps({"event_id": args.event_id, "hot_temp_f": hot_temp_f, "arm_temp_f": arm_temp_f}), flush=True)
+                            print(
+                                "WATER_DRAW_TEMP_ARMED "
+                                + json.dumps(
+                                    {
+                                        "event_id": args.event_id,
+                                        "hot_temp_f": hot_temp_f,
+                                        "arm_temp_f": round(arm_temp_f, 1),
+                                    }
+                                ),
+                                flush=True,
+                            )
                         if temperature_armed:
                             stop_temp_count = (
                                 stop_temp_count + 1

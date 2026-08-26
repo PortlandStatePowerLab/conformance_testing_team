@@ -16,6 +16,7 @@ from software.water_draw_monitor import (
     build_parser,
     integrate_volume_gallons,
     run_draw,
+    temperature_arm_threshold_f,
 )
 
 
@@ -63,6 +64,11 @@ class WaterDrawTests(unittest.TestCase):
 
     def test_nominal_flow_integration(self):
         self.assertAlmostEqual(integrate_volume_gallons(3.0, 0.5), 0.025)
+
+    def test_arm_temperature_uses_two_thirds_of_selected_drop(self):
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 5.0), 121.6666666667)
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 10.0), 118.3333333333)
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 15.0), 115.0)
 
     def test_adc_conversion_uses_4096_code_divisor(self):
         self.assertAlmostEqual(
