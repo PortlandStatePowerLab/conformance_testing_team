@@ -14,6 +14,7 @@ from software.conformance_test_runner import (
     build_parser,
     clock_text,
     generate_final_outputs,
+    publish_run_results,
     progress_text,
     prepare_master_schedule,
     safe_identifier,
@@ -93,6 +94,66 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             build_parser()
             .parse_args(["--disable-outside-communication-heartbeat"])
             .disable_outside_communication_heartbeat
+        )
+
+    def test_result_publishing_defaults_enabled_with_opt_out(self):
+        self.assertFalse(build_parser().parse_args([]).no_publish_results)
+        self.assertTrue(
+            build_parser().parse_args(["--no-publish-results"]).no_publish_results
+        )
+
+    @patch("software.station.station_identity.socket.gethostname", return_value="WH-station4")
+    @patch("software.conformance_test_runner._run_git")
+    def test_publish_commits_only_station_run_then_rebases_and_pushes(
+        self, run_git, _hostname
+    ):
+        run_git.return_value = SimpleNamespace(
+            returncode=0, stdout="/repository", stderr=""
+        )
+        repository = Path("/repository")
+        run_directory = repository / "WH-4/test_123"
+
+        published = publish_run_results(
+            run_directory,
+            "ALU-Shed-Recovery",
+            repository=repository,
+        )
+
+        self.assertTrue(published)
+        pathspec = "WH-4/test_123"
+        self.assertEqual(
+            [call.args[1] for call in run_git.call_args_list],
+            [
+                ["rev-parse", "--show-toplevel"],
+                ["add", "--", pathspec],
+                [
+                    "commit", "--only", "-m",
+                    "ALU-Shed-Recovery run WH-4", "--", pathspec,
+                ],
+                ["pull", "--rebase", "--autostash", "origin", "main"],
+                ["push", "origin", "main"],
+            ],
+        )
+
+    @patch("software.station.station_identity.socket.gethostname", return_value="WH-station2")
+    @patch("software.conformance_test_runner._run_git")
+    def test_publish_retries_push_after_refreshing_remote(self, run_git, _hostname):
+        success = SimpleNamespace(returncode=0, stdout="/repository", stderr="")
+        rejected = SimpleNamespace(returncode=1, stdout="", stderr="rejected")
+        run_git.side_effect = [
+            success, success, success, success, rejected, success, success
+        ]
+
+        published = publish_run_results(
+            Path("/repository/WH-2/test_123"),
+            "test",
+            repository=Path("/repository"),
+        )
+
+        self.assertTrue(published)
+        self.assertEqual(
+            [call.args[1][0] for call in run_git.call_args_list],
+            ["rev-parse", "add", "commit", "pull", "push", "pull", "push"],
         )
 
     def test_schedule_summary(self):

@@ -146,6 +146,16 @@ closes and contains Event Timeline, Device Information, Master Schedule, and
 Commodity Summary sheets. The detailed source CSV files remain unchanged.
 The timeline retains each approximately one-minute operational-state reading.
 
+The `saved_data/conformance_runs/` directory is its own Git repository. After
+final reports and plots are generated, a hardware run commits only its
+`WH-n/<run-directory>` inside that repository and publishes it to that
+repository's `origin/main`. The publisher verifies the nested repository root,
+pulls with rebase before each push, and retries concurrent station pushes up to
+five times. Git authentication is noninteractive; if a pull, rebase,
+authentication, or push fails, the test result remains saved and committed
+locally for a later synchronization. Pass `--no-publish-results` to keep a run
+local intentionally.
+
 Regenerate the workbook for an existing run with:
 
 ```bash

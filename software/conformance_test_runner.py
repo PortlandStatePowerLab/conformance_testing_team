@@ -59,6 +59,8 @@ DEFAULT_CTA_BINARY = (
 )
 DEFAULT_CTA_SCHEDULE = DEFAULT_CTA_DIRECTORY / "schedule.csv"
 DEFAULT_PRESTART_SECONDS = 15.0
+DEFAULT_GIT_PUSH_RETRIES = 5
+DEFAULT_GIT_TIMEOUT_SECONDS = 60.0
 GUI_STAGE_PATH_ENV = "CONFORMANCE_GUI_STAGE_PATH"
 
 
@@ -101,6 +103,107 @@ def _write_gui_stage(state: str, message: str) -> None:
     except OSError as exc:
         print(f"GUI_STAGE_WARNING {exc}", file=sys.stderr)
         temporary.unlink(missing_ok=True)
+
+
+def _run_git(
+    repository: Path,
+    arguments: list[str],
+    *,
+    timeout_seconds: float = DEFAULT_GIT_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[str]:
+    """Run Git without allowing an unattended test station to prompt."""
+    environment = os.environ.copy()
+    environment["GIT_TERMINAL_PROMPT"] = "0"
+    return subprocess.run(
+        ["git", *arguments],
+        cwd=repository,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+
+
+def publish_run_results(
+    run_directory: Path,
+    test_name: str,
+    *,
+    repository: Path = DEFAULT_RESULTS_ROOT,
+    remote: str = "origin",
+    branch: str = "main",
+    push_retries: int = DEFAULT_GIT_PUSH_RETRIES,
+) -> bool:
+    """Commit one run and publish it, retrying concurrent station pushes."""
+    from software.station.station_identity import station_number
+
+    repository = repository.resolve()
+    run_directory = run_directory.resolve()
+    try:
+        run_path = run_directory.relative_to(repository)
+        number = station_number()
+    except ValueError as exc:
+        print(f"GIT_PUBLISH_ERROR {exc}", file=sys.stderr)
+        return False
+
+    pathspec = run_path.as_posix()
+    try:
+        top_level = _run_git(repository, ["rev-parse", "--show-toplevel"])
+        if top_level.returncode != 0:
+            raise RuntimeError(top_level.stderr.strip() or top_level.stdout.strip())
+        resolved_top_level = Path(top_level.stdout.strip()).resolve()
+        if resolved_top_level != repository:
+            raise RuntimeError(
+                f"{repository} is not the root of the conformance-runs Git repository"
+            )
+
+        added = _run_git(repository, ["add", "--", pathspec])
+        if added.returncode != 0:
+            raise RuntimeError(added.stderr.strip() or added.stdout.strip())
+
+        committed = _run_git(
+            repository,
+            [
+                "commit",
+                "--only",
+                "-m",
+                f"{test_name} run WH-{number}",
+                "--",
+                pathspec,
+            ],
+        )
+        if committed.returncode != 0:
+            output = f"{committed.stdout}\n{committed.stderr}".lower()
+            if "nothing to commit" in output:
+                print(f"GIT_PUBLISH_SKIPPED no changes in {pathspec}")
+                return True
+            raise RuntimeError(committed.stderr.strip() or committed.stdout.strip())
+
+        for attempt in range(1, push_retries + 1):
+            pulled = _run_git(
+                repository,
+                ["pull", "--rebase", "--autostash", remote, branch],
+            )
+            if pulled.returncode != 0:
+                raise RuntimeError(pulled.stderr.strip() or pulled.stdout.strip())
+
+            pushed = _run_git(repository, ["push", remote, branch])
+            if pushed.returncode == 0:
+                print(f"GIT_PUBLISH_COMPLETE {pathspec}")
+                return True
+            if attempt < push_retries:
+                print(
+                    f"GIT_PUSH_RETRY attempt {attempt + 1} of {push_retries}",
+                    file=sys.stderr,
+                )
+
+        raise RuntimeError(pushed.stderr.strip() or pushed.stdout.strip())
+    except (OSError, subprocess.TimeoutExpired, RuntimeError) as exc:
+        print(
+            f"GIT_PUBLISH_ERROR results remain saved locally: {exc}",
+            file=sys.stderr,
+        )
+        return False
 
 
 def _generate_energy_take_plot(run_directory: Path) -> Path | None:
@@ -522,6 +625,11 @@ def build_parser() -> argparse.ArgumentParser:
             "refreshes; per-command prerequisites remain enabled"
         ),
     )
+    parser.add_argument(
+        "--no-publish-results",
+        action="store_true",
+        help="save results locally without committing and pushing them to GitHub",
+    )
     return parser
 
 
@@ -900,6 +1008,15 @@ def run_hardware_test(
             "Hardware shutdown complete; generating the report and PNG files.",
         )
         generate_final_outputs(run_directory)
+        if not args.no_publish_results:
+            _write_gui_stage(
+                "publishing_results",
+                "Reports generated; publishing this run to GitHub.",
+            )
+            publish_run_results(
+                run_directory,
+                safe_identifier(args.master_schedule.stem),
+            )
     return run_directory
 
 
