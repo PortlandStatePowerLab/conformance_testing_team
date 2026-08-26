@@ -196,6 +196,7 @@ let savedFilename = "";
 let knownScheduleFilenames = new Set();
 let preflightRunning = false;
 let preflightPassed = false;
+let whInformationRunning = false;
 let countdownTimer = null;
 let activeRun = null;
 const whInformationButton = document.querySelector("#get-wh-information");
@@ -318,10 +319,14 @@ function draftSignature() {
 
 function updateWorkflowState() {
   const signature = draftSignature();
+  const hardwareBusy = activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state);
   saveButton.disabled = validatedSignature !== signature || (Boolean(savedFilename) && savedSignature === signature);
-  preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
+  preflightButton.disabled = hardwareBusy || whInformationRunning || preflightRunning || !savedFilename || savedSignature !== signature;
+  preflightButton.title = hardwareBusy ? "Unavailable while a hardware test is active" : "";
+  whInformationButton.disabled = Boolean(hardwareBusy || preflightRunning || whInformationRunning);
+  whInformationButton.title = hardwareBusy ? "Unavailable while a hardware test is active" : "";
   const validSavedDuration = savedSummary && Number.isFinite(Number(savedSummary.duration_seconds)) && Number(savedSummary.duration_seconds) >= 0;
-  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || !validSavedDuration || savedSignature !== signature || (activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state));
+  startButton.disabled = hardwareBusy || whInformationRunning || preflightRunning || !preflightPassed || !savedFilename || !validSavedDuration || savedSignature !== signature;
 }
 
 function elapsedSeconds(value) {
@@ -674,7 +679,8 @@ document.querySelector("#begin-countdown").onclick = () => {
 };
 
 whInformationButton.onclick = async () => {
-  whInformationButton.disabled = true;
+  whInformationRunning = true;
+  updateWorkflowState();
   whInformationButton.textContent = "Getting WH Info…";
   whInformationResult.textContent = "Requesting information from the water heater…";
   whVersion.textContent = "CTA-2045 version: requesting…";
@@ -694,8 +700,9 @@ whInformationButton.onclick = async () => {
     whVersion.textContent = "CTA-2045 version: unavailable";
     whInformationResult.textContent = error.error || String(error);
   } finally {
-    whInformationButton.disabled = false;
+    whInformationRunning = false;
     whInformationButton.textContent = "Get WH Info";
+    updateWorkflowState();
   }
 };
 

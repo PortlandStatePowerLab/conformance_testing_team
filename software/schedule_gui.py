@@ -72,6 +72,10 @@ DEFAULT_RUN_DIRECTORY = SOFTWARE_DIRECTORY.parent / "runtime_logs" / "gui_runs"
 DEFAULT_EQUIPMENT_DIRECTORY = SOFTWARE_DIRECTORY.parent / "saved_data" / "equipment"
 PACIFIC = ZoneInfo("America/Los_Angeles")
 PREFLIGHT_MAX_AGE_SECONDS = 300
+ACTIVE_RUN_STATES = {
+    "launching", "initializing", "running", "finalizing",
+    "generating_outputs", "stopping",
+}
 EQUIPMENT_FIELDS = {
     "manufacturer": str, "model_number": str, "year": int, "voltage": str,
     "capacity_gallons": int, "station_id": str, "date_added": str,
@@ -141,6 +145,11 @@ def current_run(run_directory: Path) -> dict[str, Any] | None:
         return {"state": "unknown", "error": "run status could not be read"}
 
 
+def run_is_active(run_directory: Path) -> bool:
+    run = current_run(run_directory)
+    return bool(run and run.get("state") in ACTIVE_RUN_STATES)
+
+
 def dismiss_current_run(run_directory: Path) -> None:
     """Hide a terminal run from the operator dashboard without deleting it."""
     pointer = run_directory / "current.json"
@@ -171,10 +180,7 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
 
 def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str, Any]:
     active = current_run(run_directory)
-    if active and active.get("state") in {
-        "launching", "initializing", "running", "finalizing",
-        "generating_outputs", "stopping",
-    }:
+    if active and active.get("state") in ACTIVE_RUN_STATES:
         raise RuntimeError("a conformance test is already active on this station")
     now = datetime.now(PACIFIC)
     run_id = f"gui_{now.strftime('%Y_%m_%d_%H%M%S_%f_%Z')}"
@@ -505,6 +511,18 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         return value
 
     def _stream_preflight(self, filename: str) -> None:
+        if run_is_active(self.run_directory):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": "hardware preflight is unavailable while a test is active"},
+            )
+            return
+        if self.wh_information_lock.locked():
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": "hardware preflight cannot run during Get WH Info"},
+            )
+            return
         friendly_schedule_name(filename)
         path = self.schedule_directory / normalize_schedule_name(filename)
         if not path.is_file():
@@ -649,6 +667,8 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                 receipt = self.preflight_receipts.get(filename)
                 if receipt is None or time.monotonic() - receipt > PREFLIGHT_MAX_AGE_SECONDS:
                     raise RuntimeError("preflight must pass within five minutes before starting")
+                if self.preflight_lock.locked() or self.wh_information_lock.locked():
+                    raise RuntimeError("another hardware operation is still running")
                 with self.run_lock:
                     result = launch_run(
                         self.run_directory, path, water=schedule_uses_water(path)
@@ -662,6 +682,18 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, {"dismissed": True})
                 return
             if self.path == "/api/wh-information":
+                if run_is_active(self.run_directory):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {"error": "Get WH Info is unavailable while a test is active"},
+                    )
+                    return
+                if self.preflight_lock.locked():
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {"error": "Get WH Info cannot run during hardware preflight"},
+                    )
+                    return
                 if not self.wh_information_lock.acquire(blocking=False):
                     self._json(
                         HTTPStatus.CONFLICT,

@@ -22,6 +22,7 @@ from software.schedule_gui import (
     launch_run,
     normalize_schedule_name,
     positive_hours,
+    run_is_active,
     save_schedule,
     schedule_uses_water,
     ScheduleGuiHandler,
@@ -44,6 +45,19 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_hardware_is_busy_only_for_active_run_states(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            run = runs / "run_one"
+            run.mkdir()
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            status = run / "status.json"
+            for state in ("launching", "running", "finalizing", "generating_outputs"):
+                status.write_text(json.dumps({"state": state}), encoding="utf-8")
+                self.assertTrue(run_is_active(runs), state)
+            status.write_text('{"state":"completed"}', encoding="utf-8")
+            self.assertFalse(run_is_active(runs))
+
     def test_dependent_end_schedule_reports_variable_duration(self):
         path = REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
         rows = load_schedule_rows(path)
