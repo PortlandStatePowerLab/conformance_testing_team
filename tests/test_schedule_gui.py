@@ -111,7 +111,7 @@ class ScheduleGuiTests(unittest.TestCase):
         self.assertEqual(actions["load_up"]["expected_operational_states"], [3, 6])
         self.assertEqual(
             actions["water_draw"]["fields"],
-            ["target_volume_gal", "expected_flow_gpm"],
+            ["draw_type", "target_volume_gal", "expected_flow_gpm", "temp_drop_f", "max_draw_minutes"],
         )
         self.assertIn("100_wh", metadata["advanced_units"])
         self.assertTrue(metadata["hostname"])

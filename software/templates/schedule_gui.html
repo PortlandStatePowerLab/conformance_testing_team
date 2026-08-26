@@ -117,7 +117,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Draw Type</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Temp Set (°F)</th><th>Temp Drop (°F)</th><th>Time (min)</th><th>Stop Temp (°F)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="water-rows"></tbody>
         </table>
       </div>
@@ -127,7 +127,7 @@
     <section class="card">
       <div class="card-heading"><div><h2>Test End</h2><span class="muted">Exactly one enabled end event is required.</span></div></div>
       <div class="end-fields">
-        <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]"></label>
+        <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS or TBD"></label>
         <label>Phase<select id="end-phase"><option>pre_event</option><option>event</option><option selected>recovery</option></select></label>
         <label>Notes<input id="end-notes"></label>
       </div>
@@ -153,7 +153,7 @@
   </div>
 </dialog>
 <script>
-const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes","advanced_efficiency"];
+const canonicalColumns = ["enabled","event_id","time_after_start","phase","draw_type","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","temp_drop_f","max_draw_minutes","notes","advanced_efficiency"];
 const status = document.querySelector("#status");
 const messages = document.querySelector("#messages");
 const ctaBody = document.querySelector("#cta-rows");
@@ -161,6 +161,7 @@ const waterBody = document.querySelector("#water-rows");
 let actionDefinitions = [];
 let units = [];
 let efficiencies = [];
+let temperatureSetpointF = null;
 const phases = ["pre_event", "event", "recovery"];
 const saveButton = document.querySelector("#save");
 const preflightButton = document.querySelector("#preflight");
@@ -258,13 +259,19 @@ function addWater(source = {}) {
   cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
   const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
   cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "event"), "phase");
+  const drawType = cell(row, selectControl(["Volume", "Temp Drop"], source.draw_type && source.draw_type.toLowerCase() === "temp drop" ? "Temp Drop" : "Volume"), "draw_type");
   cell(row, inputControl(source.target_volume_gal || "", {type:"number", min:"0.000001", step:"any"}), "target_volume_gal");
   cell(row, inputControl(source.expected_flow_gpm || "", {type:"number", min:"0.000001", step:"any"}), "expected_flow_gpm");
   const estimate = document.createElement("span"); cell(row, estimate, "estimate");
+  const tempSet = inputControl(temperatureSetpointF ?? "", {type:"number", readOnly:true}); cell(row, tempSet, "temp_set_f");
+  cell(row, inputControl(source.temp_drop_f || "", {type:"number", min:"0.000001", step:"any"}), "temp_drop_f");
+  cell(row, inputControl(source.max_draw_minutes || "", {type:"number", min:"0.000001", step:"any"}), "max_draw_minutes");
+  const stopTemp = inputControl("", {type:"number", readOnly:true}); cell(row, stopTemp, "stop_temp_f");
   const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
   removeCell(row, waterBody);
   waterBody.append(row);
   time.firstElementChild.oninput = updateView;
+  drawType.firstElementChild.onchange = updateView;
   row.oninput = updateView;
   updateView();
 }
@@ -284,7 +291,7 @@ function scheduleRows() {
     rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"cta", action:rowValue(row,"action"), event_duration_minutes:rowValue(row,"event_duration_minutes"), advanced_value:rowValue(row,"advanced_value"), advanced_units:rowValue(row,"advanced_units"), advanced_efficiency:rowValue(row,"advanced_efficiency"), notes:rowValue(row,"notes")});
   }
   for (const row of waterBody.rows) {
-    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), notes:rowValue(row,"notes")});
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), draw_type:rowValue(row,"draw_type"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), temp_drop_f:rowValue(row,"temp_drop_f"), max_draw_minutes:rowValue(row,"max_draw_minutes"), notes:rowValue(row,"notes")});
   }
   rows.push({...blankCanonicalRow(), enabled:"TRUE", time_after_start:document.querySelector("#end-time").value, phase:document.querySelector("#end-phase").value, event_type:"test", action:"end", notes:document.querySelector("#end-notes").value});
   return rows;
@@ -325,9 +332,23 @@ function updateView() {
     }
   }
   for (const row of waterBody.rows) {
+    const isTempDrop = rowValue(row, "draw_type") === "Temp Drop";
+    for (const field of ["target_volume_gal", "expected_flow_gpm", "estimate"]) {
+      const td = row.querySelector(`[data-field="${field}"]`);
+      td.classList.toggle("irrelevant", isTempDrop);
+      if (td.firstElementChild && field !== "estimate") td.firstElementChild.disabled = isTempDrop;
+    }
+    for (const field of ["temp_set_f", "temp_drop_f", "max_draw_minutes", "stop_temp_f"]) {
+      const td = row.querySelector(`[data-field="${field}"]`);
+      td.classList.toggle("irrelevant", !isTempDrop);
+      if (td.firstElementChild && ["temp_drop_f", "max_draw_minutes"].includes(field)) td.firstElementChild.disabled = !isTempDrop;
+    }
     const volume = Number(rowValue(row, "target_volume_gal"));
     const flow = Number(rowValue(row, "expected_flow_gpm"));
     row.querySelector('[data-field="estimate"] span').textContent = formatDuration((volume / flow) * 60);
+    const drop = Number(rowValue(row, "temp_drop_f"));
+    row.querySelector('[data-field="temp_set_f"] input').value = temperatureSetpointF ?? "";
+    row.querySelector('[data-field="stop_temp_f"] input').value = Number.isFinite(temperatureSetpointF) && drop > 0 ? (temperatureSetpointF - drop).toFixed(1) : "";
   }
   document.querySelector("#cta-empty").hidden = ctaBody.rows.length !== 0;
   document.querySelector("#water-empty").hidden = waterBody.rows.length !== 0;
@@ -336,7 +357,7 @@ function updateView() {
     counts[row.action] = (counts[row.action] || 0) + 1;
     const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
     let details = row.phase || "";
-    if (row.action === "water_draw") details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    if (row.action === "water_draw") details = row.draw_type === "Temp Drop" ? `${row.temp_drop_f || "?"}°F drop; max ${row.max_draw_minutes || "?"} min` : `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
     else if (row.event_type === "cta") {
       const duration = row.event_duration_minutes || "?";
       details = `duration ${duration}${duration.toLowerCase() === "max" ? "" : " min"}${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
@@ -644,6 +665,7 @@ async function initialize() {
   const equipment = document.querySelector("#station-equipment");
   if (metadata.equipment) {
     const item = metadata.equipment;
+    temperatureSetpointF = Number.isFinite(Number(item.temperature_setpoint_f)) ? Number(item.temperature_setpoint_f) : null;
     equipment.textContent = `${item.manufacturer} ${item.model_number}\n${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
   } else {
     equipment.textContent = metadata.equipment_error || "Water-heater information not configured.";

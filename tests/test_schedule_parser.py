@@ -5,6 +5,7 @@ from pathlib import Path
 
 from software.schedule_parser import (
     EXTENDED_SCHEDULE_COLUMNS,
+    DRAW_EXTENDED_SCHEDULE_COLUMNS,
     SCHEDULE_COLUMNS,
     ScheduleValidationError,
     encode_event_duration,
@@ -50,6 +51,36 @@ class DurationEncodingTests(unittest.TestCase):
 
 
 class MasterScheduleTests(unittest.TestCase):
+    def test_temp_drop_draw_allows_dependent_tbd_end(self):
+        rows = [
+            ["true", "water_draw_1", "01:35:00", "event", "Temp Drop", "water_draw", "water_draw", "", "", "", "", "", "", "15", "60", "", ""],
+            ["true", "test_end", "TBD", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            events = load_schedule(path)
+        self.assertEqual(events[0].draw_type, "temp drop")
+        self.assertTrue(events[-1].dependent_end)
+        self.assertEqual(events[-1].offset_seconds, 2 * 3600 + 35 * 60)
+
+    def test_tbd_end_is_rejected_for_volume_draw(self):
+        rows = [
+            ["true", "water_draw_1", "01:35:00", "event", "Volume", "water_draw", "water_draw", "", "", "", "", "2", "3", "", "", "", ""],
+            ["true", "test_end", "TBD", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            with self.assertRaisesRegex(ScheduleValidationError, "Temp Drop"):
+                load_schedule(path)
+
     def test_checked_in_schedule_is_valid(self):
         events = load_schedule(MASTER_SCHEDULE)
         self.assertEqual(events[-1].event_id, "test_end")

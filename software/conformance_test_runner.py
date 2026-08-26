@@ -543,6 +543,7 @@ def _launch_water_draw(
     *,
     enable_output: bool,
     sensor_configuration: Path | None,
+    equipment_configuration: Path | None = None,
 ) -> ManagedProcess:
     output_csv = run_directory / f"{event.event_id}.csv"
     command = [
@@ -551,13 +552,27 @@ def _launch_water_draw(
         "software.water_draw_monitor",
         "--event-id",
         event.event_id,
-        "--target-gal",
-        str(event.target_volume_gal),
+        "--draw-type",
+        "temp_drop" if getattr(event, "draw_type", "volume") == "temp drop" else "volume",
         "--output-csv",
         str(output_csv),
         "--sample-interval-seconds",
         "0.5",
     ]
+    if getattr(event, "draw_type", "volume") == "temp drop":
+        if equipment_configuration is None:
+            raise RuntimeError("Temp Drop draw requires archived station equipment")
+        equipment = json.loads(equipment_configuration.read_text(encoding="utf-8"))
+        setpoint = equipment.get("temperature_setpoint_f")
+        if isinstance(setpoint, bool) or not isinstance(setpoint, (int, float)) or not math.isfinite(float(setpoint)):
+            raise RuntimeError("Temp Drop draw requires finite equipment temperature_setpoint_f")
+        command.extend([
+            "--temp-set-f", str(setpoint),
+            "--temp-drop-f", str(event.temp_drop_f),
+            "--max-run-minutes", str(event.max_draw_minutes),
+        ])
+    else:
+        command.extend(["--target-gal", str(event.target_volume_gal)])
     if sensor_configuration is not None:
         command.extend(["--sensor-configuration", str(sensor_configuration)])
     if enable_output:
@@ -607,6 +622,13 @@ def run_hardware_test(
     archived_equipment = _archive_station_equipment(run_directory)
     if archived_equipment is None:
         print("EQUIPMENT_SNAPSHOT_WARNING station equipment not available", file=sys.stderr)
+    if any(event.draw_type == "temp drop" for event in events):
+        if archived_equipment is None:
+            raise RuntimeError("Temp Drop schedule requires station equipment configuration")
+        equipment = json.loads(archived_equipment.read_text(encoding="utf-8"))
+        setpoint = equipment.get("temperature_setpoint_f")
+        if isinstance(setpoint, bool) or not isinstance(setpoint, (int, float)) or not math.isfinite(float(setpoint)):
+            raise RuntimeError("Temp Drop schedule requires finite temperature_setpoint_f")
     if args.master_schedule.suffix.lower() == ".xlsx":
         shutil.copy2(args.master_schedule, run_directory / "master_schedule.xlsx")
     shutil.copy2(canonical_schedule, run_directory / "master_schedule.csv")
@@ -718,6 +740,10 @@ def run_hardware_test(
 
         draws = [event for event in events if event.event_type == "water_draw"]
         test_end = next(event for event in events if event.event_type == "test")
+        dependent_draw_id = (
+            max((event for event in draws if event.source_row < test_end.source_row), key=lambda event: event.source_row).event_id
+            if test_end.dependent_end else None
+        )
         progress = ProgressReporter(events)
         next_draw_index = 0
         test_started_logged = False
@@ -741,6 +767,7 @@ def run_hardware_test(
 
             if active_draw is not None and active_draw.process.poll() is not None:
                 return_code = active_draw.process.returncode
+                completed_draw_id = active_draw.event_id
                 logger.record(
                     "water_draw_completed",
                     "ok" if return_code == 0 else "failed",
@@ -751,8 +778,12 @@ def run_hardware_test(
                 active_draw = None
                 if return_code != 0:
                     raise RuntimeError(f"water draw failed with code {return_code}")
+                if completed_draw_id == dependent_draw_id:
+                    logger.record("dependent_test_end", "triggered", event_id=completed_draw_id)
+                    outcome = "completed"
+                    break
 
-            if elapsed >= test_end.offset_seconds:
+            if not test_end.dependent_end and elapsed >= test_end.offset_seconds:
                 if active_draw is not None:
                     stop_water_draw_at_test_end(
                         active_draw,
@@ -782,6 +813,7 @@ def run_hardware_test(
                     run_directory,
                     enable_output=args.enable_water_output,
                     sensor_configuration=archived_sensor_configuration,
+                    equipment_configuration=archived_equipment,
                 )
                 logger.record(
                     "water_draw_started",
@@ -789,7 +821,9 @@ def run_hardware_test(
                     event_id=event.event_id,
                     details={
                         "pid": active_draw.process.pid,
+                        "draw_type": event.draw_type,
                         "target_volume_gal": event.target_volume_gal,
+                        "temp_drop_f": event.temp_drop_f,
                     },
                 )
 

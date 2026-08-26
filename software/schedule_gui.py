@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import re
 import socket
@@ -29,7 +30,7 @@ try:
     from .schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
-        EXTENDED_SCHEDULE_COLUMNS,
+        DRAW_EXTENDED_SCHEDULE_COLUMNS,
         MAX_DURATION,
         ScheduleValidationError,
         load_schedule,
@@ -45,7 +46,7 @@ except ImportError:
     from schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
-        EXTENDED_SCHEDULE_COLUMNS,
+        DRAW_EXTENDED_SCHEDULE_COLUMNS,
         MAX_DURATION,
         ScheduleValidationError,
         load_schedule,
@@ -92,14 +93,15 @@ def load_station_equipment(
     if not isinstance(value, dict):
         raise ValueError("equipment information must be a JSON object")
     missing = sorted(set(EQUIPMENT_FIELDS).difference(value))
-    extra = sorted(set(value).difference(EQUIPMENT_FIELDS))
+    extra = sorted(set(value).difference(set(EQUIPMENT_FIELDS) | {"temperature_setpoint_f"}))
     if missing or extra:
         raise ValueError(
             f"equipment fields invalid; missing={missing}, unexpected={extra}"
         )
     for field, expected_type in EQUIPMENT_FIELDS.items():
         if not isinstance(value[field], expected_type) or isinstance(value[field], bool):
-            raise ValueError(f"equipment field {field} must be {expected_type.__name__}")
+            expected_name = "number" if isinstance(expected_type, tuple) else expected_type.__name__
+            raise ValueError(f"equipment field {field} must be {expected_name}")
     if value["station_id"] != hostname:
         raise ValueError(
             f"equipment station_id {value['station_id']!r} does not match "
@@ -107,6 +109,12 @@ def load_station_equipment(
         )
     if value["year"] < 1900 or value["capacity_gallons"] <= 0:
         raise ValueError("equipment year and capacity must be positive")
+    if "temperature_setpoint_f" in value and (
+        isinstance(value["temperature_setpoint_f"], bool)
+        or not isinstance(value["temperature_setpoint_f"], (int, float))
+        or not math.isfinite(float(value["temperature_setpoint_f"]))
+    ):
+        raise ValueError("equipment temperature_setpoint_f must be finite")
     return value
 
 
@@ -287,7 +295,10 @@ def editor_metadata(hostname: str | None = None) -> dict[str, Any]:
                 "action": "water_draw",
                 "event_type": "water_draw",
                 "expected_operational_states": [],
-                "fields": ["target_volume_gal", "expected_flow_gpm"],
+                "fields": [
+                    "draw_type", "target_volume_gal", "expected_flow_gpm",
+                    "temp_drop_f", "max_draw_minutes",
+                ],
             },
             {
                 "action": "end",
@@ -347,13 +358,13 @@ def _canonical_rows(value: Any) -> list[dict[str, str]]:
     for index, source in enumerate(value, start=1):
         if not isinstance(source, dict):
             raise ValueError(f"row {index} must be an object")
-        unexpected = sorted(set(source).difference(EXTENDED_SCHEDULE_COLUMNS))
+        unexpected = sorted(set(source).difference(DRAW_EXTENDED_SCHEDULE_COLUMNS))
         if unexpected:
             raise ValueError(f"row {index} contains unknown fields: {unexpected}")
         rows.append(
             {
                 column: "" if source.get(column) is None else str(source.get(column, ""))
-                for column in EXTENDED_SCHEDULE_COLUMNS
+                for column in DRAW_EXTENDED_SCHEDULE_COLUMNS
             }
         )
     return rows
@@ -386,7 +397,7 @@ def derive_rows(value: Any) -> list[dict[str, str]]:
 def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+            handle, fieldnames=DRAW_EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -402,7 +413,7 @@ def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
         ) as handle:
             temporary_path = Path(handle.name)
             writer = csv.DictWriter(
-                handle, fieldnames=EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+                handle, fieldnames=DRAW_EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
             )
             writer.writeheader()
             writer.writerows(rows)
