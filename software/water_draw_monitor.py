@@ -35,6 +35,7 @@ DEFAULT_LOW_FLOW_TIMEOUT_SECONDS = 20.0
 TEMP_ARM_MARGIN_F = 10.0
 TEMP_CONFIRMATION_SAMPLES = 20
 MAX_INVALID_TEMP_SAMPLES = 20
+TEMPERATURE_COMPARISON_EPSILON_F = 1e-6
 
 EXIT_SUCCESS = 0
 EXIT_MAX_RUNTIME = 2
@@ -350,7 +351,11 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                             temperature_armed = True
                             print("WATER_DRAW_TEMP_ARMED " + json.dumps({"event_id": args.event_id, "hot_temp_f": hot_temp_f, "arm_temp_f": arm_temp_f}), flush=True)
                         if temperature_armed:
-                            stop_temp_count = stop_temp_count + 1 if hot_temp_f <= stop_temp_f else 0
+                            stop_temp_count = (
+                                stop_temp_count + 1
+                                if hot_temp_f <= stop_temp_f + TEMPERATURE_COMPARISON_EPSILON_F
+                                else 0
+                            )
 
                 if snapshot.flow_gpm < args.low_flow_gpm:
                     if low_flow_start is None:

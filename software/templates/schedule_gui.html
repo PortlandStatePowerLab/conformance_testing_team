@@ -24,6 +24,18 @@
     th, td { border: 1px solid #d8dde7; padding: .35rem; vertical-align: top; }
     th { background: #e8edf5; white-space: nowrap; text-align: left; }
     td input, td select { width: 8.5rem; }
+    td[data-field="enabled"] input, td[data-field="enabled"] select { width: 5.5rem; }
+    td[data-field="time_after_start"] input { width: 7.25rem; }
+    td[data-field="phase"] select { width: 7.25rem; }
+    td[data-field="action"] select { width: 9.5rem; }
+    td[data-field="event_duration_minutes"] input,
+    td[data-field="advanced_value"] input,
+    td[data-field="advanced_units"] select,
+    td[data-field="target_volume_gal"] input,
+    td[data-field="temp_set_f"] input,
+    td[data-field="temp_drop_f"] input,
+    td[data-field="max_draw_minutes"] input,
+    td[data-field="stop_temp_f"] input { width: 7.25rem; }
     td .notes { width: 13rem; }
     td.irrelevant > * { display: none; }
     td.irrelevant::after { content: "—"; color: #8b949e; }
@@ -103,7 +115,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Efficiency (optional)</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Start Time</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Efficiency (optional)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="cta-rows"></tbody>
         </table>
       </div>
@@ -117,7 +129,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Draw Type</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Temp Set (°F)</th><th>Temp Drop (°F)</th><th>Time (min)</th><th>Stop Temp (°F)</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Start Time</th><th>Phase</th><th>Draw Type</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Temp Set (°F)</th><th>Temp Drop (°F)</th><th>Time (min)</th><th>Stop Temp (°F)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="water-rows"></tbody>
         </table>
       </div>

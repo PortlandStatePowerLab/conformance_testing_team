@@ -36,7 +36,12 @@ class WaterDrawTests(unittest.TestCase):
                 cold_temp_f=68.0, ambient_temp_c=22.0, ambient_temp_f=71.6,
                 flow_gpm=1.0,
             )
-            temperatures = [75.0, 115.0] + [109.0] * 19 + [111.0] + [109.0] * 20
+            temperatures = (
+                [75.0, 115.0]
+                + [109.0] * 19
+                + [111.0]
+                + [110.00000000000006] * 20
+            )
             snapshots = [SensorSnapshot(hot_temp_f=value, **base) for value in temperatures]
             sensor_reader = Mock()
             sensor_reader.get_sensor_snapshot.side_effect = [snapshots[0], *snapshots]
