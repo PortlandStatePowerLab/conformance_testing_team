@@ -324,6 +324,8 @@ def schedule_summary(events: list[ScheduleEvent]) -> dict[str, Any]:
         "cta_events": sum(event.event_type == "cta" for event in events),
         "water_draws": sum(event.event_type == "water_draw" for event in events),
         "duration_seconds": test_end.offset_seconds,
+        "dependent_end": test_end.dependent_end,
+        "duration_estimated": test_end.dependent_end,
     }
 
 
@@ -351,15 +353,13 @@ def progress_text(
     duration = test_end.offset_seconds
     effective_elapsed = min(max(elapsed_seconds, 0.0), float(duration))
     percentage = 100.0 if duration == 0 else effective_elapsed / duration * 100.0
-    completed_cells = min(
-        bar_width,
-        max(0, int(percentage / 100.0 * bar_width)),
-    )
-    bar = "#" * completed_cells + "-" * (bar_width - completed_cells)
+    completed_cells = min(bar_width, max(0, int(percentage / 100.0 * bar_width)))
+    bar_text = f"[{'#' * completed_cells}{'-' * (bar_width - completed_cells)}] {percentage:5.1f}%"
+    remaining_text = clock_text(duration - effective_elapsed)
 
     phase = events[0].phase or "unspecified"
     for event in events:
-        if event.offset_seconds <= elapsed_seconds and event.phase:
+        if not event.dependent_end and event.offset_seconds <= elapsed_seconds and event.phase:
             phase = event.phase
 
     next_event = next(
@@ -373,9 +373,9 @@ def progress_text(
         next_text = f"{next_event.event_id} in {clock_text(countdown)}"
 
     fields = [
-        f"[{bar}] {percentage:5.1f}%",
+        bar_text,
         f"elapsed {clock_text(effective_elapsed)}",
-        f"remaining {clock_text(duration - effective_elapsed)}",
+        f"{'estimated ' if test_end.dependent_end else ''}remaining {remaining_text}",
         f"phase {phase}",
         f"next {next_text}",
         f"status {status}",
@@ -955,7 +955,11 @@ def run_hardware_test(
         )
         if progress is not None:
             progress.finish(
-                test_end.offset_seconds if outcome == "completed" else last_elapsed,
+                (
+                    last_elapsed if test_end.dependent_end
+                    else test_end.offset_seconds if outcome == "completed"
+                    else last_elapsed
+                ),
                 outcome,
             )
 

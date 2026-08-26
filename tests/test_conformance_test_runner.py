@@ -30,6 +30,19 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_dependent_end_progress_reports_variable_duration(self):
+        events = load_schedule(
+            REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
+        )
+
+        summary = schedule_summary(events)
+        progress = progress_text(events, 60)
+
+        self.assertTrue(summary["dependent_end"])
+        self.assertEqual(summary["duration_seconds"], 9300)
+        self.assertTrue(summary["duration_estimated"])
+        self.assertIn("estimated remaining", progress)
+
     def test_archives_station_equipment_for_future_plot_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

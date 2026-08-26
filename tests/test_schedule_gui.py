@@ -44,6 +44,15 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_dependent_end_schedule_reports_variable_duration(self):
+        path = REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
+        rows = load_schedule_rows(path)
+        _, summary = validate_rows(rows)
+
+        self.assertTrue(summary["dependent_end"])
+        self.assertEqual(summary["duration_seconds"], 9300)
+        self.assertTrue(summary["duration_estimated"])
+
     def test_station_equipment_is_selected_and_validated_by_hostname(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "WH-station1.json"
@@ -179,6 +188,22 @@ class ScheduleGuiTests(unittest.TestCase):
                 save_schedule(schedule_directory, "protected", invalid_rows)
 
             self.assertEqual(destination.read_bytes(), original)
+
+    def test_identical_save_preserves_existing_file_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            schedule_directory = Path(directory)
+            destination, _ = save_schedule(
+                schedule_directory, "unchanged", master_rows()
+            )
+            existing = b"\xef\xbb\xbf" + destination.read_bytes().replace(b"\n", b"\r\n")
+            destination.write_bytes(existing)
+
+            saved, _ = save_schedule(
+                schedule_directory, "unchanged", load_schedule_rows(destination)
+            )
+
+            self.assertEqual(saved, destination)
+            self.assertEqual(destination.read_bytes(), existing)
 
     def test_schedule_name_cannot_escape_schedule_directory(self):
         for invalid in ("../outside", "nested/name", "", ".hidden", "name.csv.exe"):

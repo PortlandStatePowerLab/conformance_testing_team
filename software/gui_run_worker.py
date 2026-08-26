@@ -42,12 +42,14 @@ def run(args: argparse.Namespace) -> int:
     status_path = args.run_directory / "status.json"
     status = json.loads(status_path.read_text(encoding="utf-8"))
     events = load_schedule(args.schedule)
-    duration = next(event.offset_seconds for event in events if event.event_type == "test")
+    test_end = next(event for event in events if event.event_type == "test")
+    duration = test_end.offset_seconds
     started = datetime.now(PACIFIC)
     status.update(
         state="initializing", worker_pid=os.getpid(), started_at=started.isoformat(),
         expected_end_at=(started + timedelta(seconds=duration)).isoformat(),
-        duration_seconds=duration, error=None,
+        duration_seconds=duration, dependent_end=test_end.dependent_end,
+        duration_estimated=test_end.dependent_end, error=None,
     )
     atomic_json(status_path, status)
     command = [

@@ -32,6 +32,7 @@ try:
         CTA_ACTION_CODES,
         DRAW_EXTENDED_SCHEDULE_COLUMNS,
         MAX_DURATION,
+        ScheduleEvent,
         ScheduleValidationError,
         load_schedule,
     )
@@ -48,6 +49,7 @@ except ImportError:
         CTA_ACTION_CODES,
         DRAW_EXTENDED_SCHEDULE_COLUMNS,
         MAX_DURATION,
+        ScheduleEvent,
         ScheduleValidationError,
         load_schedule,
     )
@@ -182,12 +184,15 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
     shutil.copy2(schedule, snapshot)
     result_name = schedule.stem
     events = load_schedule(snapshot)
-    duration = next(event.offset_seconds for event in events if event.event_type == "test")
+    test_end = next(event for event in events if event.event_type == "test")
+    duration = test_end.offset_seconds
     status = {
         "run_id": run_id, "state": "launching", "schedule": schedule.name,
         "result_name": result_name,
         "schedule_snapshot": str(snapshot), "water_output_enabled": water,
         "requested_at": now.isoformat(), "duration_seconds": duration,
+        "dependent_end": test_end.dependent_end,
+        "duration_estimated": test_end.dependent_end,
         "last_heartbeat_at": now.isoformat(),
     }
     _atomic_json(directory / "status.json", status)
@@ -385,7 +390,19 @@ def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
-def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
+def _schedule_summary(events: list[ScheduleEvent]) -> dict[str, Any]:
+    test_end = next(event for event in events if event.event_type == "test")
+    return {
+        "enabled_events": len(events),
+        "cta_events": sum(event.event_type == "cta" for event in events),
+        "water_draws": sum(event.event_type == "water_draw" for event in events),
+        "duration_seconds": test_end.offset_seconds,
+        "dependent_end": test_end.dependent_end,
+        "duration_estimated": test_end.dependent_end,
+    }
+
+
+def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, Any]]:
     """Validate browser rows through the existing authoritative CSV parser."""
     rows = derive_rows(value)
     temporary_path: Path | None = None
@@ -403,23 +420,21 @@ def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
-    summary = {
-        "enabled_events": len(events),
-        "cta_events": sum(event.event_type == "cta" for event in events),
-        "water_draws": sum(event.event_type == "water_draw" for event in events),
-        "duration_seconds": max((event.offset_seconds for event in events), default=0),
-    }
-    return rows, summary
+    return rows, _schedule_summary(events)
 
 
 def save_schedule(
     directory: Path, name: str, value: Any
-) -> tuple[Path, dict[str, int]]:
+) -> tuple[Path, dict[str, Any]]:
     """Validate and atomically save one canonical GUI-authored schedule."""
     filename = normalize_schedule_name(name)
     rows, summary = validate_rows(value)
     directory.mkdir(parents=True, exist_ok=True)
     destination = directory / filename
+    if destination.is_file():
+        existing_rows, _ = validate_rows(load_schedule_rows(destination))
+        if existing_rows == rows:
+            return destination, summary
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -586,12 +601,15 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                 friendly_schedule_name(requested)
                 filename = normalize_schedule_name(requested)
                 path = self.schedule_directory / filename
+                rows = load_schedule_rows(path)
+                _, summary = validate_rows(rows)
                 self._json(
                     HTTPStatus.OK,
                     {
                         "name": filename,
                         "display_name": friendly_schedule_name(filename),
-                        "rows": load_schedule_rows(path),
+                        "rows": rows,
+                        "summary": summary,
                     },
                 )
             except FileNotFoundError:

@@ -189,7 +189,9 @@ const runHeading = document.querySelector("#run-heading");
 const runDetails = document.querySelector("#run-details");
 const refreshRunButton = document.querySelector("#refresh-run");
 let validatedSignature = null;
+let validatedSummary = null;
 let savedSignature = null;
+let savedSummary = null;
 let savedFilename = "";
 let knownScheduleFilenames = new Set();
 let preflightRunning = false;
@@ -316,9 +318,10 @@ function draftSignature() {
 
 function updateWorkflowState() {
   const signature = draftSignature();
-  saveButton.disabled = validatedSignature !== signature;
+  saveButton.disabled = validatedSignature !== signature || (Boolean(savedFilename) && savedSignature === signature);
   preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
-  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || savedSignature !== signature || (activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state));
+  const validSavedDuration = savedSummary && Number.isFinite(Number(savedSummary.duration_seconds)) && Number(savedSummary.duration_seconds) >= 0;
+  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || !validSavedDuration || savedSignature !== signature || (activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state));
 }
 
 function elapsedSeconds(value) {
@@ -396,7 +399,10 @@ async function request(path, body) {
 
 function show(result, valid) {
   status.className = `status ${valid ? "valid" : "invalid"}`;
-  if (result.summary) messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${result.summary.duration_seconds} seconds.`;
+  if (result.summary) {
+    const duration = result.summary.duration_estimated ? `${result.summary.duration_seconds} seconds estimated maximum` : `${result.summary.duration_seconds} seconds`;
+    messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${duration}.`;
+  }
   else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
 }
 
@@ -442,9 +448,11 @@ document.querySelector("#validate").onclick = async () => {
   try {
     const result = await request("/api/validate", {rows:scheduleRows()});
     validatedSignature = draftSignature();
+    validatedSummary = result.summary;
     show(result, true);
   } catch (error) {
     validatedSignature = null;
+    validatedSummary = null;
     show(error, false);
   }
   updateWorkflowState();
@@ -462,6 +470,7 @@ document.querySelector("#save").onclick = async () => {
     const result = await request("/api/save", {name:name.value, rows:scheduleRows()});
     savedFilename = result.saved;
     savedSignature = draftSignature();
+    savedSummary = result.summary;
     show(result, true);
     await refreshSchedules(result.saved);
   } catch (error) { show(error, false); }
@@ -474,14 +483,18 @@ document.querySelector("#load").onclick = async () => {
     const response = await fetch(`/api/schedules/${encodeURIComponent(selected)}`);
     const result = await response.json();
     if (!response.ok) throw result;
-    loadRows(result.rows);
     document.querySelector("#name").value = result.display_name;
-    validatedSignature = null;
-    savedSignature = null;
+    loadRows(result.rows);
     savedFilename = result.name;
-    messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
-    status.className = "status";
+    const signature = draftSignature();
+    validatedSignature = signature;
+    validatedSummary = result.summary;
+    savedSignature = signature;
+    savedSummary = result.summary;
+    messages.textContent = `Loaded and validated ${result.display_name}. No changes need to be saved.`;
+    status.className = "status valid";
     resetPreflightDisplay();
+    preflightLines.textContent = "Loaded schedule is already saved and validated. Run preflight when ready.";
     await dismissTerminalRun();
     updateWorkflowState();
   } catch (error) { show(error, false); }
@@ -557,7 +570,9 @@ preflightButton.onclick = async () => {
 };
 
 function clockText(seconds) {
-  const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const numeric = Number(seconds);
+  if (!Number.isFinite(numeric)) return "calculating";
+  const value = Math.max(0, Math.ceil(numeric));
   const hours = Math.floor(value / 3600);
   const minutes = Math.floor((value % 3600) / 60);
   const secs = value % 60;
@@ -577,7 +592,10 @@ function renderRun(run) {
   }
   const heartbeat = run.last_heartbeat_at ? new Date(run.last_heartbeat_at).toLocaleString() : "not yet available";
   const lifecycle = run.message ? `${run.message} · ` : "";
-  runDetails.textContent = `${lifecycle}Remaining ${clockText(remaining)} · expected finish ${run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating"} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
+  const remainingLabel = run.duration_estimated ? "Estimated remaining" : "Remaining";
+  const finishLabel = run.duration_estimated ? "estimated latest finish" : "expected finish";
+  const finishText = run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating";
+  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
   refreshRunButton.textContent = ["completed", "failed"].includes(run.state) ? "Dismiss completed test" : "Refresh status";
   updateWorkflowState();
 }
@@ -611,8 +629,14 @@ refreshRunButton.onclick = async () => {
   }
 };
 startButton.onclick = () => {
-  const duration = elapsedSeconds(document.querySelector("#end-time").value);
-  document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${clockText(duration)} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
+  const duration = Number(savedSummary?.duration_seconds);
+  if (!Number.isFinite(duration) || duration < 0) {
+    show({error:"The saved schedule has no valid Python-validated duration. Validate and save it again before starting."}, false);
+    updateWorkflowState();
+    return;
+  }
+  const durationText = savedSummary.duration_estimated ? `${clockText(duration)} estimated maximum — may end earlier at the temperature-drop target` : clockText(duration);
+  document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${durationText} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
   countdown.hidden = true;
   document.querySelector("#begin-countdown").hidden = false;
   startDialog.showModal();
