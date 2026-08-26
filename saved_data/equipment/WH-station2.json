@@ -5,5 +5,6 @@
   "voltage": "240 VAC",
   "capacity_gallons": 50,
   "station_id": "WH-station2",
-  "date_added": "2026-08-20"
+  "date_added": "2026-08-20",
+  "temperature_setpoint_f": 125.0
 }
