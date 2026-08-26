@@ -635,7 +635,7 @@ startButton.onclick = () => {
     updateWorkflowState();
     return;
   }
-  const durationText = savedSummary.duration_estimated ? `${clockText(duration)} estimated maximum — may end earlier at the temperature-drop target` : clockText(duration);
+  const durationText = savedSummary.duration_estimated ? `${clockText(duration)} estimated maximum` : clockText(duration);
   document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${durationText} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
   countdown.hidden = true;
   document.querySelector("#begin-countdown").hidden = false;
