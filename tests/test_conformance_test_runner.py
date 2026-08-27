@@ -87,6 +87,10 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             DEFAULT_MASTER_SCHEDULE,
         )
 
+    def test_explicit_test_name_is_available_for_gui_publishing(self):
+        args = build_parser().parse_args(["--test-name", "FHR-Normal"])
+        self.assertEqual(args.test_name, "FHR-Normal")
+
     def test_csv_master_schedule_is_validated_and_used_directly(self):
         with patch(
             "software.conformance_test_runner.load_schedule"

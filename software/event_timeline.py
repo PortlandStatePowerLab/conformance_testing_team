@@ -171,6 +171,23 @@ def _event(phase, label: str, timestamp: datetime, milestone: str, observation: 
     )
 
 
+def _water_draw_start_observation(details: dict[str, object]) -> str:
+    """Describe volume and temperature-drop draw targets without assuming either."""
+    target = details.get("target_volume_gal")
+    if target is not None:
+        try:
+            return f"Target {float(target):.2f} gal"
+        except (TypeError, ValueError):
+            pass
+    temperature_drop = details.get("temp_drop_f")
+    if temperature_drop is not None:
+        try:
+            return f"Temperature drop target {float(temperature_drop):g} °F"
+        except (TypeError, ValueError):
+            pass
+    return "Draw target unavailable"
+
+
 def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]:
     """Build a concise milestone sequence for one completed run."""
     directory = Path(run_directory).resolve()
@@ -280,7 +297,7 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
                 continue
             event_id = row.get("event_id", "").strip() or "Water draw"
             if kind == "water_draw_started":
-                observation = f"Target {float(details.get('target_volume_gal', 0)):.2f} gal"
+                observation = _water_draw_start_observation(details)
                 milestone = f"{event_id} started"
             else:
                 draw_path = directory / f"{event_id}.csv"

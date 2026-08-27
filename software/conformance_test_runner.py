@@ -582,6 +582,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--results-root", type=Path, default=DEFAULT_RESULTS_ROOT)
     parser.add_argument("--run-id", type=safe_identifier)
+    parser.add_argument(
+        "--test-name",
+        type=safe_identifier,
+        help="friendly test name used for publishing; defaults to the schedule filename",
+    )
     parser.add_argument("--cta-controller-dir", type=Path, default=DEFAULT_CTA_DIRECTORY)
     parser.add_argument("--cta-binary", type=Path, default=DEFAULT_CTA_BINARY)
     parser.add_argument("--cta-schedule", type=Path, default=DEFAULT_CTA_SCHEDULE)
@@ -1019,7 +1024,7 @@ def run_hardware_test(
             )
             publish_run_results(
                 run_directory,
-                safe_identifier(args.master_schedule.stem),
+                args.test_name or safe_identifier(args.master_schedule.stem),
             )
     return run_directory
 

@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 from software.event_timeline import (
     _mode,
     _power_points,
+    _water_draw_start_observation,
     build_event_timeline,
     plot_event_timeline,
 )
@@ -24,6 +25,14 @@ def write_csv(path, columns, rows):
 
 
 class EventTimelineTests(unittest.TestCase):
+    def test_temperature_drop_draw_does_not_require_volume_target(self):
+        self.assertEqual(
+            _water_draw_start_observation(
+                {"draw_type": "temp drop", "target_volume_gal": None, "temp_drop_f": 15.0}
+            ),
+            "Temperature drop target 15 °F",
+        )
+
     def test_current_classifier_uses_gray_areas_and_hysteresis(self):
         self.assertEqual(_mode(0.10), "standby")
         self.assertEqual(_mode(0.25), "fan")

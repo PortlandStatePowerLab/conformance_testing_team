@@ -56,6 +56,7 @@ def run(args: argparse.Namespace) -> int:
         sys.executable, "-m", "software.conformance_test_runner", "--run-hardware",
         "--master-schedule", str(args.schedule),
         "--run-id", f"{args.result_name}_{pacific_filename_timestamp()}",
+        "--test-name", args.result_name,
     ]
     if args.water:
         command.append("--enable-water-output")
