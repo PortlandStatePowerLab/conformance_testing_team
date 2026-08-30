@@ -1126,7 +1126,6 @@ def run_hardware_test(
                         details={
                             "pid": active_draw.process.pid,
                             "draw_type": cut_in_event.draw_type,
-                            "expected_flow_gpm": cut_in_event.expected_flow_gpm,
                             "max_draw_minutes": cut_in_event.max_draw_minutes,
                         },
                     )

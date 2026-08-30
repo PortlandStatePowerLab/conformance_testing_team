@@ -29,7 +29,8 @@ scheduled times.
 
 Water Draw `Time (min)` is represented by `max_draw_minutes` and appears in
 the browser editor as **Max time (min)**. A `Cut-in` draw uses `TBD` for its
-start, waits for the first CTA command's fresh cut-out OpState, draws until the
+start and requires only Max time. It waits for the first CTA command's fresh
+cut-out OpState, draws until the
 corresponding cut-in OpState, closes the valve, and waits for the subsequent
 cut-out. Its Max time covers the water-on and recovery phases together. It must
 be immediately followed by a `Temp Drop` draw with a `TBD` start; that draw is

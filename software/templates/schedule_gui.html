@@ -367,8 +367,8 @@ function updateView() {
       if (td.firstElementChild && field !== "estimate") td.firstElementChild.disabled = !isVolume;
     }
     const flowCell = row.querySelector('[data-field="expected_flow_gpm"]');
-    flowCell.classList.toggle("irrelevant", isTempDrop);
-    flowCell.firstElementChild.disabled = isTempDrop;
+    flowCell.classList.toggle("irrelevant", !isVolume);
+    flowCell.firstElementChild.disabled = !isVolume;
     for (const field of ["temp_set_f", "temp_drop_f", "stop_temp_f"]) {
       const td = row.querySelector(`[data-field="${field}"]`);
       td.classList.toggle("irrelevant", !isTempDrop);
@@ -393,7 +393,7 @@ function updateView() {
     let details = row.phase || "";
     if (row.action === "water_draw") {
       if (row.draw_type === "Temp Drop") details = `${row.temp_drop_f || "?"}°F drop; max ${row.max_draw_minutes || "?"} min`;
-      else if (row.draw_type === "Cut-in") details = `cut-in at ${row.expected_flow_gpm || "?"} GPM; max ${row.max_draw_minutes || "?"} min`;
+      else if (row.draw_type === "Cut-in") details = `cut-in; max ${row.max_draw_minutes || "?"} min`;
       else details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
     }
     else if (row.event_type === "cta") {

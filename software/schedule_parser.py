@@ -314,11 +314,12 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
             temp_drop = _parse_positive_float(temp_drop_text, "temp_drop_f")
             max_draw_minutes = _parse_positive_float(max_draw_text, "max_draw_minutes")
         else:
-            if volume_text or temp_drop_text:
-                raise ValueError("Cut-in draws cannot contain target volume or Temp Drop values")
-            if not flow_text or not max_draw_text:
-                raise ValueError("Cut-in draws require expected_flow_gpm and max_draw_minutes")
-            flow = _parse_positive_float(flow_text, "expected_flow_gpm")
+            if volume_text or flow_text or temp_drop_text:
+                raise ValueError(
+                    "Cut-in draws cannot contain target volume, expected flow, or Temp Drop values"
+                )
+            if not max_draw_text:
+                raise ValueError("Cut-in draws require max_draw_minutes")
             max_draw_minutes = _parse_positive_float(max_draw_text, "max_draw_minutes")
     else:
         if action != "end":

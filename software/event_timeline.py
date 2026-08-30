@@ -174,10 +174,9 @@ def _event(phase, label: str, timestamp: datetime, milestone: str, observation: 
 def _water_draw_start_observation(details: dict[str, object]) -> str:
     """Describe volume and temperature-drop draw targets without assuming either."""
     if details.get("draw_type") == "cut-in":
-        flow = details.get("expected_flow_gpm")
         maximum = details.get("max_draw_minutes")
         try:
-            return f"Cut-in at {float(flow):g} gpm; max {float(maximum):g} min"
+            return f"Cut-in; max {float(maximum):g} min"
         except (TypeError, ValueError):
             return "Cut-in draw"
     target = details.get("target_volume_gal")

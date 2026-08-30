@@ -54,7 +54,7 @@ class MasterScheduleTests(unittest.TestCase):
     def test_cut_in_and_dependent_temp_drop_schedule_is_valid(self):
         rows = [
             ["true", "shed_1", "00:00:00", "pre_event", "", "cta", "shed", "max", "", "", "2|4", "", "", "", "", "", ""],
-            ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "0.5", "", "30", "", ""],
+            ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "", "", "30", "", ""],
             ["true", "water_draw_2", "TBD", "event", "Temp Drop", "water_draw", "water_draw", "", "", "", "", "", "", "15", "60", "", ""],
             ["true", "test_end", "TBD", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
         ]
@@ -77,7 +77,7 @@ class MasterScheduleTests(unittest.TestCase):
     def test_volume_cannot_follow_state_controlled_draw(self):
         rows = [
             ["true", "shed_1", "00:00:00", "pre_event", "", "cta", "shed", "max", "", "", "2|4", "", "", "", "", "", ""],
-            ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "0.5", "", "30", "", ""],
+            ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "", "", "30", "", ""],
             ["true", "water_draw_2", "01:00:00", "event", "Volume", "water_draw", "water_draw", "", "", "", "", "5", "3", "", "", "", ""],
             ["true", "test_end", "02:00:00", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
         ]
