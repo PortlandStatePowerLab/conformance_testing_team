@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from software.conformance_test_runner import (
+    CutInStateError,
+    CutInStateTracker,
     DEFAULT_MASTER_SCHEDULE,
     ProgressReporter,
     _create_run_directory,
@@ -30,6 +32,80 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_cut_in_tracker_accepts_transient_five_between_target_states(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        self.assertIsNone(tracker.observe(0))
+        self.assertEqual(tracker.observe(4), "start_draw")
+        self.assertIsNone(tracker.observe(5))
+        self.assertEqual(tracker.observe(2), "stop_draw")
+        self.assertIsNone(tracker.observe(5))
+        self.assertEqual(tracker.observe(4), "complete")
+
+    def test_cut_in_tracker_uses_first_expected_state_without_confirmation(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        self.assertEqual(tracker.observe(4), "start_draw")
+        self.assertEqual(tracker.observe(2), "stop_draw")
+        self.assertEqual(tracker.observe(4), "complete")
+        self.assertIsNone(tracker.observe(5))
+
+    def test_cut_in_tracker_resets_short_five_sequence(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.observe(4)
+        tracker.observe(5)
+        tracker.observe(5)
+        self.assertEqual(tracker.observe(2), "stop_draw")
+        self.assertEqual(tracker.consecutive_fives, 0)
+
+    def test_cut_in_tracker_fails_on_three_consecutive_fives(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.observe(4)
+        tracker.observe(5)
+        tracker.observe(5)
+        with self.assertRaisesRegex(CutInStateError, "three consecutive OpState 5"):
+            tracker.observe(5)
+
+    def test_cut_in_tracker_fails_on_three_read_failures(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.read_failed()
+        tracker.read_failed()
+        with self.assertRaisesRegex(CutInStateError, "three consecutive OpState read"):
+            tracker.read_failed()
+
+    def test_cut_in_tracker_fails_on_three_mixed_unexpected_states(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.observe(4)
+        tracker.observe(0)
+        tracker.observe(3)
+        with self.assertRaisesRegex(CutInStateError, "three consecutive unexpected"):
+            tracker.observe(6)
+
+    def test_cut_in_draw_launches_without_volume_target(self):
+        event = SimpleNamespace(
+            event_id="water_draw_1",
+            draw_type="cut-in",
+            max_draw_minutes=30.0,
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "software.conformance_test_runner.start_process"
+        ) as start_process:
+            _launch_water_draw(
+                event,
+                Path(directory),
+                enable_output=True,
+                sensor_configuration=None,
+            )
+
+        command = start_process.call_args.args[1]
+        self.assertEqual(command[command.index("--draw-type") + 1], "cut_in")
+        self.assertEqual(command[command.index("--max-run-minutes") + 1], "30.0")
+        self.assertNotIn("--target-gal", command)
+
     def test_dependent_end_progress_reports_variable_duration(self):
         events = load_schedule(
             REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"

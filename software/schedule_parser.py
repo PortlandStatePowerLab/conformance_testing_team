@@ -14,6 +14,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
+try:
+    from .cta_operational_states import CUT_IN_STATES_BY_ACTION
+except ImportError:
+    from cta_operational_states import CUT_IN_STATES_BY_ACTION
+
 
 SCHEDULE_COLUMNS = (
     "enabled",
@@ -107,7 +112,7 @@ class ScheduleEvent:
     def expected_draw_seconds(self) -> float | None:
         if self.event_type != "water_draw":
             return None
-        if self.draw_type == "temp drop":
+        if self.draw_type in {"cut-in", "temp drop"}:
             return None if self.max_draw_minutes is None else self.max_draw_minutes * 60.0
         if self.target_volume_gal is None or self.expected_flow_gpm is None:
             return None
@@ -292,8 +297,8 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text:
             raise ValueError("water draws cannot contain CTA argument or expectation values")
         draw_type = draw_type_text or "volume"
-        if draw_type not in {"volume", "temp drop"}:
-            raise ValueError("draw_type must be Volume or Temp Drop")
+        if draw_type not in {"volume", "cut-in", "temp drop"}:
+            raise ValueError("draw_type must be Volume, Cut-in, or Temp Drop")
         if draw_type == "volume":
             if not volume_text or not flow_text:
                 raise ValueError("Volume draws require target_volume_gal and expected_flow_gpm")
@@ -301,12 +306,19 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
                 raise ValueError("Volume draws cannot contain Temp Drop values")
             volume = _parse_positive_float(volume_text, "target_volume_gal")
             flow = _parse_positive_float(flow_text, "expected_flow_gpm")
-        else:
+        elif draw_type == "temp drop":
             if volume_text or flow_text:
                 raise ValueError("Temp Drop draws cannot contain Volume draw values")
             if not temp_drop_text or not max_draw_text:
                 raise ValueError("Temp Drop draws require temp_drop_f and max_draw_minutes")
             temp_drop = _parse_positive_float(temp_drop_text, "temp_drop_f")
+            max_draw_minutes = _parse_positive_float(max_draw_text, "max_draw_minutes")
+        else:
+            if volume_text or temp_drop_text:
+                raise ValueError("Cut-in draws cannot contain target volume or Temp Drop values")
+            if not flow_text or not max_draw_text:
+                raise ValueError("Cut-in draws require expected_flow_gpm and max_draw_minutes")
+            flow = _parse_positive_float(flow_text, "expected_flow_gpm")
             max_draw_minutes = _parse_positive_float(max_draw_text, "max_draw_minutes")
     else:
         if action != "end":
@@ -397,22 +409,88 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
             seen_ids[event.event_id] = event.source_row
 
     enabled_in_source_order = [event for event in events if event.enabled]
-    dependent_ends = [event for event in enabled_in_source_order if event.dependent_end]
-    if len(dependent_ends) > 1:
-        errors.append("only one enabled test end event may use TBD")
-    if dependent_ends:
-        end = dependent_ends[0]
-        preceding = [event for event in enabled_in_source_order if event.source_row < end.source_row]
-        trigger = preceding[-1] if preceding else None
-        if end.event_type != "test" or end.action != "end":
-            errors.append(f"row {end.source_row}: TBD is allowed only for the test end event")
-        elif trigger is None or trigger.event_type != "water_draw" or trigger.draw_type != "temp drop":
-            errors.append("TBD test end must immediately follow an enabled Temp Drop water draw")
-        else:
-            assert trigger.max_draw_minutes is not None
-            replacement = replace(end, offset_seconds=trigger.offset_seconds + int(math.ceil(trigger.max_draw_minutes * 60)))
-            events[events.index(end)] = replacement
-            enabled_in_source_order[enabled_in_source_order.index(end)] = replacement
+    first_cta = next(
+        (event for event in enabled_in_source_order if event.event_type == "cta"),
+        None,
+    )
+    previous_draw: ScheduleEvent | None = None
+    for event in tuple(enabled_in_source_order):
+        replacement = event
+        if event.event_type == "water_draw":
+            if event.draw_type == "cut-in":
+                if not event.dependent_end:
+                    errors.append(f"row {event.source_row}: Cut-in start time must be TBD")
+                elif first_cta is None:
+                    errors.append(f"row {event.source_row}: Cut-in requires an enabled CTA command")
+                elif first_cta.action not in CUT_IN_STATES_BY_ACTION:
+                    errors.append(
+                        f"row {event.source_row}: CTA action '{first_cta.action}' does not define Cut-in states"
+                    )
+                else:
+                    previous_draw_end = (
+                        previous_draw.offset_seconds
+                        + int(math.ceil(previous_draw.expected_draw_seconds or 0.0))
+                        if previous_draw is not None
+                        else first_cta.offset_seconds
+                    )
+                    replacement = replace(
+                        event,
+                        offset_seconds=max(first_cta.offset_seconds, previous_draw_end),
+                    )
+            elif event.dependent_end:
+                if event.draw_type != "temp drop" or previous_draw is None or previous_draw.draw_type != "cut-in":
+                    errors.append(
+                        f"row {event.source_row}: TBD is allowed for Temp Drop only immediately after Cut-in"
+                    )
+                else:
+                    assert previous_draw.max_draw_minutes is not None
+                    replacement = replace(
+                        event,
+                        offset_seconds=previous_draw.offset_seconds
+                        + int(math.ceil(previous_draw.max_draw_minutes * 60)),
+                    )
+            previous_draw = replacement
+        elif event.dependent_end:
+            if event.event_type != "test" or event.action != "end":
+                errors.append(f"row {event.source_row}: unsupported TBD start time")
+            elif previous_draw is None or previous_draw.draw_type != "temp drop":
+                errors.append("TBD test end must immediately follow an enabled Temp Drop water draw")
+            else:
+                assert previous_draw.max_draw_minutes is not None
+                replacement = replace(
+                    event,
+                    offset_seconds=previous_draw.offset_seconds
+                    + int(math.ceil(previous_draw.max_draw_minutes * 60)),
+                )
+        if replacement is not event:
+            events[events.index(event)] = replacement
+            enabled_in_source_order[enabled_in_source_order.index(event)] = replacement
+
+    draws_in_source_order = [
+        event for event in enabled_in_source_order if event.event_type == "water_draw"
+    ]
+    state_controlled_seen = False
+    for index, draw in enumerate(draws_in_source_order):
+        if draw.draw_type in {"cut-in", "temp drop"}:
+            state_controlled_seen = True
+        elif draw.draw_type == "volume" and state_controlled_seen:
+            errors.append(
+                f"row {draw.source_row}: Volume draws cannot follow Cut-in or Temp Drop draws"
+            )
+        if draw.draw_type == "cut-in":
+            following = (
+                draws_in_source_order[index + 1]
+                if index + 1 < len(draws_in_source_order)
+                else None
+            )
+            if (
+                following is None
+                or following.draw_type != "temp drop"
+                or not following.dependent_end
+            ):
+                errors.append(
+                    f"row {draw.source_row}: Cut-in must be immediately followed by a TBD Temp Drop draw"
+                )
     enabled_events = sorted(enabled_in_source_order, key=lambda event: (event.offset_seconds, event.source_row))
     end_events = [
         event

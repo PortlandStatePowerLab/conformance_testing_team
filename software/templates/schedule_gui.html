@@ -129,7 +129,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Start Time</th><th>Phase</th><th>Draw Type</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Temp Set (°F)</th><th>Temp Drop (°F)</th><th>Time (min)</th><th>Stop Temp (°F)</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Start Time</th><th>Phase</th><th>Draw Type</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Temp Set (°F)</th><th>Temp Drop (°F)</th><th>Max time (min)</th><th>Stop Temp (°F)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="water-rows"></tbody>
         </table>
       </div>
@@ -273,9 +273,11 @@ function addCta(source = {}) {
 function addWater(source = {}) {
   const row = document.createElement("tr");
   cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
-  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
+  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS or TBD", pattern:"(?:[0-9]+:[0-5][0-9]:[0-5][0-9]|[Tt][Bb][Dd])"}), "time_after_start");
   cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "event"), "phase");
-  const drawType = cell(row, selectControl(["Volume", "Temp Drop"], source.draw_type && source.draw_type.toLowerCase() === "temp drop" ? "Temp Drop" : "Volume"), "draw_type");
+  const normalizedDrawType = (source.draw_type || "volume").toLowerCase();
+  const selectedDrawType = normalizedDrawType === "cut-in" ? "Cut-in" : normalizedDrawType === "temp drop" ? "Temp Drop" : "Volume";
+  const drawType = cell(row, selectControl(["Volume", "Cut-in", "Temp Drop"], selectedDrawType), "draw_type");
   cell(row, inputControl(source.target_volume_gal || "", {type:"number", min:"0.000001", step:"any"}), "target_volume_gal");
   cell(row, inputControl(source.expected_flow_gpm || "", {type:"number", min:"0.000001", step:"any"}), "expected_flow_gpm");
   const estimate = document.createElement("span"); cell(row, estimate, "estimate");
@@ -287,7 +289,10 @@ function addWater(source = {}) {
   removeCell(row, waterBody);
   waterBody.append(row);
   time.firstElementChild.oninput = updateView;
-  drawType.firstElementChild.onchange = updateView;
+  drawType.firstElementChild.onchange = () => {
+    if (rowValue(row, "draw_type") === "Cut-in") time.firstElementChild.value = "TBD";
+    updateView();
+  };
   row.oninput = updateView;
   updateView();
 }
@@ -354,16 +359,24 @@ function updateView() {
   }
   for (const row of waterBody.rows) {
     const isTempDrop = rowValue(row, "draw_type") === "Temp Drop";
-    for (const field of ["target_volume_gal", "expected_flow_gpm", "estimate"]) {
+    const isCutIn = rowValue(row, "draw_type") === "Cut-in";
+    const isVolume = !isTempDrop && !isCutIn;
+    for (const field of ["target_volume_gal", "estimate"]) {
       const td = row.querySelector(`[data-field="${field}"]`);
-      td.classList.toggle("irrelevant", isTempDrop);
-      if (td.firstElementChild && field !== "estimate") td.firstElementChild.disabled = isTempDrop;
+      td.classList.toggle("irrelevant", !isVolume);
+      if (td.firstElementChild && field !== "estimate") td.firstElementChild.disabled = !isVolume;
     }
-    for (const field of ["temp_set_f", "temp_drop_f", "max_draw_minutes", "stop_temp_f"]) {
+    const flowCell = row.querySelector('[data-field="expected_flow_gpm"]');
+    flowCell.classList.toggle("irrelevant", isTempDrop);
+    flowCell.firstElementChild.disabled = isTempDrop;
+    for (const field of ["temp_set_f", "temp_drop_f", "stop_temp_f"]) {
       const td = row.querySelector(`[data-field="${field}"]`);
       td.classList.toggle("irrelevant", !isTempDrop);
-      if (td.firstElementChild && ["temp_drop_f", "max_draw_minutes"].includes(field)) td.firstElementChild.disabled = !isTempDrop;
+      if (td.firstElementChild && field === "temp_drop_f") td.firstElementChild.disabled = !isTempDrop;
     }
+    const maxTimeCell = row.querySelector('[data-field="max_draw_minutes"]');
+    maxTimeCell.classList.toggle("irrelevant", isVolume);
+    maxTimeCell.firstElementChild.disabled = isVolume;
     const volume = Number(rowValue(row, "target_volume_gal"));
     const flow = Number(rowValue(row, "expected_flow_gpm"));
     row.querySelector('[data-field="estimate"] span').textContent = formatDuration((volume / flow) * 60);
@@ -378,7 +391,11 @@ function updateView() {
     counts[row.action] = (counts[row.action] || 0) + 1;
     const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
     let details = row.phase || "";
-    if (row.action === "water_draw") details = row.draw_type === "Temp Drop" ? `${row.temp_drop_f || "?"}°F drop; max ${row.max_draw_minutes || "?"} min` : `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    if (row.action === "water_draw") {
+      if (row.draw_type === "Temp Drop") details = `${row.temp_drop_f || "?"}°F drop; max ${row.max_draw_minutes || "?"} min`;
+      else if (row.draw_type === "Cut-in") details = `cut-in at ${row.expected_flow_gpm || "?"} GPM; max ${row.max_draw_minutes || "?"} min`;
+      else details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    }
     else if (row.event_type === "cta") {
       const duration = row.event_duration_minutes || "?";
       details = `duration ${duration}${duration.toLowerCase() === "max" ? "" : " min"}${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;

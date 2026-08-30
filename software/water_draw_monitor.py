@@ -95,7 +95,9 @@ def build_parser() -> argparse.ArgumentParser:
     repository_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--event-id", required=True)
-    parser.add_argument("--draw-type", choices=("volume", "temp_drop"), default="volume")
+    parser.add_argument(
+        "--draw-type", choices=("volume", "cut_in", "temp_drop"), default="volume"
+    )
     parser.add_argument("--target-gal", type=positive_float)
     parser.add_argument("--temp-set-f", type=float)
     parser.add_argument("--temp-drop-f", type=positive_float)

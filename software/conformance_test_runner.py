@@ -23,6 +23,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
+    from .cta_operational_states import CUT_IN_STATES_BY_ACTION
     from .conformance_report import generate_conformance_report
     from .schedule_compiler import compile_cta_schedule
     from .schedule_parser import ScheduleEvent, load_schedule
@@ -31,6 +32,7 @@ try:
     )
     from .xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
+    from cta_operational_states import CUT_IN_STATES_BY_ACTION
     from conformance_report import generate_conformance_report
     from schedule_compiler import compile_cta_schedule
     from schedule_parser import ScheduleEvent, load_schedule
@@ -482,6 +484,127 @@ class ManagedProcess:
         self.log_handle.close()
 
 
+@dataclass(frozen=True)
+class CtaLogUpdate:
+    event: str
+    event_id: str
+    command: str
+    result: str
+    operational_state: int | None
+
+
+class CtaEventReader:
+    """Return newly appended CTA event-log rows without polling the CTA device."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._rows_seen = 0
+        self._file_size_seen = -1
+
+    def read_new(self) -> list[CtaLogUpdate]:
+        if not self.path.is_file():
+            return []
+        file_size = self.path.stat().st_size
+        if file_size == self._file_size_seen:
+            return []
+        data = self.path.read_bytes()
+        self._file_size_seen = len(data)
+        final_newline = data.rfind(b"\n")
+        if final_newline < 0:
+            return []
+        complete_text = data[: final_newline + 1].decode("utf-8-sig")
+        rows = list(csv.DictReader(complete_text.splitlines()))
+        if len(rows) < self._rows_seen:
+            self._rows_seen = 0
+        new_rows = rows[self._rows_seen :]
+        self._rows_seen = len(rows)
+        updates: list[CtaLogUpdate] = []
+        for row in new_rows:
+            state_text = (row.get("operational_state") or "").strip()
+            try:
+                state = int(state_text) if state_text else None
+            except ValueError:
+                state = None
+            updates.append(
+                CtaLogUpdate(
+                    event=(row.get("event") or "").strip(),
+                    event_id=(row.get("event_id") or "").strip(),
+                    command=(row.get("command") or "").strip(),
+                    result=(row.get("result") or "").strip().lower(),
+                    operational_state=state,
+                )
+            )
+        return updates
+
+
+class CutInStateError(RuntimeError):
+    """Raised when Cut-in OpState tolerance is exhausted."""
+
+
+class CutInStateTracker:
+    FAILURE_LIMIT = 3
+
+    def __init__(self, *, cut_in_state: int, cut_out_state: int) -> None:
+        self.cut_in_state = cut_in_state
+        self.cut_out_state = cut_out_state
+        self.phase = "waiting_for_cta"
+        self.consecutive_fives = 0
+        self.consecutive_read_failures = 0
+        self.consecutive_unexpected = 0
+
+    def cta_completed(self) -> None:
+        if self.phase == "waiting_for_cta":
+            self.phase = "waiting_for_initial_cut_out"
+
+    def read_failed(self) -> None:
+        if self.phase in {"waiting_for_cta", "complete"}:
+            return
+        self.consecutive_read_failures += 1
+        if self.consecutive_read_failures >= self.FAILURE_LIMIT:
+            raise CutInStateError("three consecutive OpState read failures")
+
+    def observe(self, state: int) -> str | None:
+        if self.phase in {"waiting_for_cta", "complete"}:
+            return None
+        self.consecutive_read_failures = 0
+        if state == 5:
+            self.consecutive_fives += 1
+            self.consecutive_unexpected = 0
+            if self.consecutive_fives >= self.FAILURE_LIMIT:
+                raise CutInStateError("three consecutive OpState 5 readings")
+            return None
+
+        self.consecutive_fives = 0
+        target = (
+            self.cut_out_state
+            if self.phase in {"waiting_for_initial_cut_out", "recovering_to_cut_out"}
+            else self.cut_in_state
+        )
+        hold_states = {
+            "waiting_for_initial_cut_out": {0, 1, self.cut_in_state},
+            "drawing_to_cut_in": {self.cut_out_state},
+            "recovering_to_cut_out": {self.cut_in_state},
+        }[self.phase]
+        if state == target:
+            self.consecutive_unexpected = 0
+            if self.phase == "waiting_for_initial_cut_out":
+                self.phase = "drawing_to_cut_in"
+                return "start_draw"
+            if self.phase == "drawing_to_cut_in":
+                self.phase = "recovering_to_cut_out"
+                return "stop_draw"
+            self.phase = "complete"
+            return "complete"
+        if state in hold_states:
+            self.consecutive_unexpected = 0
+            return None
+
+        self.consecutive_unexpected += 1
+        if self.consecutive_unexpected >= self.FAILURE_LIMIT:
+            raise CutInStateError("three consecutive unexpected OpState readings")
+        return None
+
+
 def start_process(
     name: str,
     command: list[str],
@@ -666,7 +789,12 @@ def _launch_water_draw(
         "--event-id",
         event.event_id,
         "--draw-type",
-        "temp_drop" if getattr(event, "draw_type", "volume") == "temp drop" else "volume",
+        (
+            "temp_drop"
+            if getattr(event, "draw_type", "volume") == "temp drop"
+            else "cut_in" if getattr(event, "draw_type", "volume") == "cut-in"
+            else "volume"
+        ),
         "--output-csv",
         str(output_csv),
         "--sample-interval-seconds",
@@ -684,6 +812,8 @@ def _launch_water_draw(
             "--temp-drop-f", str(event.temp_drop_f),
             "--max-run-minutes", str(event.max_draw_minutes),
         ])
+    elif getattr(event, "draw_type", "volume") == "cut-in":
+        command.extend(["--max-run-minutes", str(event.max_draw_minutes)])
     else:
         command.extend(["--target-gal", str(event.target_volume_gal)])
     if sensor_configuration is not None:
@@ -852,12 +982,23 @@ def run_hardware_test(
         )
 
         draws = [event for event in events if event.event_type == "water_draw"]
+        first_cta = min(
+            (event for event in events if event.event_type == "cta"),
+            key=lambda event: event.source_row,
+            default=None,
+        )
         test_end = next(event for event in events if event.event_type == "test")
         dependent_draw_id = (
             max((event for event in draws if event.source_row < test_end.source_row), key=lambda event: event.source_row).event_id
             if test_end.dependent_end else None
         )
         progress = ProgressReporter(events)
+        cta_event_reader = CtaEventReader(run_directory / "cta_events.csv")
+        cta_command_results: dict[str, str] = {}
+        cut_in_tracker: CutInStateTracker | None = None
+        cut_in_event: ScheduleEvent | None = None
+        cut_in_deadline: float | None = None
+        released_draw_ids: set[str] = set()
         next_draw_index = 0
         test_started_logged = False
 
@@ -876,6 +1017,189 @@ def run_hardware_test(
             if controller.process.poll() is not None:
                 raise RuntimeError(
                     f"CTA controller exited unexpectedly with code {controller.process.returncode}"
+                )
+
+            if (
+                cut_in_tracker is None
+                and next_draw_index < len(draws)
+                and draws[next_draw_index].draw_type == "cut-in"
+                and elapsed >= draws[next_draw_index].offset_seconds
+            ):
+                if first_cta is None:
+                    raise RuntimeError("Cut-in water draw has no associated CTA command")
+                cut_in_event = draws[next_draw_index]
+                next_draw_index += 1
+                cut_in_state, cut_out_state = CUT_IN_STATES_BY_ACTION[first_cta.action]
+                cut_in_tracker = CutInStateTracker(
+                    cut_in_state=cut_in_state,
+                    cut_out_state=cut_out_state,
+                )
+                logger.record(
+                    "cut_in_armed",
+                    "waiting_for_cta",
+                    event_id=cut_in_event.event_id,
+                    details={
+                        "cta_event_id": first_cta.event_id,
+                        "cta_action": first_cta.action,
+                        "cut_in_state": cut_in_state,
+                        "cut_out_state": cut_out_state,
+                    },
+                )
+                if first_cta.event_id in cta_command_results:
+                    if cta_command_results[first_cta.event_id] != "ok":
+                        raise RuntimeError(
+                            f"associated CTA command failed before {cut_in_event.event_id}"
+                        )
+                    cut_in_tracker.cta_completed()
+                    logger.record(
+                        "cut_in_waiting_for_initial_cut_out",
+                        "waiting",
+                        event_id=cut_in_event.event_id,
+                    )
+
+            for update in cta_event_reader.read_new():
+                if update.event == "command_completed" and update.event_id:
+                    cta_command_results[update.event_id] = update.result
+                elif update.event == "command_exception" and update.event_id:
+                    cta_command_results[update.event_id] = "error"
+                if cut_in_tracker is None or cut_in_event is None:
+                    continue
+                if (
+                    cut_in_tracker.phase == "waiting_for_cta"
+                    and update.event_id == first_cta.event_id
+                    and update.event in {"command_completed", "command_exception"}
+                ):
+                    if update.event != "command_completed" or update.result != "ok":
+                        raise RuntimeError(
+                            f"associated CTA command failed before {cut_in_event.event_id}"
+                        )
+                    cut_in_tracker.cta_completed()
+                    logger.record(
+                        "cut_in_waiting_for_initial_cut_out",
+                        "waiting",
+                        event_id=cut_in_event.event_id,
+                    )
+                    continue
+                if cut_in_tracker.phase == "waiting_for_cta":
+                    continue
+                if (
+                    update.command == "query_operational_state"
+                    and (
+                        update.event == "query_exception"
+                        or (
+                            update.event == "query_completed"
+                            and update.result != "ok"
+                        )
+                    )
+                ):
+                    cut_in_tracker.read_failed()
+                    continue
+                if update.event != "operational_state" or update.operational_state is None:
+                    continue
+
+                action = cut_in_tracker.observe(update.operational_state)
+                if action == "start_draw":
+                    active_draw = _launch_water_draw(
+                        cut_in_event,
+                        run_directory,
+                        enable_output=args.enable_water_output,
+                        sensor_configuration=archived_sensor_configuration,
+                        equipment_configuration=archived_equipment,
+                    )
+                    cut_in_deadline = (
+                        time.monotonic() + cut_in_event.max_draw_minutes * 60.0
+                    )
+                    logger.record(
+                        "cut_in_initial_cut_out",
+                        "water_draw_started",
+                        event_id=cut_in_event.event_id,
+                        details={
+                            "operational_state": update.operational_state,
+                            "pid": active_draw.process.pid,
+                            "max_draw_minutes": cut_in_event.max_draw_minutes,
+                        },
+                    )
+                    logger.record(
+                        "water_draw_started",
+                        "started",
+                        event_id=cut_in_event.event_id,
+                        details={
+                            "pid": active_draw.process.pid,
+                            "draw_type": cut_in_event.draw_type,
+                            "expected_flow_gpm": cut_in_event.expected_flow_gpm,
+                            "max_draw_minutes": cut_in_event.max_draw_minutes,
+                        },
+                    )
+                    # Later rows in this batch predate the valve action.  The
+                    # cut-in phase must be satisfied by a fresh observation.
+                    break
+                elif action == "stop_draw":
+                    if active_draw is None:
+                        raise RuntimeError("Cut-in state observed without an active water draw")
+                    stop_process(
+                        active_draw,
+                        timeout_seconds=args.shutdown_timeout_seconds,
+                        logger=logger,
+                    )
+                    stopped_return_code = active_draw.process.returncode
+                    active_draw = None
+                    logger.record(
+                        "water_draw_completed",
+                        "ok",
+                        event_id=cut_in_event.event_id,
+                        details={
+                            "return_code": stopped_return_code,
+                            "reason": "cut_in_observed",
+                        },
+                    )
+                    logger.record(
+                        "cut_in_observed",
+                        "water_stopped",
+                        event_id=cut_in_event.event_id,
+                        details={"operational_state": update.operational_state},
+                    )
+                    # Do not let a cut-out row already buffered before valve
+                    # closure complete the recovery phase.
+                    break
+                elif action == "complete":
+                    completed_cut_in_id = cut_in_event.event_id
+                    logger.record(
+                        "cut_out_observed",
+                        "completed",
+                        event_id=completed_cut_in_id,
+                        details={"operational_state": update.operational_state},
+                    )
+                    if (
+                        next_draw_index < len(draws)
+                        and draws[next_draw_index].dependent_end
+                        and draws[next_draw_index].draw_type == "temp drop"
+                    ):
+                        released_draw_ids.add(draws[next_draw_index].event_id)
+                    cut_in_tracker = None
+                    cut_in_event = None
+                    cut_in_deadline = None
+
+            if (
+                cut_in_deadline is not None
+                and cut_in_event is not None
+                and time.monotonic() >= cut_in_deadline
+            ):
+                if active_draw is not None:
+                    stop_process(
+                        active_draw,
+                        timeout_seconds=args.shutdown_timeout_seconds,
+                        logger=logger,
+                    )
+                    active_draw = None
+                logger.record(
+                    "cut_in_timeout",
+                    "failed",
+                    event_id=cut_in_event.event_id,
+                    details={"phase": cut_in_tracker.phase if cut_in_tracker else "unknown"},
+                )
+                raise TimeoutError(
+                    f"{cut_in_event.event_id} exceeded its Max time during "
+                    f"{cut_in_tracker.phase if cut_in_tracker else 'unknown'}"
                 )
 
             if active_draw is not None and active_draw.process.poll() is not None:
@@ -909,10 +1233,17 @@ def run_hardware_test(
 
             while (
                 next_draw_index < len(draws)
-                and elapsed >= draws[next_draw_index].offset_seconds
+                and (
+                    draws[next_draw_index].event_id in released_draw_ids
+                    or (
+                        not draws[next_draw_index].dependent_end
+                        and elapsed >= draws[next_draw_index].offset_seconds
+                    )
+                )
             ):
                 event = draws[next_draw_index]
                 next_draw_index += 1
+                released_draw_ids.discard(event.event_id)
                 if active_draw is not None:
                     logger.record(
                         "water_draw_missed",

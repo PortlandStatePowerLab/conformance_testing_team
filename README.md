@@ -27,6 +27,16 @@ generated refreshes do not repeat or extend user commands; all user-entered CTA
 commands and their 15-second outside-communication prerequisites retain their
 scheduled times.
 
+Water Draw `Time (min)` is represented by `max_draw_minutes` and appears in
+the browser editor as **Max time (min)**. A `Cut-in` draw uses `TBD` for its
+start, waits for the first CTA command's fresh cut-out OpState, draws until the
+corresponding cut-in OpState, closes the valve, and waits for the subsequent
+cut-out. Its Max time covers the water-on and recovery phases together. It must
+be immediately followed by a `Temp Drop` draw with a `TBD` start; that draw is
+released by the recovery cut-out. Volume draws cannot follow Cut-in or Temp
+Drop draws. The orchestrator consumes the controller's existing 30-second
+`cta_events.csv` OpState records and does not issue additional CTA reads.
+
 The heartbeat is enabled by default. Disable only the recurring refreshes for
 a controlled comparison while retaining every command prerequisite:
 
@@ -144,7 +154,8 @@ orchestrator events, process logs, and a human-readable
 `conformance_test_report.xlsx` workbook. The workbook is generated when the run
 closes and contains Event Timeline, Device Information, Master Schedule, and
 Commodity Summary sheets. The detailed source CSV files remain unchanged.
-The timeline retains each approximately one-minute operational-state reading.
+The timeline retains the existing approximately 30-second operational-state
+readings; commodity records remain on their one-minute cadence.
 
 The `saved_data/conformance_runs/` directory is its own Git repository. After
 final reports and plots are generated, a hardware run commits only its

@@ -51,6 +51,60 @@ class DurationEncodingTests(unittest.TestCase):
 
 
 class MasterScheduleTests(unittest.TestCase):
+    def test_cut_in_and_dependent_temp_drop_schedule_is_valid(self):
+        rows = [
+            ["true", "shed_1", "00:00:00", "pre_event", "", "cta", "shed", "max", "", "", "2|4", "", "", "", "", "", ""],
+            ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "0.5", "", "30", "", ""],
+            ["true", "water_draw_2", "TBD", "event", "Temp Drop", "water_draw", "water_draw", "", "", "", "", "", "", "15", "60", "", ""],
+            ["true", "test_end", "TBD", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            events = load_schedule(path)
+
+        cut_in = next(event for event in events if event.draw_type == "cut-in")
+        temp_drop = next(event for event in events if event.draw_type == "temp drop")
+        self.assertTrue(cut_in.dependent_end)
+        self.assertEqual(cut_in.offset_seconds, 0)
+        self.assertEqual(cut_in.expected_draw_seconds, 30 * 60)
+        self.assertEqual(temp_drop.offset_seconds, 30 * 60)
+        self.assertEqual(events[-1].offset_seconds, 90 * 60)
+
+    def test_volume_cannot_follow_state_controlled_draw(self):
+        rows = [
+            ["true", "shed_1", "00:00:00", "pre_event", "", "cta", "shed", "max", "", "", "2|4", "", "", "", "", "", ""],
+            ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "0.5", "", "30", "", ""],
+            ["true", "water_draw_2", "01:00:00", "event", "Volume", "water_draw", "water_draw", "", "", "", "", "5", "3", "", "", "", ""],
+            ["true", "test_end", "02:00:00", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            with self.assertRaisesRegex(ScheduleValidationError, "Volume draws cannot follow"):
+                load_schedule(path)
+
+    def test_tbd_temp_drop_requires_immediately_preceding_cut_in(self):
+        rows = [
+            ["true", "water_draw_1", "00:10:00", "event", "Volume", "water_draw", "water_draw", "", "", "", "", "2", "3", "", "", "", ""],
+            ["true", "water_draw_2", "TBD", "event", "Temp Drop", "water_draw", "water_draw", "", "", "", "", "", "", "15", "60", "", ""],
+            ["true", "test_end", "02:00:00", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
+                writer.writerows(rows)
+            with self.assertRaisesRegex(ScheduleValidationError, "only immediately after Cut-in"):
+                load_schedule(path)
+
     def test_temp_drop_draw_allows_dependent_tbd_end(self):
         rows = [
             ["true", "water_draw_1", "01:35:00", "event", "Temp Drop", "water_draw", "water_draw", "", "", "", "", "", "", "15", "60", "", ""],

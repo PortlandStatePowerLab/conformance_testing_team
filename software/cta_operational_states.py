@@ -30,6 +30,17 @@ EXPECTED_STATES_BY_ACTION = {
     "grid_emergency": (2, 4),
 }
 
+# State levels used by a state-controlled Cut-in water draw.  The first value
+# is the running/cut-in state and the second is the idle/cut-out state.
+CUT_IN_STATES_BY_ACTION = {
+    "load_up": (3, 6),
+    "advanced_load_up": (3, 6),
+    "run_normal": (1, 0),
+    "shed": (2, 4),
+    "critical_peak": (2, 4),
+    "grid_emergency": (2, 4),
+}
+
 
 def operational_state_name(code: int) -> str:
     return OPERATIONAL_STATE_NAMES.get(code, f"Unknown state ({code})")
