@@ -8,7 +8,7 @@ from typing import Protocol
 
 from software.exception_notes import add_exception_note
 from software.sensors import SensorSnapshot
-from software.valve.valve_interface import Valve
+from software.valve import Valve
 
 MAX_RUN_MINUTES = 5.0
 MIN_FLOW_GPM = 0.05

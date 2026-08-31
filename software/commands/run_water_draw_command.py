@@ -13,7 +13,7 @@ from software.runtime.controlled_water_draw_workflow import (
     MAX_RUN_MINUTES,
     run_controlled_water_draw,
 )
-from software.valve.gpio_valve_builder import build_gpio_valve
+from software.valve import build_gpio_valve
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

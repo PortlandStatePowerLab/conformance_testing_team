@@ -2,7 +2,7 @@
 
 ## Purpose
 
-MAX1238 communication, construction, interfaces, and read-only ADC diagnostics.
+WH station MAX1238 communication, construction, interfaces, and read-only ADC diagnostics.
 
 ## Contains
 
@@ -42,8 +42,8 @@ that belong in `software/station/station_adc_builder.py`
 - A driver communicates directly with one hardware model over I2C and owns its open bus connection.
 - A device builder constructs and configures that driver using connection details supplied by its caller.
 - A station builder supplies the bus number and device address from the station hardware map.
-- A diagnosti exercises ADC behavior and reports results without becoming part of the supported package API
-- The caller that receives an ADC from a builder, owns it, and must close it, when finished.
+- A diagnostic exercises ADC behavior and reports results without becoming part of the supported package API
+- When a caller receives an ADC object from a builder, that caller owns the object, and must close it when finished.
 
 ## Usage
 
@@ -55,7 +55,7 @@ through the `software.adc` public API.
 Normal selection processes should use `build_station_adc()` from `software/station/station_adc_builder.py`
 so the installed bus number and device address come from the station hardware map.
 
-Operators normally run the supported `bin/adc-raw` or `bin/adc-acquistion-compare` entrypoints
+Operators normally run the supported `bin/adc-raw` or `bin/adc-acquisition-compare` entrypoints
 instead of importing diagnostic modules directly.
 
 ## Safety notes
