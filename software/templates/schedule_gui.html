@@ -429,7 +429,7 @@ function updateView() {
     let details = row.phase || "";
     if (row.action === "water_draw") {
       if (row.draw_type === "Temp Drop") details = `${row.temp_drop_f || "?"}°F drop; max ${row.max_draw_minutes || "?"} min`;
-      else if (row.draw_type === "Cut-in") details = `cut-in; max ${row.max_draw_minutes || "?"} min`;
+      else if (row.draw_type === "Cut-in") details = `cut-in; valve-open max ${row.max_draw_minutes || "?"} min; 12 h recovery watchdog`;
       else details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
     }
     else if (row.event_type === "cta") {
@@ -656,7 +656,13 @@ function renderRun(run) {
   const warnings = Array.isArray(run.communication_warnings) && run.communication_warnings.length
     ? ` · Earlier CTA warning${run.communication_warnings.length === 1 ? "" : "s"}: ${run.communication_warnings.join("; ")}`
     : "";
-  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}${warnings}`;
+  const recoveryRemaining = run.recovery_deadline_at
+    ? Math.max(0, (Date.parse(run.recovery_deadline_at) - Date.now()) / 1000)
+    : null;
+  const recovery = run.cut_in_phase === "recovery" && recoveryRemaining !== null
+    ? ` · Recovery watchdog remaining ${clockText(recoveryRemaining)}`
+    : "";
+  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)}${recovery} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}${warnings}`;
   const terminal = ["completed", "failed", "stopped"].includes(run.state);
   refreshRunButton.textContent = terminal ? "Dismiss test" : "Refresh status";
   stopTestButton.hidden = !["launching", "initializing", "running"].includes(run.state);

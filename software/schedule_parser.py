@@ -19,6 +19,8 @@ try:
 except ImportError:
     from cta_operational_states import CUT_IN_STATES_BY_ACTION
 
+CUT_IN_RECOVERY_TIMEOUT_SECONDS = 12 * 60 * 60
+
 
 SCHEDULE_COLUMNS = (
     "enabled",
@@ -63,7 +65,7 @@ TRUE_VALUES = {"true", "yes", "1"}
 FALSE_VALUES = {"false", "no", "0"}
 MAX_DURATION = "max"
 OUTSIDE_COMMUNICATION_LEAD_SECONDS = 15
-OUTSIDE_COMMUNICATION_REFRESH_SECONDS = 13 * 60 + 30
+OUTSIDE_COMMUNICATION_REFRESH_SECONDS = 10 * 60
 MAX_FINITE_DURATION_BYTE = 0xFE
 MAX_FINITE_DURATION_SECONDS = 2 * MAX_FINITE_DURATION_BYTE**2
 MAX_EVENT_DURATION_MINUTES = 2150
@@ -448,7 +450,8 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
                     replacement = replace(
                         event,
                         offset_seconds=previous_draw.offset_seconds
-                        + int(math.ceil(previous_draw.max_draw_minutes * 60)),
+                        + int(math.ceil(previous_draw.max_draw_minutes * 60))
+                        + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
                     )
             previous_draw = replacement
         elif event.dependent_end:

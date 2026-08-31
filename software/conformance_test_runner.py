@@ -26,7 +26,11 @@ try:
     from .cta_operational_states import CUT_IN_STATES_BY_ACTION
     from .conformance_report import generate_conformance_report
     from .schedule_compiler import compile_cta_schedule
-    from .schedule_parser import ScheduleEvent, load_schedule
+    from .schedule_parser import (
+        CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+        ScheduleEvent,
+        load_schedule,
+    )
     from .sensors.sensor_configuration_loader import (
         load_sensor_configuration,
     )
@@ -35,7 +39,11 @@ except ImportError:
     from cta_operational_states import CUT_IN_STATES_BY_ACTION
     from conformance_report import generate_conformance_report
     from schedule_compiler import compile_cta_schedule
-    from schedule_parser import ScheduleEvent, load_schedule
+    from schedule_parser import (
+        CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+        ScheduleEvent,
+        load_schedule,
+    )
     from sensors.sensor_configuration_loader import load_sensor_configuration
     from xlsx_schedule_importer import import_xlsx_schedule
 
@@ -771,7 +779,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--disable-outside-communication-heartbeat",
         action="store_true",
         help=(
-            "disable recurring 13-minute-30-second outside-communication "
+            "disable recurring 10-minute outside-communication "
             "refreshes; per-command prerequisites remain enabled"
         ),
     )
@@ -1026,6 +1034,7 @@ def run_hardware_test(
         cut_in_tracker: CutInStateTracker | None = None
         cut_in_event: ScheduleEvent | None = None
         cut_in_deadline: float | None = None
+        cut_in_recovery_deadline: float | None = None
         released_draw_ids: set[str] = set()
         next_draw_index = 0
         test_started_logged = False
@@ -1170,6 +1179,14 @@ def run_hardware_test(
                     )
                     stopped_return_code = active_draw.process.returncode
                     active_draw = None
+                    cut_in_deadline = None
+                    cut_in_recovery_deadline = (
+                        time.monotonic() + CUT_IN_RECOVERY_TIMEOUT_SECONDS
+                    )
+                    recovery_deadline_at = (
+                        datetime.now().astimezone()
+                        + timedelta(seconds=CUT_IN_RECOVERY_TIMEOUT_SECONDS)
+                    ).isoformat()
                     logger.record(
                         "water_draw_completed",
                         "ok",
@@ -1183,7 +1200,18 @@ def run_hardware_test(
                         "cut_in_observed",
                         "water_stopped",
                         event_id=cut_in_event.event_id,
-                        details={"operational_state": update.operational_state},
+                        details={
+                            "operational_state": update.operational_state,
+                            "recovery_timeout_seconds": CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+                            "recovery_deadline_at": recovery_deadline_at,
+                        },
+                    )
+                    _write_gui_stage(
+                        "running",
+                        "Water draw complete; waiting for Cut-in recovery state.",
+                        cut_in_phase="recovery",
+                        recovery_deadline_at=recovery_deadline_at,
+                        result_directory=str(run_directory),
                     )
                     # Do not let a cut-out row already buffered before valve
                     # closure complete the recovery phase.
@@ -1202,9 +1230,17 @@ def run_hardware_test(
                         and draws[next_draw_index].draw_type == "temp drop"
                     ):
                         released_draw_ids.add(draws[next_draw_index].event_id)
+                    _write_gui_stage(
+                        "running",
+                        "Cut-in recovery complete; starting the dependent water draw.",
+                        cut_in_phase=None,
+                        recovery_deadline_at=None,
+                        result_directory=str(run_directory),
+                    )
                     cut_in_tracker = None
                     cut_in_event = None
                     cut_in_deadline = None
+                    cut_in_recovery_deadline = None
 
             if (
                 cut_in_deadline is not None
@@ -1225,8 +1261,26 @@ def run_hardware_test(
                     details={"phase": cut_in_tracker.phase if cut_in_tracker else "unknown"},
                 )
                 raise TimeoutError(
-                    f"{cut_in_event.event_id} exceeded its Max time during "
-                    f"{cut_in_tracker.phase if cut_in_tracker else 'unknown'}"
+                    f"{cut_in_event.event_id} exceeded its Max time while the valve was open"
+                )
+
+            if (
+                cut_in_recovery_deadline is not None
+                and cut_in_event is not None
+                and time.monotonic() >= cut_in_recovery_deadline
+            ):
+                logger.record(
+                    "cut_in_recovery_timeout",
+                    "failed",
+                    event_id=cut_in_event.event_id,
+                    details={
+                        "phase": cut_in_tracker.phase if cut_in_tracker else "unknown",
+                        "timeout_seconds": CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+                    },
+                )
+                raise TimeoutError(
+                    f"{cut_in_event.event_id} did not return to its Cut-in recovery state "
+                    "within 12 hours"
                 )
 
             if active_draw is not None and active_draw.process.poll() is not None:
@@ -1241,6 +1295,15 @@ def run_hardware_test(
                 active_draw.close_log()
                 active_draw = None
                 if return_code != 0:
+                    if (
+                        cut_in_event is not None
+                        and completed_draw_id == cut_in_event.event_id
+                        and return_code == 2
+                    ):
+                        raise TimeoutError(
+                            f"{cut_in_event.event_id} exceeded its Max time while "
+                            "the valve was open"
+                        )
                     raise RuntimeError(f"water draw failed with code {return_code}")
                 if completed_draw_id == dependent_draw_id:
                     logger.record("dependent_test_end", "triggered", event_id=completed_draw_id)

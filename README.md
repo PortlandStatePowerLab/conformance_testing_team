@@ -21,7 +21,7 @@ Zero means off, 1 is least efficient, 9 is most efficient, and 10 requests
 vacation mode (which an SGD is not required to support). Existing XLSX and CSV
 schedules without this optional column retain the original 7-byte request.
 Beginning with the first CTA command prerequisite, the compiler automatically
-refreshes outside communication every 13 minutes 30 seconds for the entire
+refreshes outside communication every 10 minutes for the entire
 test, including run-normal periods. The heartbeat stops at test end. These
 generated refreshes do not repeat or extend user commands; all user-entered CTA
 commands and their 15-second outside-communication prerequisites retain their
@@ -32,7 +32,8 @@ the browser editor as **Max time (min)**. A `Cut-in` draw uses `TBD` for its
 start and requires only Max time. It waits for the first CTA command's fresh
 cut-out OpState, draws until the
 corresponding cut-in OpState, closes the valve, and waits for the subsequent
-cut-out. Its Max time covers the water-on and recovery phases together. It must
+cut-out. Its Max time applies only while the valve is open; after cut-in closes
+the valve, a fixed 12-hour watchdog limits the wait for recovery cut-out. It must
 be immediately followed by a `Temp Drop` draw with a `TBD` start; that draw is
 released by the recovery cut-out. Volume draws cannot follow Cut-in or Temp
 Drop draws. The orchestrator consumes the controller's existing 30-second

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from software.schedule_parser import (
+    CUT_IN_RECOVERY_TIMEOUT_SECONDS,
     EXTENDED_SCHEDULE_COLUMNS,
     DRAW_EXTENDED_SCHEDULE_COLUMNS,
     SCHEDULE_COLUMNS,
@@ -71,8 +72,15 @@ class MasterScheduleTests(unittest.TestCase):
         self.assertTrue(cut_in.dependent_end)
         self.assertEqual(cut_in.offset_seconds, 0)
         self.assertEqual(cut_in.expected_draw_seconds, 30 * 60)
-        self.assertEqual(temp_drop.offset_seconds, 30 * 60)
-        self.assertEqual(events[-1].offset_seconds, 90 * 60)
+        self.assertEqual(CUT_IN_RECOVERY_TIMEOUT_SECONDS, 12 * 60 * 60)
+        self.assertEqual(
+            temp_drop.offset_seconds,
+            30 * 60 + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+        )
+        self.assertEqual(
+            events[-1].offset_seconds,
+            90 * 60 + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+        )
 
     def test_volume_cannot_follow_state_controlled_draw(self):
         rows = [
