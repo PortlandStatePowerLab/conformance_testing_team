@@ -49,6 +49,12 @@
     #run-status { border-left: .4rem solid #0969da; }
     #run-status.failed { border-left-color: #cf222e; }
     #run-status.completed { border-left-color: #238636; }
+    #run-status.stopped { border-left-color: #d97706; }
+    .run-status-layout { display: flex; align-items: start; gap: 1rem; }
+    .run-status-main { flex: 1; min-width: 0; }
+    .run-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+    .danger { color: white; background: #cf222e; border: 1px solid #a40e26; border-radius: .3rem; font-weight: 700; }
+    .danger:hover { background: #a40e26; }
     dialog { border: 0; border-radius: .75rem; padding: 1.5rem; max-width: 34rem; box-shadow: 0 8px 30px #0005; }
     dialog::backdrop { background: #0008; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
@@ -102,9 +108,17 @@
     <div id="preflight-failures"></div>
   </div>
   <div id="run-status" class="status" hidden>
-    <strong id="run-heading">No active test.</strong>
-    <div id="run-details" class="muted"></div>
-    <button id="refresh-run" type="button">Refresh status</button>
+    <div class="run-status-layout">
+      <div class="run-status-main">
+        <strong id="run-heading">No active test.</strong>
+        <div id="run-details" class="muted"></div>
+      </div>
+      <div class="run-actions">
+        <button id="refresh-run" type="button">Refresh status</button>
+        <button id="delete-stopped-results" class="danger" type="button" hidden>Delete stopped results</button>
+        <button id="stop-test" class="danger" type="button" hidden>Stop Test</button>
+      </div>
+    </div>
   </div>
 
   <div class="cards">
@@ -164,6 +178,24 @@
     <button id="begin-countdown" type="button">Begin 10-second countdown</button>
   </div>
 </dialog>
+<dialog id="stop-dialog">
+  <h2>Stop this running test?</h2>
+  <p><strong>The valve will be closed and the CTA device will be returned to normal.</strong></p>
+  <p>Final plots and automatic Git publishing will be skipped. Existing measurements will remain available unless you delete them afterward.</p>
+  <div class="dialog-actions">
+    <button id="cancel-stop" type="button">Keep test running</button>
+    <button id="confirm-stop" class="danger" type="button">Yes, stop test</button>
+  </div>
+</dialog>
+<dialog id="delete-results-dialog">
+  <h2>Delete stopped test results?</h2>
+  <p><strong>This permanently deletes the saved measurement and CTA result directory for this stopped test.</strong></p>
+  <p>The small GUI status record is retained as an audit that the test was stopped.</p>
+  <div class="dialog-actions">
+    <button id="cancel-delete-results" type="button">Keep results</button>
+    <button id="confirm-delete-results" class="danger" type="button">Delete results</button>
+  </div>
+</dialog>
 <script>
 const canonicalColumns = ["enabled","event_id","time_after_start","phase","draw_type","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","temp_drop_f","max_draw_minutes","notes","advanced_efficiency"];
 const status = document.querySelector("#status");
@@ -184,6 +216,10 @@ const preflightFailures = document.querySelector("#preflight-failures");
 const startButton = document.querySelector("#start-test");
 const startDialog = document.querySelector("#start-dialog");
 const countdown = document.querySelector("#countdown");
+const stopTestButton = document.querySelector("#stop-test");
+const deleteStoppedResultsButton = document.querySelector("#delete-stopped-results");
+const stopDialog = document.querySelector("#stop-dialog");
+const deleteResultsDialog = document.querySelector("#delete-results-dialog");
 const runStatus = document.querySelector("#run-status");
 const runHeading = document.querySelector("#run-heading");
 const runDetails = document.querySelector("#run-details");
@@ -324,7 +360,7 @@ function draftSignature() {
 
 function updateWorkflowState() {
   const signature = draftSignature();
-  const hardwareBusy = activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state);
+  const hardwareBusy = activeRun && ["launching","initializing","running","stopping","finalizing","generating_outputs","publishing_results"].includes(activeRun.state);
   saveButton.disabled = validatedSignature !== signature || (Boolean(savedFilename) && savedSignature === signature);
   preflightButton.disabled = hardwareBusy || whInformationRunning || preflightRunning || !savedFilename || savedSignature !== signature;
   preflightButton.title = hardwareBusy ? "Unavailable while a hardware test is active" : "";
@@ -618,7 +654,10 @@ function renderRun(run) {
   const finishLabel = run.duration_estimated ? "estimated latest finish" : "expected finish";
   const finishText = run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating";
   runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
-  refreshRunButton.textContent = ["completed", "failed"].includes(run.state) ? "Dismiss completed test" : "Refresh status";
+  const terminal = ["completed", "failed", "stopped"].includes(run.state);
+  refreshRunButton.textContent = terminal ? "Dismiss test" : "Refresh status";
+  stopTestButton.hidden = !["launching", "initializing", "running"].includes(run.state);
+  deleteStoppedResultsButton.hidden = run.state !== "stopped" || !run.result_directory || Boolean(run.results_deleted);
   updateWorkflowState();
 }
 
@@ -638,16 +677,46 @@ async function refreshRunStatus({dismissTerminal = false} = {}) {
 }
 
 async function dismissTerminalRun() {
-  if (!activeRun || !["completed", "failed"].includes(activeRun.state)) return;
+  if (!activeRun || !["completed", "failed", "stopped"].includes(activeRun.state)) return;
   await request("/api/runs/current/dismiss", {});
   renderRun(null);
 }
 
 refreshRunButton.onclick = async () => {
-  if (activeRun && ["completed", "failed"].includes(activeRun.state)) {
+  if (activeRun && ["completed", "failed", "stopped"].includes(activeRun.state)) {
     await dismissTerminalRun();
   } else {
     await refreshRunStatus();
+  }
+};
+stopTestButton.onclick = () => stopDialog.showModal();
+document.querySelector("#cancel-stop").onclick = () => stopDialog.close();
+stopDialog.oncancel = () => stopDialog.close();
+document.querySelector("#confirm-stop").onclick = async () => {
+  document.querySelector("#confirm-stop").disabled = true;
+  try {
+    const result = await request("/api/runs/current/stop", {});
+    stopDialog.close();
+    renderRun(result.run);
+  } catch (error) {
+    show(error, false);
+  } finally {
+    document.querySelector("#confirm-stop").disabled = false;
+  }
+};
+deleteStoppedResultsButton.onclick = () => deleteResultsDialog.showModal();
+document.querySelector("#cancel-delete-results").onclick = () => deleteResultsDialog.close();
+deleteResultsDialog.oncancel = () => deleteResultsDialog.close();
+document.querySelector("#confirm-delete-results").onclick = async () => {
+  document.querySelector("#confirm-delete-results").disabled = true;
+  try {
+    const result = await request("/api/runs/current/delete-results", {});
+    deleteResultsDialog.close();
+    renderRun(result.run);
+  } catch (error) {
+    show(error, false);
+  } finally {
+    document.querySelector("#confirm-delete-results").disabled = false;
   }
 };
 startButton.onclick = () => {

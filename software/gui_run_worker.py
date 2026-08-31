@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -62,6 +63,7 @@ def run(args: argparse.Namespace) -> int:
         command.append("--enable-water-output")
     log_path = args.run_directory / "runner.log"
     stage_path = args.run_directory / "runner_stage.json"
+    stop_request_path = args.run_directory / "stop_requested.json"
     return_code = 1
     try:
         with log_path.open("a", encoding="utf-8", buffering=1) as log:
@@ -73,15 +75,29 @@ def run(args: argparse.Namespace) -> int:
             )
             status.update(state="running", runner_pid=process.pid)
             atomic_json(status_path, status)
+            stop_sent = False
             while process.poll() is None:
                 now = datetime.now(PACIFIC)
                 elapsed = max(0, int((now - started).total_seconds()))
+                if stop_request_path.is_file() and not stop_sent:
+                    status.update(
+                        state="stopping",
+                        message="Stop requested; safely shutting down hardware.",
+                    )
+                    atomic_json(status_path, status)
+                    process.send_signal(signal.SIGINT)
+                    stop_sent = True
                 if stage_path.is_file():
                     try:
                         stage = json.loads(stage_path.read_text(encoding="utf-8"))
-                        status.update(state=stage["state"], message=stage["message"])
+                        status.update(stage)
                     except (KeyError, OSError, json.JSONDecodeError):
                         pass
+                if stop_sent and status.get("state") == "running":
+                    status.update(
+                        state="stopping",
+                        message="Stop requested; safely shutting down hardware.",
+                    )
                 status.update(
                     last_heartbeat_at=now.isoformat(),
                     elapsed_seconds=min(elapsed, duration),
@@ -91,15 +107,28 @@ def run(args: argparse.Namespace) -> int:
                     ),
                 )
                 atomic_json(status_path, status)
-                time.sleep(5)
+                time.sleep(1)
             return_code = process.returncode
+        final_stage: dict[str, Any] = {}
+        if stage_path.is_file():
+            try:
+                final_stage = json.loads(stage_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                pass
+        stopped = final_stage.get("state") == "stopped" or (
+            stop_sent and return_code in {0, -signal.SIGINT, 128 + signal.SIGINT}
+        )
+        status.update(final_stage)
         status.update(
-            state="completed" if return_code == 0 else "failed",
+            state="stopped" if stopped else "completed" if return_code == 0 else "failed",
             finished_at=datetime.now(PACIFIC).isoformat(), return_code=return_code,
-            remaining_seconds=0 if return_code == 0 else status.get("remaining_seconds"),
+            remaining_seconds=0 if return_code == 0 or stopped else status.get("remaining_seconds"),
             message=(
-                "Test complete; shutdown and final report generation finished."
-                if return_code == 0 else "The test runner exited before completion."
+                "Test stopped safely; plots and automatic publishing were skipped."
+                if stopped
+                else "Test complete; shutdown and final report generation finished."
+                if return_code == 0
+                else "The test runner exited before completion."
             ),
         )
     except Exception as exc:
@@ -108,7 +137,7 @@ def run(args: argparse.Namespace) -> int:
             error=f"{type(exc).__name__}: {exc}", return_code=return_code,
         )
     atomic_json(status_path, status)
-    return 0 if status["state"] == "completed" else 1
+    return 0 if status["state"] in {"completed", "stopped"} else 1
 
 
 def main() -> int:

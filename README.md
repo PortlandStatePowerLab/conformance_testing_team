@@ -86,6 +86,16 @@ Refreshing or closing the browser does not stop that worker; reopening the GUI
 restores the current run status. Only one active GUI-launched test is permitted
 per station, and preflight approval expires after five minutes.
 
+While a test is launching, initializing, or running, its status panel includes
+a red **Stop Test** button with a confirmation dialog. A confirmed stop is
+persisted for the detached worker, which interrupts the runner through its
+normal cleanup path: active water is stopped, the CTA device is returned to
+normal, and monitoring processes and logs are closed. Operator-stopped tests
+skip final plot/report generation and automatic Git publishing. Once the GUI
+shows `stopped`, a separately confirmed **Delete stopped results** action can
+remove that run's local saved-result directory; the small GUI status record is
+retained for audit purposes.
+
 Validate the schedule without accessing hardware:
 
 ```bash

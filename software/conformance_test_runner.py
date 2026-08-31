@@ -88,7 +88,7 @@ def _archive_station_equipment(
     return destination
 
 
-def _write_gui_stage(state: str, message: str) -> None:
+def _write_gui_stage(state: str, message: str, **details: Any) -> None:
     """Publish an optional GUI lifecycle marker without coupling to the GUI."""
     configured = os.environ.get(GUI_STAGE_PATH_ENV)
     if not configured:
@@ -98,7 +98,7 @@ def _write_gui_stage(state: str, message: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary.write_text(
-            json.dumps({"state": state, "message": message}) + "\n",
+            json.dumps({"state": state, "message": message, **details}) + "\n",
             encoding="utf-8",
         )
         os.replace(temporary, path)
@@ -862,6 +862,11 @@ def run_hardware_test(
         args.run_id,
         args.master_schedule,
     )
+    _write_gui_stage(
+        "running",
+        "Hardware test is running.",
+        result_directory=str(run_directory),
+    )
     archived_equipment = _archive_station_equipment(run_directory)
     if archived_equipment is None:
         print("EQUIPMENT_SNAPSHOT_WARNING station equipment not available", file=sys.stderr)
@@ -1286,7 +1291,12 @@ def run_hardware_test(
     finally:
         _write_gui_stage(
             "finalizing",
-            "Scheduled test complete; returning hardware to normal and closing logs.",
+            (
+                "Stop requested; returning hardware to normal and closing logs."
+                if outcome == "interrupted"
+                else "Scheduled test complete; returning hardware to normal and closing logs."
+            ),
+            result_directory=str(run_directory),
         )
         if progress is not None:
             progress.finish(
@@ -1342,20 +1352,29 @@ def run_hardware_test(
 
         logger.record("run_finished", outcome)
         logger.close()
-        _write_gui_stage(
-            "generating_outputs",
-            "Hardware shutdown complete; generating the report and PNG files.",
-        )
-        generate_final_outputs(run_directory)
-        if not args.no_publish_results:
+        if outcome == "interrupted":
             _write_gui_stage(
-                "publishing_results",
-                "Reports generated; publishing this run to GitHub.",
+                "stopped",
+                "Test stopped safely; plots and automatic publishing were skipped.",
+                result_directory=str(run_directory),
             )
-            publish_run_results(
-                run_directory,
-                args.test_name or safe_identifier(args.master_schedule.stem),
+        else:
+            _write_gui_stage(
+                "generating_outputs",
+                "Hardware shutdown complete; generating the report and PNG files.",
+                result_directory=str(run_directory),
             )
+            generate_final_outputs(run_directory)
+            if not args.no_publish_results:
+                _write_gui_stage(
+                    "publishing_results",
+                    "Reports generated; publishing this run to GitHub.",
+                    result_directory=str(run_directory),
+                )
+                publish_run_results(
+                    run_directory,
+                    args.test_name or safe_identifier(args.master_schedule.stem),
+                )
     return run_directory
 
 

@@ -14,6 +14,7 @@ from software.schedule_gui import (
     DEFAULT_IDLE_TIMEOUT_HOURS,
     current_run,
     dismiss_current_run,
+    delete_current_stopped_results,
     derive_rows,
     editor_metadata,
     friendly_schedule_name,
@@ -23,6 +24,7 @@ from software.schedule_gui import (
     normalize_schedule_name,
     positive_hours,
     run_is_active,
+    request_current_run_stop,
     save_schedule,
     schedule_uses_water,
     ScheduleGuiHandler,
@@ -45,6 +47,53 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_active_run_stop_request_is_persisted_for_worker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            run = runs / "run_one"
+            run.mkdir()
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            (run / "status.json").write_text(
+                '{"run_id":"run_one","state":"running"}', encoding="utf-8"
+            )
+
+            status = request_current_run_stop(runs)
+
+            self.assertEqual(status["state"], "stopping")
+            self.assertTrue((run / "stop_requested.json").is_file())
+            saved = json.loads((run / "status.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["state"], "stopping")
+
+    def test_stopped_result_directory_can_be_deleted_after_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs = root / "gui_runs"
+            result_root = root / "results"
+            run = runs / "run_one"
+            result = result_root / "WH-3" / "stopped_run"
+            run.mkdir(parents=True)
+            result.mkdir(parents=True)
+            (result / "measurements.csv").write_text("data", encoding="utf-8")
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            (run / "status.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "run_one",
+                        "state": "stopped",
+                        "result_directory": str(result),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = delete_current_stopped_results(
+                runs, results_root=result_root
+            )
+
+            self.assertFalse(result.exists())
+            self.assertTrue(status["results_deleted"])
+            self.assertTrue(run.is_dir())
+
     def test_hardware_is_busy_only_for_active_run_states(self):
         with tempfile.TemporaryDirectory() as directory:
             runs = Path(directory)

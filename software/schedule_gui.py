@@ -74,8 +74,10 @@ PACIFIC = ZoneInfo("America/Los_Angeles")
 PREFLIGHT_MAX_AGE_SECONDS = 300
 ACTIVE_RUN_STATES = {
     "launching", "initializing", "running", "finalizing",
-    "generating_outputs", "stopping",
+    "generating_outputs", "publishing_results", "stopping",
 }
+STOPPABLE_RUN_STATES = {"launching", "initializing", "running"}
+TERMINAL_RUN_STATES = {"completed", "failed", "stopped"}
 EQUIPMENT_FIELDS = {
     "manufacturer": str, "model_number": str, "year": int, "voltage": str,
     "capacity_gallons": int, "station_id": str, "date_added": str,
@@ -135,7 +137,8 @@ def current_run(run_directory: Path) -> dict[str, Any] | None:
         status = _read_json(run_directory / run_id / "status.json")
         heartbeat = status.get("last_heartbeat_at")
         if heartbeat and status.get("state") in {
-            "launching", "initializing", "running", "finalizing", "generating_outputs"
+            "launching", "initializing", "running", "stopping", "finalizing",
+            "generating_outputs", "publishing_results",
         }:
             age = (datetime.now(PACIFIC) - datetime.fromisoformat(heartbeat)).total_seconds()
             status["status_age_seconds"] = max(0, int(age))
@@ -158,9 +161,68 @@ def dismiss_current_run(run_directory: Path) -> None:
     current = _read_json(pointer)
     run_id = str(current["run_id"])
     status = _read_json(run_directory / run_id / "status.json")
-    if status.get("state") not in {"completed", "failed"}:
+    if status.get("state") not in TERMINAL_RUN_STATES:
         raise RuntimeError("an active test cannot be dismissed")
     _atomic_json(pointer, {"run_id": run_id, "dismissed": True})
+
+
+def request_current_run_stop(run_directory: Path) -> dict[str, Any]:
+    """Ask the detached worker to interrupt its runner through normal cleanup."""
+    pointer = _read_json(run_directory / "current.json")
+    run_id = str(pointer["run_id"])
+    directory = (run_directory / run_id).resolve()
+    status_path = directory / "status.json"
+    status = _read_json(status_path)
+    if status.get("state") == "stopping":
+        return status
+    if status.get("state") not in STOPPABLE_RUN_STATES:
+        raise RuntimeError("this test is no longer in a stoppable state")
+    requested_at = datetime.now(PACIFIC).isoformat()
+    _atomic_json(
+        directory / "stop_requested.json",
+        {"requested_at": requested_at, "run_id": run_id},
+    )
+    status.update(
+        state="stopping",
+        message="Stop requested; safely shutting down hardware.",
+        stop_requested_at=requested_at,
+    )
+    _atomic_json(status_path, status)
+    return status
+
+
+def delete_current_stopped_results(
+    run_directory: Path,
+    *,
+    results_root: Path = SOFTWARE_DIRECTORY.parent / "saved_data" / "conformance_runs",
+) -> dict[str, Any]:
+    """Delete only the saved result directory for a safely stopped GUI run."""
+    pointer = _read_json(run_directory / "current.json")
+    run_id = str(pointer["run_id"])
+    status_path = run_directory / run_id / "status.json"
+    status = _read_json(status_path)
+    if status.get("state") != "stopped":
+        raise RuntimeError("results can be deleted only after a test is safely stopped")
+    configured = status.get("result_directory")
+    if not configured:
+        raise RuntimeError("the stopped run has no recorded result directory")
+    target = Path(str(configured)).resolve()
+    root = results_root.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError("stopped result directory is outside the results root") from exc
+    if target == root:
+        raise RuntimeError("refusing to delete the results root")
+    if target.exists():
+        shutil.rmtree(target)
+    status.update(
+        results_deleted=True,
+        results_deleted_at=datetime.now(PACIFIC).isoformat(),
+        message="Stopped test results were deleted by the operator.",
+    )
+    _atomic_json(status_path, status)
+    return status
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -680,6 +742,16 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                 with self.run_lock:
                     dismiss_current_run(self.run_directory)
                 self._json(HTTPStatus.OK, {"dismissed": True})
+                return
+            if self.path == "/api/runs/current/stop":
+                with self.run_lock:
+                    result = request_current_run_stop(self.run_directory)
+                self._json(HTTPStatus.ACCEPTED, {"run": result})
+                return
+            if self.path == "/api/runs/current/delete-results":
+                with self.run_lock:
+                    result = delete_current_stopped_results(self.run_directory)
+                self._json(HTTPStatus.OK, {"run": result})
                 return
             if self.path == "/api/wh-information":
                 if run_is_active(self.run_directory):
