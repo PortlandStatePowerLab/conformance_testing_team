@@ -17,7 +17,7 @@ from software.cold_water.client import (
     SshSnapshotClient,
 )
 from software.exception_notes import add_exception_note
-from software.sensors.sensor_reader import SensorReader, SensorSnapshot
+from software.sensors import SensorReader, SensorSnapshot
 from software.station.station_identity import station_number
 
 

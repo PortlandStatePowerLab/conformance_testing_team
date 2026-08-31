@@ -20,8 +20,9 @@ from software.cold_water.protocol import (
     hello_message,
     reading_message,
 )
-from software.sensors.sensor_reader import SensorReader
+from software.sensors import SensorReader
 from software.station.station_identity import station_number
+from software.helpers import _unix_socket_family
 
 
 DEFAULT_SAMPLE_PERIOD_SECONDS = 0.5
@@ -37,7 +38,7 @@ def systemd_listen_socket() -> socket.socket | None:
         return None
     inherited = socket.fromfd(
         SYSTEMD_LISTEN_FD,
-        socket.AF_UNIX,
+        _unix_socket_family(),
         socket.SOCK_STREAM,
     )
     inherited.set_inheritable(False)
@@ -53,7 +54,7 @@ def create_listen_socket(path: Path) -> socket.socket:
                 f"refusing to replace non-socket path: {path}"
             )
         path.unlink()
-    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener = socket.socket(_unix_socket_family(), socket.SOCK_STREAM)
     listener.bind(str(path))
     listener.listen()
     return listener

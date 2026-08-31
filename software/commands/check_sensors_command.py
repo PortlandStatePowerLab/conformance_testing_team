@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from software.sensors import sensor_diagnostic as diagnostic
 from software.station.station_adc_builder import build_station_adc
 from software.sensors.sensor_diagnostic import DEFAULT_WATCH_INTERVAL_S, run_sensor_check
-from software.sensors.sensor_reader import SensorReader
+from software.sensors import SensorReader
 
 time = diagnostic.time
 

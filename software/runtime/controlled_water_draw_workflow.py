@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from software.exception_notes import add_exception_note
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 from software.valve.valve_interface import Valve
 
 MAX_RUN_MINUTES = 5.0

@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Protocol
 
 # Grouped sensor reads and canonical conversions from ``sensor_reader.py``.
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 
 # endregion Imports
 
