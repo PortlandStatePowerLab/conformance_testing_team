@@ -1,5 +1,29 @@
 # Water-Heater Conformance Test Runner
 
+This software implements an HTTP GUI to load a test, add a test, validate a test, start a test run, and get real time data from the test run
+
+## Steps to Open the SSH/HTTP GUI
+After cloning the repository to the Raspberry Pi, open an SSH connection to the Pi from your computer
+* $ ssh -L <port number>:127.0.0.1:5000 pi@<Pi IP address> (Use the port number 5000 + Pi number. In the case of Pi 3, we would use 5003)
+A password may need to be entered to access the Pi. Once you are in the Pi, start a Tmux session
+* $  tmux new -s gui
+* $ cd conformance_testing_team
+* $ make schedule-gui
+(Optional) On the terminal, press Ctrl + b, then d to change from the tmux terminal to the normal terminal.
+To access the tmux session again:
+* tmux attach -t gui
+
+Your gui is now running. Go to a web browser and type in http://127.0.0.1:5003/ for station 3 for example. Just change the port number 5003 to any number you chose above if accessing a different water heater.
+You should now see the conformance test schedule open and ready to use
+
+### Important Notes on the tmux GUI session
+* The tmux session is chosen in order to keep the gui running in the background in the event of an SSH connection error or disconnect.
+* The alternative systemctl is not used because this would keep the GUI service active permanently. Starting the testing GUI intentionally is preferred over a constant running process 
+* The specific SSH local-forwarding connection of ssh -L <port number>:127.0.0.1:5000 pi@<Pi IP address> provides access to the GUI without exposing the GUI’s port directly on the network
+* The schedule-gui python script times out after 48 hours of no post or get requests so that the service ends in case someone forgets about the tmux or python script running
+
+
+## Manually run a start a test schedule
 The human-editable test definition is
 `software/conformance_test_schedule_main.xlsx`. Running the test runner imports
 it into the canonical `software/conformance_test_schedule.csv` before
