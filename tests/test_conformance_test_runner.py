@@ -10,6 +10,7 @@ from software.conformance_test_runner import (
     CutInStateTracker,
     DEFAULT_MASTER_SCHEDULE,
     ProgressReporter,
+    _cta_communication_warnings,
     _create_run_directory,
     _archive_station_equipment,
     _launch_water_draw,
@@ -32,6 +33,25 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_cta_communication_warnings_include_nak_layer_command_and_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run_directory = Path(directory)
+            (run_directory / "cta_events.csv").write_text(
+                "event,command,nak_reason\n"
+                "link_nak,none,Checksum error\n"
+                "application_nak,basic_dr,No reason given\n"
+                "operational_state,query_operational_state,\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                _cta_communication_warnings(run_directory),
+                [
+                    "Link NAK for none: Checksum error",
+                    "Application NAK for basic_dr: No reason given",
+                ],
+            )
+
     def test_cut_in_tracker_accepts_transient_five_between_target_states(self):
         tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
         tracker.cta_completed()

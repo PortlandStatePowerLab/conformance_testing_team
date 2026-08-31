@@ -107,6 +107,28 @@ def _write_gui_stage(state: str, message: str, **details: Any) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _cta_communication_warnings(run_directory: Path) -> list[str]:
+    """Return concise CTA NAK warnings for a failed GUI run."""
+    path = run_directory / "cta_events.csv"
+    if not path.is_file():
+        return []
+    warnings: list[str] = []
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("event") not in {"link_nak", "application_nak"}:
+                    continue
+                layer = (
+                    "Link NAK" if row["event"] == "link_nak" else "Application NAK"
+                )
+                command = row.get("command") or "unknown command"
+                reason = row.get("nak_reason") or "No reason given"
+                warnings.append(f"{layer} for {command}: {reason}")
+    except (OSError, csv.Error):
+        return []
+    return warnings
+
+
 def _run_git(
     repository: Path,
     arguments: list[str],
@@ -894,6 +916,7 @@ def run_hardware_test(
     progress: ProgressReporter | None = None
     last_elapsed = -args.prestart_seconds
     outcome = "failed"
+    failure_error: str | None = None
 
     try:
         logger.record(
@@ -1282,6 +1305,7 @@ def run_hardware_test(
         logger.record("run_interrupted", "requested")
     except Exception as exc:
         outcome = "failed"
+        failure_error = f"{type(exc).__name__}: {exc}"
         logger.record(
             "run_error",
             "failed",
@@ -1374,6 +1398,14 @@ def run_hardware_test(
                 publish_run_results(
                     run_directory,
                     args.test_name or safe_identifier(args.master_schedule.stem),
+                )
+            if outcome == "failed":
+                _write_gui_stage(
+                    "failed",
+                    "Test failed.",
+                    error=failure_error,
+                    communication_warnings=_cta_communication_warnings(run_directory),
+                    result_directory=str(run_directory),
                 )
     return run_directory
 

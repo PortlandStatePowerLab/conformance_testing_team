@@ -119,17 +119,18 @@ def run(args: argparse.Namespace) -> int:
             stop_sent and return_code in {0, -signal.SIGINT, 128 + signal.SIGINT}
         )
         status.update(final_stage)
+        final_message = final_stage.get("message")
         status.update(
             state="stopped" if stopped else "completed" if return_code == 0 else "failed",
             finished_at=datetime.now(PACIFIC).isoformat(), return_code=return_code,
             remaining_seconds=0 if return_code == 0 or stopped else status.get("remaining_seconds"),
-            message=(
+            message=(final_message or (
                 "Test stopped safely; plots and automatic publishing were skipped."
                 if stopped
                 else "Test complete; shutdown and final report generation finished."
                 if return_code == 0
                 else "The test runner exited before completion."
-            ),
+            )),
         )
     except Exception as exc:
         status.update(

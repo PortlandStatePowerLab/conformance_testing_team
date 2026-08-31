@@ -653,7 +653,10 @@ function renderRun(run) {
   const remainingLabel = run.duration_estimated ? "Estimated remaining" : "Remaining";
   const finishLabel = run.duration_estimated ? "estimated latest finish" : "expected finish";
   const finishText = run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating";
-  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
+  const warnings = Array.isArray(run.communication_warnings) && run.communication_warnings.length
+    ? ` · Earlier CTA warning${run.communication_warnings.length === 1 ? "" : "s"}: ${run.communication_warnings.join("; ")}`
+    : "";
+  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}${warnings}`;
   const terminal = ["completed", "failed", "stopped"].includes(run.state);
   refreshRunButton.textContent = terminal ? "Dismiss test" : "Refresh status";
   stopTestButton.hidden = !["launching", "initializing", "running"].includes(run.state);
