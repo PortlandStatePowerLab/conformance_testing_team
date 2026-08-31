@@ -247,6 +247,15 @@ def _generate_energy_take_plot(run_directory: Path) -> Path | None:
     )[1]
 
 
+def _generate_energy_take_water_plot(run_directory: Path) -> Path | None:
+    from software.run_plot_water import plot_run_with_water
+
+    return plot_run_with_water(
+        run_directory,
+        output_path=run_directory / "energy_take_power_water.png",
+    )[1]
+
+
 def _generate_state_verification_plot(run_directory: Path) -> Path | None:
     from software.state_verification_plot import plot_state_verification
 
@@ -287,8 +296,8 @@ def generate_final_outputs(
     tasks = (
         ("CONFORMANCE_REPORT", lambda: generate_conformance_report(run_directory)),
         (
-            "ENERGY_TAKE_PLOT",
-            lambda: _generate_energy_take_plot(run_directory),
+            "ENERGY_TAKE_WATER_PLOT",
+            lambda: _generate_energy_take_water_plot(run_directory),
         ),
         (
             "STATE_VERIFICATION_PLOT",

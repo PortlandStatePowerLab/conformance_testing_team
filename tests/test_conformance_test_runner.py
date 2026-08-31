@@ -409,8 +409,8 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 return_value=run_directory / "conformance_test_report.xlsx",
             ) as report,
             patch(
-                "software.conformance_test_runner._generate_energy_take_plot",
-                return_value=run_directory / "energy_take_power.png",
+                "software.conformance_test_runner._generate_energy_take_water_plot",
+                return_value=run_directory / "energy_take_power_water.png",
             ) as energy_plot,
             patch(
                 "software.conformance_test_runner._generate_state_verification_plot",
@@ -437,7 +437,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         phase_summary.assert_called_once()
         event_timeline.assert_called_once()
         self.assertIn("CONFORMANCE_REPORT run", output.getvalue())
-        self.assertIn("ENERGY_TAKE_PLOT run", output.getvalue())
+        self.assertIn("ENERGY_TAKE_WATER_PLOT run", output.getvalue())
         self.assertIn("PHASE_SUMMARY run", output.getvalue())
         self.assertIn("STATE_VERIFICATION_PLOT_ERROR ValueError: no states", errors.getvalue())
 

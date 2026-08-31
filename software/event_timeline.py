@@ -207,6 +207,7 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
         plot_data.power[-1].timestamp,
     )
     events: list[TimelineEvent] = []
+    first_expected_timestamps: set[datetime] = set()
 
     for index, phase in enumerate(phases):
         label = labels[phase.timestamp]
@@ -232,6 +233,7 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
             )
             expected_text = " or ".join(str(code) for code in sorted(phase.expected_states))
             if expected is not None:
+                first_expected_timestamps.add(expected.timestamp)
                 events.append(_event(
                     phase,
                     label,
@@ -269,6 +271,32 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
                         f"{baseline:.0f} to {changed.value:.0f} Wh",
                         "Commodity poll",
                     ))
+
+    # Preserve the concise first-expected-state milestone above, then report every
+    # subsequent state transition without repeating unchanged polling samples.
+    previous_code = None
+    for report in verification.reports:
+        changed = report.code != previous_code
+        previous_code = report.code
+        if not changed or report.timestamp in first_expected_timestamps:
+            continue
+        phase = _active_phase(phases, report.timestamp)
+        if phase is None or report.timestamp > run_end:
+            continue
+        expected_text = " or ".join(str(code) for code in sorted(phase.expected_states))
+        expectation = (
+            "expected"
+            if report.code in phase.expected_states
+            else f"not expected; expected {expected_text}"
+        )
+        events.append(_event(
+            phase,
+            labels[phase.timestamp],
+            report.timestamp,
+            "Operational state changed",
+            f"State {report.code}: {report.name} ({expectation})",
+            "CTA state poll",
+        ))
 
     points = _power_points(_read_csv(directory / "power.csv"))
     previous_mode = points[0].mode if points else "standby"
