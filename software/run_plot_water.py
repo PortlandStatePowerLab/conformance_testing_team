@@ -9,8 +9,6 @@ import statistics
 from datetime import time, timedelta
 from pathlib import Path
 
-import matplotlib.dates as mdates
-
 from .run_plot import (
     _duck_curve_display_start,
     _shift,
@@ -19,6 +17,7 @@ from .run_plot import (
     plot_run,
 )
 from .state_verification_plot import load_verification_data, verification_status
+from .time_axis import apply_clock_ticks
 
 
 PLOT_FILENAME = "energy_take_power_water.png"
@@ -180,8 +179,7 @@ def add_operational_state_band(
     state_axis.set_ylabel(
         "Operational\nState", rotation=0, ha="right", va="center", labelpad=10
     )
-    state_axis.xaxis.set_major_locator(mdates.HourLocator())
-    state_axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
+    apply_clock_ticks(state_axis, display_start, plot_end)
     state_axis.tick_params(axis="x", rotation=45)
     state_axis.set_xlabel("Duck-Curve Time")
     for spine in state_axis.spines.values():

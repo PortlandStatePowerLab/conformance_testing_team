@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
-import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
 from .equipment_metadata import equipment_title_line
+from .time_axis import apply_clock_ticks
 
 from .run_plot import (
     _command_phases,
@@ -305,8 +305,7 @@ def plot_state_verification(
             spine.set_linewidth(0.8)
     command_axis.tick_params(axis="x", bottom=False, labelbottom=False)
     report_axis.tick_params(axis="x", bottom=False, labelbottom=False)
-    result_axis.xaxis.set_major_locator(mdates.HourLocator())
-    result_axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
+    apply_clock_ticks(result_axis, display_start, display_end)
     result_axis.set_xlabel("Duck-Curve Time")
     result_axis.tick_params(axis="x", rotation=45)
     equipment_line = equipment_title_line(directory)

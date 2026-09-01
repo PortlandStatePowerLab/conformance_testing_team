@@ -10,10 +10,10 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Iterable
 
-import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
 from .equipment_metadata import equipment_title_line
+from .time_axis import apply_clock_ticks
 
 
 PLOT_FILENAME = "energy_take_power.png"
@@ -353,8 +353,7 @@ def plot_run(
     power_axis.set_ylabel("Real Power (kW)", color="red")
     energy_axis.tick_params(axis="y", colors="green")
     power_axis.tick_params(axis="y", colors="red")
-    energy_axis.xaxis.set_major_locator(mdates.HourLocator())
-    energy_axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
+    apply_clock_ticks(energy_axis, display_start, plot_end)
     energy_axis.grid(True, color="#b0b0b0", alpha=0.45)
     energy_axis.legend(handles=[energy_line, power_line], loc="upper left")
     equipment_line = equipment_title_line(directory)
