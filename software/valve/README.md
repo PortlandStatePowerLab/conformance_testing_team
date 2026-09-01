@@ -33,9 +33,15 @@ An interface defines operations; a driver touches GPIO; a builder configures har
 
 ## Usage
 
-Import the interface in workflows. Operators run `bin/valve-check`.
+Workflows depend on the `Valve` protocol. Hardware composition and operator commands construct
+the installed valve through `build_gpio_valve()`. Human operators normally run `bin/valve-check`
+for diagnostic behaviors.
 
 ## Safety notes
 
 The builder and driver actuate GPIO17 and the connected valve. `bin/valve-check`
 defaults to a 0.25-second open pulse; use `--state off` for a close-only command.
+
+Importing `Valve` or `build_gpio_valve` is safe on Windows because `RPi.GPIO` is loaded
+only when the builder is called. The caller owns the returned driver and must call `cleanup()`
+when valve control is finished.

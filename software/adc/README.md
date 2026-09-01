@@ -21,10 +21,10 @@ Supported callers import only the portable protocol and configured device builde
 from software.adc import SensorAdc, build_max1238
 ```
 
-The hardware coupled `Max1238` class, the configuration decisions, start-up timing constant,
+The hardware-specific `Max1238` class, the configuration decisions, start-up timing constant,
 and the diagnostic helpers are private implementation details.
 
-Station specific I2C bus number and MAX1238 device address selection are wiring details
+Station-specific I2C bus number and MAX1238 device address selection are wiring details
 that belong in `software/station/station_adc_builder.py`
 
 ## Does not belong here
@@ -42,7 +42,7 @@ that belong in `software/station/station_adc_builder.py`
 - A driver communicates directly with one hardware model over I2C and owns its open bus connection.
 - A device builder constructs and configures that driver using connection details supplied by its caller.
 - A station builder supplies the bus number and device address from the station hardware map.
-- A diagnostic exercises ADC behavior and reports results without becoming part of the supported package API
+- A diagnostic exercises ADC behavior and reports results without becoming part of the supported package API.
 - When a caller receives an ADC object from a builder, that caller owns the object, and must close it when finished.
 
 ## Usage

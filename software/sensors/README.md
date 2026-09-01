@@ -14,7 +14,7 @@ WH station sensor configuration, deterministic conversions, grouped measurement 
 
 ## Public API
 
-Supported consumers import the sensor reaer and snapshot through the package:
+Supported consumers import the sensor reader and snapshot through the package:
 
 ```python
 from software.sensors import SensorReader, SensorSnapshot
@@ -33,7 +33,9 @@ A reader retrieves and processes measurements; conversion math has no hardware a
 
 ## Usage
 
-insert something <- here
+Portable consumers import `SensorReader` and `SensorSnapshot` through `software.sensors`.
+Station assembly constructs and owns the ADC object and injects it into `SensorReader`.
+Human operators normally run `bin/sensor-check`.
 
 ## Safety notes
 
