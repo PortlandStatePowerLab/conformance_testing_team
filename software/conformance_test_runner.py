@@ -998,7 +998,7 @@ def run_hardware_test(
         )
         controller = start_process(
             "cta_controller",
-            [str(args.cta_binary)],
+            [str(args.cta_binary), "--schedule"],
             log_path=run_directory / "cta_controller.log",
             cwd=args.cta_controller_dir,
             environment=controller_environment,
