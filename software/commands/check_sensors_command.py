@@ -6,9 +6,9 @@ import argparse
 from collections.abc import Sequence
 
 from software.sensors import sensor_diagnostic as diagnostic
-from software.adc.max1238_builder import build_max1238
+from software.station.station_adc_builder import build_station_adc
 from software.sensors.sensor_diagnostic import DEFAULT_WATCH_INTERVAL_S, run_sensor_check
-from software.sensors.sensor_reader import SensorReader, SensorSnapshot
+from software.sensors import SensorReader
 
 time = diagnostic.time
 
@@ -25,7 +25,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    adc = build_max1238()
+    adc = build_station_adc()
     try:
         run_sensor_check(SensorReader(adc), watch=args.watch, interval_s=args.interval_s)
     except KeyboardInterrupt:

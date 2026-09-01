@@ -6,7 +6,7 @@ import argparse
 from collections.abc import Sequence
 
 from software.exception_notes import add_exception_note
-from software.valve.gpio_valve_builder import build_gpio_valve
+from software.valve import build_gpio_valve
 from software.valve.valve_diagnostic import MAX_PULSE_SECONDS, run_valve_diagnostic
 
 

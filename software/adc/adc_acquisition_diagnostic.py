@@ -46,14 +46,6 @@ class DiagnosticAdc(Protocol):
         """Read an inclusive channel range keyed by channel number."""
         ...
 
-    def setup_adc(self, **kwargs: object) -> None:
-        """Transmit an explicit MAX1238 setup configuration."""
-        ...
-
-    def close(self) -> None:
-        """Close the owned ADC connection."""
-        ...
-
 
 @dataclass(frozen=True)
 class AcquisitionResult:

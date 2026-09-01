@@ -9,6 +9,9 @@ import types
 import unittest
 from enum import Enum
 from unittest.mock import patch
+from typing import TYPE_CHECKING, cast
+if TYPE_CHECKING:
+    from software.adc.max1238_driver import Max1238
 
 from software.commands import check_adc_acquisition_command as compare_adc_acquisition
 
@@ -66,8 +69,8 @@ class CompareAdcAcquisitionTest(unittest.TestCase):
         fake_driver = self.make_fake_driver_module()
         with (
             patch.object(
-                compare_adc_acquisition, "build_max1238", return_value=fake_adc
-            ) as build_max1238,
+                compare_adc_acquisition, "build_station_adc", return_value=fake_adc
+            ) as build_station_adc,
             patch.dict(sys.modules, {"software.adc.max1238_driver": fake_driver}),
             patch.object(compare_adc_acquisition.time, "sleep", return_value=None),
             contextlib.redirect_stdout(captured_output),
@@ -75,7 +78,7 @@ class CompareAdcAcquisitionTest(unittest.TestCase):
             exit_code = compare_adc_acquisition.main(["--samples", "3", "--delay-s", "0"])
 
         self.assertEqual(exit_code, 0)
-        build_max1238.assert_called_once_with()
+        build_station_adc.assert_called_once_with()
         self.assertTrue(fake_adc.closed)
         self.assertEqual(fake_adc.setup_calls[0]["clock"], fake_driver.ClockType.Internal)
         self.assertEqual(
@@ -141,8 +144,11 @@ class CompareAdcAcquisitionTest(unittest.TestCase):
                         side_effect=lambda delay: events.append(("sleep", delay)),
                     ),
                 ):
-                    compare_adc_acquisition.configure_clock_mode(fake_adc, mode)
-                setup = events[0][1]
+                    compare_adc_acquisition.configure_clock_mode(
+                        cast("Max1238", fake_adc),
+                        mode
+                    )
+                setup = cast(dict[str, object], events[0][1])
                 self.assertEqual(setup["clock"], expected_clock)
                 self.assertEqual(
                     setup["referenceVoltage"],
@@ -160,7 +166,7 @@ class CompareAdcAcquisitionTest(unittest.TestCase):
         fake_adc = RaisingFakeAdc()
         fake_driver = self.make_fake_driver_module()
         with (
-            patch.object(compare_adc_acquisition, "build_max1238", return_value=fake_adc),
+            patch.object(compare_adc_acquisition, "build_station_adc", return_value=fake_adc),
             patch.dict(sys.modules, {"software.adc.max1238_driver": fake_driver}),
             patch.object(compare_adc_acquisition.time, "sleep", return_value=None),
         ):

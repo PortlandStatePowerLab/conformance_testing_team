@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import unittest
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 
-from software.runtime.controlled_water_draw_workflow import run_controlled_water_draw
+from software.runtime import run_controlled_water_draw
 
 
 class FakeValve:

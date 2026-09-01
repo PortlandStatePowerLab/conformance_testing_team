@@ -2,11 +2,24 @@
 
 ## Purpose
 
-Finite or ongoing station coordination that combines subsystem dependencies.
+Manually invoked commissioning workflows that coordinate configured station
+subsystems without owning their construction.
 
 ## Contains
 
-- `controlled_water_draw_workflow.py`: one finite target-volume water draw.
+- `__init__.py`: supported package export: `run_controlled_water_draw`.
+- `controlled_water_draw_workflow.py`: one manual, finite target-volume water draw.
+
+## Public API
+
+Supported consumers import the controlled water-draw workflow through the package:
+
+```python
+from software.runtime import run_controlled_water_draw
+```
+
+Runtime limits, low-flow settings, reporting cadence, internal dependency protocols,
+and workflow-loop details are not part of the supported package API.
 
 ## Does not belong here
 
@@ -14,12 +27,20 @@ Finite or ongoing station coordination that combines subsystem dependencies.
 
 ## Role rules
 
-A workflow is a finite multi-step lab procedure; runtime code coordinates subsystems without becoming their driver.
+A workflow is a finite multi-step lab procedure. Runtime code coordinates borrowed
+subsystem dependencies without constructing them or becoming their hardware driver.
 
 ## Usage
 
-Import the workflow through `software.runtime.controlled_water_draw_workflow`; operators run `bin/wh-draw`.
+Use `run_controlled_water_draw()` for a manually requested commissioning draw.
+Operators normally invoke the workflow through `bin/wh-draw`.
+
+Scheduled conformance-test water draws use `software.water_draw_monitor`; they do
+not run through this manual commissioning workflow.
 
 ## Safety notes
 
-The workflow can actuate an injected valve and consume live sensor readings. It must receive correctly configured dependencies and always closes the valve on exit.
+The workflow actuates an injected valve and consumes live sensor readings. It must
+receive correctly configured dependencies and always attempts to close the valve on
+exit. The caller retains ownership of the valve and sensor session and must perform
+final cleanup.

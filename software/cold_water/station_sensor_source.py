@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
-from software.adc.max1238_builder import build_max1238
+from software.station.station_adc_builder import build_station_adc
 from software.cold_water.client import (
     DEFAULT_REMOTE_HOST,
     DEFAULT_REMOTE_USER,
@@ -17,13 +17,19 @@ from software.cold_water.client import (
     SshSnapshotClient,
 )
 from software.exception_notes import add_exception_note
-from software.sensors.sensor_reader import SensorReader, SensorSnapshot
+from software.sensors import SensorReader, SensorSnapshot
 from software.station.station_identity import station_number
 
 
 class SensorSnapshotReader(Protocol):
     def get_sensor_snapshot(self) -> SensorSnapshot: ...
 
+class CloseableResource(Protocol):
+    """Define the cleanup operation required or an owned resource."""
+
+    def close(self) -> None:
+        """Release the owned resource."""
+        ...
 
 class CompositeSensorReader:
     """Combine local station sensors with Pi 1's shared cold measurement."""
@@ -57,7 +63,7 @@ class StationSensorSession:
 
     reader: SensorSnapshotReader
     remote_client: SnapshotClient
-    adc: object | None = None
+    adc: CloseableResource | None = None
 
     def close(self) -> None:
         first_error: BaseException | None = None
@@ -110,7 +116,7 @@ def build_station_sensor_session(
     )
     adc = None
     try:
-        adc = build_max1238()
+        adc = build_station_adc()
         local_reader = SensorReader(adc, configuration_path=configuration_path)
         reader = CompositeSensorReader(local_reader, client)
         return StationSensorSession(

@@ -1,12 +1,14 @@
-"""Construct the installed MAX1238 with its internal reference and external clock.
+"""
+Construct and configure a MAX1238 ADC.
 
 This module owns the concrete MAX1238 construction and startup boundary. It opens the
-configured Raspberry Pi I2C bus, applies the station ADC setup with the internal 4.096 V
-reference and external conversion clock, waits for the internal reference to become ready,
-and returns the prepared driver.
+caller-selected Linux I2C bus, configures the MAX1238 with its internal 4.096 V reference
+and external conversion clock, waits for the internal reference to become ready, and returns
+the prepared driver.
 
-Higher-level sensor services should depend on the shared ADC interface instead of importing
-this module or the concrete MAX1238 driver.
+Station-specific connection details such as I2C bus number and installed address belong
+to the station composition layer. Higher-level sensor services should depend on the shared
+ADC interface instead of importing the concrete driver.
 """
 
 # region Imports
@@ -18,18 +20,19 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-# Physical station connection for the installed MAX1238.
-from software.station.station_hardware_map import (
-    MAX1238_I2C_ADDR,
-    MAX1238_I2C_BUS,
-)
-
 if TYPE_CHECKING:
     # Imported only by static type checkers. The real hardware import remains inside the
     # build_max1238() function, so this module can be imported on Windows.
     from software.adc.max1238_driver import Max1238
 
 # endregion Imports
+
+# region MAX1238 Device Defaults
+
+# Default seven-bit I2C address for the MAX1238EEE+ device.
+MAX1238_DEFAULT_I2C_ADDRESS = 0x35
+
+# endregion MAX1238 Device Defaults
 
 # region MAX1238 Startup Configuration
 
@@ -42,14 +45,15 @@ MAX1238_INTERNAL_REFERENCE_WAKEUP_S = 0.010
 
 def build_max1238(
     *,
-    bus_num: int = MAX1238_I2C_BUS,
-    address: int = MAX1238_I2C_ADDR,
+    bus_num: int,
+    address: int = MAX1238_DEFAULT_I2C_ADDRESS,
 ) -> Max1238:
     """Construct and configure one ready-to-use MAX1238 ADC.
 
     Args:
-        bus_num (int): Linux I2C bus number. Defaults to station mapped bus.
-        address (int): Seven-bit MAX1238 I2C address. Defaults to station mapped address.
+        bus_num (int): Linux I2C bus number. Contains physical MAX1238.
+            Caller or station composition layer must supply this value.
+        address (int): Seven-bit MAX1238 I2C address. Defaults to MAX1238 device address.
 
     Returns:
         A configured ``Max1238`` object with an open SMBus connection.
@@ -64,7 +68,7 @@ def build_max1238(
             propagate to the caller.
 
     Configuration:
-        The station uses the MAX1238 internal 4.096 V reference, external
+        Configures the MAX1238 with its internal 4.096 V reference, external
         conversion clock, unipolar input mode, and single-ended channel reads.
 
     Ownership:

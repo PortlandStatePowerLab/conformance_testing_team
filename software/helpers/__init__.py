@@ -1,1 +1,1 @@
-"""Shared conformance-station hardware and conversion helpers."""
+"""Legacy conformance-station hardware and conversion helpers."""

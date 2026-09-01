@@ -15,11 +15,24 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Protocol
 
 # Grouped sensor reads and canonical conversions from ``sensor_reader.py``.
-from software.sensors.sensor_reader import SensorReader, SensorSnapshot
+from software.sensors import SensorSnapshot
 
 # endregion Imports
+
+# region Diagnostic Interfaces
+
+
+class SensorSnapshotReader(Protocol):
+    """Provide grouped sensor snapshots for sensor diagnostics."""
+
+    def get_sensor_snapshot(self) -> SensorSnapshot:
+        """Return one snapshot of all station sensors."""
+        ...
+
+# endregion Diagnostic Interfaces
 
 # region Diagnostic Configuration
 
@@ -120,7 +133,7 @@ def print_watch_runtime_stats(
 
 # Obtains and prints one snapshot or watches at ``interval_s`` until interrupted.
 def run_sensor_check(
-    reader: SensorReader,
+    reader: SensorSnapshotReader,
     *,
     watch: bool,
     interval_s: float,

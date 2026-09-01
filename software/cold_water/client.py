@@ -12,14 +12,15 @@ import threading
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import BinaryIO, Protocol
+from typing import BinaryIO, Protocol, cast
 
 from software.cold_water.protocol import (
     decode_message,
     message_age_seconds,
     snapshot_from_reading,
 )
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
+from software.cold_water.unix_socket_helper import _unix_socket_family
 
 
 DEFAULT_SOCKET_PATH = Path("/run/cold-water/cold-water.sock")
@@ -132,10 +133,10 @@ class LocalSnapshotClient(_StreamSnapshotClient):
         socket_path: Path = DEFAULT_SOCKET_PATH,
         **kwargs,
     ) -> None:
-        self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._socket = socket.socket(_unix_socket_family(), socket.SOCK_STREAM)
         try:
             self._socket.connect(str(socket_path))
-            stream = self._socket.makefile("rb")
+            stream = cast(BinaryIO, self._socket.makefile("rb"))
             super().__init__(stream, **kwargs)
         except BaseException:
             self._socket.close()
@@ -186,7 +187,7 @@ class SshSnapshotClient(_StreamSnapshotClient):
         if self._process.stdout is None:
             self._process.terminate()
             raise RuntimeError("SSH did not provide a snapshot stream")
-        super().__init__(self._process.stdout, **kwargs)
+        super().__init__(cast(BinaryIO, self._process.stdout, **kwargs))
 
     def close(self) -> None:
         super().close()
@@ -207,7 +208,7 @@ def proxy_local_stream(
 ) -> int:
     """Forward the local Unix stream to stdout for a forced SSH command."""
     destination = output or sys.stdout.buffer
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+    with socket.socket(_unix_socket_family(), socket.SOCK_STREAM) as connection:
         connection.connect(str(socket_path))
         while True:
             data = connection.recv(65536)

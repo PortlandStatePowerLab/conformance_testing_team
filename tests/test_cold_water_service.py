@@ -6,13 +6,14 @@ import socket
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest import mock
 
 from software.cold_water.client import _StreamSnapshotClient
+from software.cold_water.protocol import reading_message, snapshot_from_reading
 from software.cold_water.service import SnapshotService
 from software.cold_water.station_sensor_source import CompositeSensorReader
 from software.cold_water import station_sensor_source
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 from software.station.station_identity import station_number, station_results_directory
 
 
@@ -50,8 +51,8 @@ class ColdWaterServiceTest(unittest.TestCase):
         )
 
     def test_composite_replaces_only_cold_fields(self):
-        local = Mock()
-        remote = Mock()
+        local = mock.Mock()
+        remote = mock.Mock()
         local.get_sensor_snapshot.return_value = snapshot(cold_temp_c=99.0)
         remote.get_sensor_snapshot.return_value = snapshot(cold_temp_c=24.5)
 
@@ -62,17 +63,25 @@ class ColdWaterServiceTest(unittest.TestCase):
         self.assertEqual(combined.hot_temp_c, 50.0)
         self.assertEqual(combined.flow_gpm, 3.0)
 
+    def test_protocol_preserves_cold_fahrenheit_and_source_station(self):
+        message = reading_message(snapshot(cold_temp_c=24.5), sequence=1)
+
+        decoded = snapshot_from_reading(message)
+
+        self.assertEqual(decoded.cold_temp_f, 76.1)
+        self.assertEqual(decoded.cold_source_station, "WH-station1")
+
     def test_station1_client_never_constructs_an_adc(self):
-        client = Mock()
+        client = mock.Mock()
         with (
-            unittest.mock.patch.object(
+            mock.patch.object(
                 station_sensor_source,
                 "LocalSnapshotClient",
                 return_value=client,
             ),
-            unittest.mock.patch.object(
+            mock.patch.object(
                 station_sensor_source,
-                "build_max1238",
+                "build_station_adc",
             ) as build_adc,
         ):
             session = station_sensor_source.build_station_sensor_session(
@@ -83,21 +92,21 @@ class ColdWaterServiceTest(unittest.TestCase):
         build_adc.assert_not_called()
 
     def test_station2_combines_one_local_adc_with_remote_cold(self):
-        client = Mock()
-        adc = Mock()
-        local_reader = Mock()
+        client = mock.Mock()
+        adc = mock.Mock()
+        local_reader = mock.Mock()
         with (
-            unittest.mock.patch.object(
+            mock.patch.object(
                 station_sensor_source,
                 "SshSnapshotClient",
                 return_value=client,
             ),
-            unittest.mock.patch.object(
+            mock.patch.object(
                 station_sensor_source,
-                "build_max1238",
+                "build_station_adc",
                 return_value=adc,
             ) as build_adc,
-            unittest.mock.patch.object(
+            mock.patch.object(
                 station_sensor_source,
                 "SensorReader",
                 return_value=local_reader,
@@ -116,7 +125,7 @@ class ColdWaterServiceTest(unittest.TestCase):
         listener.bind(("127.0.0.1", 0))
         listener.listen()
         address = listener.getsockname()
-        reader = Mock()
+        reader = mock.Mock()
         reader.get_sensor_snapshot.return_value = snapshot()
         service = SnapshotService(
             listener,

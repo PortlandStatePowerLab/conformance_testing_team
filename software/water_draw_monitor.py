@@ -25,7 +25,8 @@ from software.cold_water.station_sensor_source import (
 from software.exception_notes import add_exception_note
 from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
 from software.station.station_hardware_map import VALVE_PIN
-from software.valve.gpio_valve_builder import build_gpio_valve
+from software.sensors import SensorSnapshot
+from software.valve import build_gpio_valve
 
 
 DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.5
@@ -43,7 +44,7 @@ EXIT_LOW_FLOW = 3
 EXIT_SENSOR_ERROR = 4
 EXIT_TERMINATED = 5
 
-CSV_COLUMNS = (
+CSV_COLUMNS: tuple[str, ...] = (
     "event_id",
     "timestamp_pacific",
     "draw_elapsed_seconds",
@@ -67,7 +68,7 @@ CSV_COLUMNS = (
     "cold_source_timestamp_pacific",
 )
 
-TEMPERATURE_COLUMNS = (
+TEMPERATURE_COLUMNS: tuple[str, ...] = (
     "hot_temp_c",
     "hot_temp_f",
     "cold_temp_c",
@@ -187,9 +188,9 @@ def _row(
     valve_state: str,
     target_volume_gal: float | None,
     volume_gal: float,
-    snapshot: Any | None,
+    snapshot: SensorSnapshot | None,
 ) -> dict[str, Any]:
-    row = {column: "" for column in CSV_COLUMNS}
+    row: dict[str, Any] = {column: "" for column in CSV_COLUMNS}
     row.update(
         {
             "event_id": event_id,

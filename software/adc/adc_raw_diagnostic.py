@@ -16,8 +16,8 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
-# Shared hardware-agnostic ADC read interface from ``adc_interface.py``.
-from software.adc.adc_interface import SensorAdc
+# Hardware-agnostic ADC read protocol used within this package.
+from .adc_interfaces import SensorAdc
 
 # ADC configuration and channel assignments from ``station_hardware_map.py``.
 from software.station.station_hardware_map import (

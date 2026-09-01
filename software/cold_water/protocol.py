@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from software.pacific_time import pacific_timestamp
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 
 
 PROTOCOL_VERSION = 1
@@ -105,16 +105,46 @@ def snapshot_from_reading(message: dict[str, Any]) -> SensorSnapshot:
         "ambient_temp_f",
         "flow_gpm",
     )
-    values: dict[str, int | float] = {}
+
+    # Parse integer and float fields separately so static type checkers preserve each
+    # SensorSnapshot field type; explicit construction also retains source metadata.
+    integer_values: dict[str,int] = {}
     for field in integer_fields:
-        values[field] = int(message[field])
+        integer_values[field] = int(message[field])
+
+    float_values: dict[str,float] = {}
     for field in float_fields:
         value = float(message[field])
         if not math.isfinite(value):
-            raise ValueError(f"cold-water field {field} must be finite")
-        values[field] = value
+            raise ValueError(f"cold-water field {field} must have an ending amount of decimal places (or \"finite\"")
+        float_values[field] = value
+
     return SensorSnapshot(
-        **values,
+        hot_raw_counts=integer_values["hot_raw_counts"],
+        cold_raw_counts=integer_values["cold_raw_counts"],
+        flow_raw_counts=integer_values["flow_raw_counts"],
+        ambient_raw_counts=integer_values["ambient_raw_counts"],
+        hot_temp_c=float_values["hot_temp_c"],
+        hot_temp_f=float_values["hot_temp_f"],
+        cold_temp_c=float_values["cold_temp_c"],
+        cold_temp_f=float_values["cold_temp_f"],
+        ambient_temp_c=float_values["ambient_temp_c"],
+        ambient_temp_f=float_values["ambient_temp_f"],
+        flow_gpm=float_values["flow_gpm"],
         cold_source_station=str(message["source_station"]),
-        cold_source_timestamp_pacific=str(message["timestamp_pacific"]),
-    )
+        cold_source_timestamp_pacific=str(message["timestamp_pacific"])
+)
+
+    # values: dict[str, int | float] = {}
+    # for field in integer_fields:
+    #     values[field] = int(message[field])
+    # for field in float_fields:
+    #     value = float(message[field])
+    #     if not math.isfinite(value):
+    #         raise ValueError(f"cold-water field {field} must be finite")
+    #     values[field] = value
+    # return SensorSnapshot(
+    #     **values,
+    #     cold_source_station=str(message["source_station"]),
+    #     cold_source_timestamp_pacific=str(message["timestamp_pacific"]),
+    # )

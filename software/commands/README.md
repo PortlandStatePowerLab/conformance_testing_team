@@ -6,7 +6,7 @@ User-invoked Python entrypoints that parse arguments, construct dependencies, ca
 
 ## Contains
 
-- `run_water_draw_command.py`: controlled draw command.
+- `run_water_draw_command.py`: manual commissioning draw command.
 - `check_*_command.py`: ADC, sensor, and valve checks.
 
 ## Does not belong here
