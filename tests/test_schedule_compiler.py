@@ -174,10 +174,11 @@ class ScheduleCompilerTests(unittest.TestCase):
             for event in events
             if event.event_id.startswith("auto_outside_comm_heartbeat_")
         ]
-        self.assertEqual(len(heartbeats), 4)
+        self.assertEqual(len(heartbeats), 5)
         self.assertEqual(
             [event.offset_seconds for event in heartbeats],
-            [13 * 60 + 15, 26 * 60 + 45, 40 * 60 + 15, 53 * 60 + 45],
+            [9 * 60 + 45, 19 * 60 + 45,
+             39 * 60 + 45, 49 * 60 + 45, 59 * 60 + 45],
         )
         self.assertTrue(all(event.command_code == "o" for event in heartbeats))
         self.assertTrue(all(event.prerequisite_for is None for event in heartbeats))

@@ -6,14 +6,18 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from software.conformance_test_runner import (
+    CutInStateError,
+    CutInStateTracker,
     DEFAULT_MASTER_SCHEDULE,
     ProgressReporter,
+    _cta_communication_warnings,
     _create_run_directory,
     _archive_station_equipment,
     _launch_water_draw,
     build_parser,
     clock_text,
     generate_final_outputs,
+    publish_run_results,
     progress_text,
     prepare_master_schedule,
     safe_identifier,
@@ -29,6 +33,112 @@ MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
+    def test_cta_communication_warnings_include_nak_layer_command_and_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run_directory = Path(directory)
+            (run_directory / "cta_events.csv").write_text(
+                "event,command,nak_reason\n"
+                "link_nak,none,Checksum error\n"
+                "application_nak,basic_dr,No reason given\n"
+                "operational_state,query_operational_state,\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                _cta_communication_warnings(run_directory),
+                [
+                    "Link NAK for none: Checksum error",
+                    "Application NAK for basic_dr: No reason given",
+                ],
+            )
+
+    def test_cut_in_tracker_accepts_transient_five_between_target_states(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        self.assertIsNone(tracker.observe(0))
+        self.assertEqual(tracker.observe(4), "start_draw")
+        self.assertIsNone(tracker.observe(5))
+        self.assertEqual(tracker.observe(2), "stop_draw")
+        self.assertIsNone(tracker.observe(5))
+        self.assertEqual(tracker.observe(4), "complete")
+
+    def test_cut_in_tracker_uses_first_expected_state_without_confirmation(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        self.assertEqual(tracker.observe(4), "start_draw")
+        self.assertEqual(tracker.observe(2), "stop_draw")
+        self.assertEqual(tracker.observe(4), "complete")
+        self.assertIsNone(tracker.observe(5))
+
+    def test_cut_in_tracker_resets_short_five_sequence(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.observe(4)
+        tracker.observe(5)
+        tracker.observe(5)
+        self.assertEqual(tracker.observe(2), "stop_draw")
+        self.assertEqual(tracker.consecutive_fives, 0)
+
+    def test_cut_in_tracker_fails_on_three_consecutive_fives(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.observe(4)
+        tracker.observe(5)
+        tracker.observe(5)
+        with self.assertRaisesRegex(CutInStateError, "three consecutive OpState 5"):
+            tracker.observe(5)
+
+    def test_cut_in_tracker_fails_on_three_read_failures(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.read_failed()
+        tracker.read_failed()
+        with self.assertRaisesRegex(CutInStateError, "three consecutive OpState read"):
+            tracker.read_failed()
+
+    def test_cut_in_tracker_fails_on_three_mixed_unexpected_states(self):
+        tracker = CutInStateTracker(cut_in_state=2, cut_out_state=4)
+        tracker.cta_completed()
+        tracker.observe(4)
+        tracker.observe(0)
+        tracker.observe(3)
+        with self.assertRaisesRegex(CutInStateError, "three consecutive unexpected"):
+            tracker.observe(6)
+
+    def test_cut_in_draw_launches_without_volume_target(self):
+        event = SimpleNamespace(
+            event_id="water_draw_1",
+            draw_type="cut-in",
+            max_draw_minutes=30.0,
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "software.conformance_test_runner.start_process"
+        ) as start_process:
+            _launch_water_draw(
+                event,
+                Path(directory),
+                enable_output=True,
+                sensor_configuration=None,
+            )
+
+        command = start_process.call_args.args[1]
+        self.assertEqual(command[command.index("--draw-type") + 1], "cut_in")
+        self.assertEqual(command[command.index("--max-run-minutes") + 1], "30.0")
+        self.assertNotIn("--target-gal", command)
+
+    def test_dependent_end_progress_reports_variable_duration(self):
+        events = load_schedule(
+            REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
+        )
+
+        summary = schedule_summary(events)
+        progress = progress_text(events, 60)
+
+        self.assertTrue(summary["dependent_end"])
+        self.assertEqual(summary["duration_seconds"], 9300)
+        self.assertTrue(summary["duration_estimated"])
+        self.assertIn("estimated remaining", progress)
+
     def test_archives_station_equipment_for_future_plot_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -73,6 +183,10 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             DEFAULT_MASTER_SCHEDULE,
         )
 
+    def test_explicit_test_name_is_available_for_gui_publishing(self):
+        args = build_parser().parse_args(["--test-name", "FHR-Normal"])
+        self.assertEqual(args.test_name, "FHR-Normal")
+
     def test_csv_master_schedule_is_validated_and_used_directly(self):
         with patch(
             "software.conformance_test_runner.load_schedule"
@@ -93,6 +207,66 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             build_parser()
             .parse_args(["--disable-outside-communication-heartbeat"])
             .disable_outside_communication_heartbeat
+        )
+
+    def test_result_publishing_defaults_enabled_with_opt_out(self):
+        self.assertFalse(build_parser().parse_args([]).no_publish_results)
+        self.assertTrue(
+            build_parser().parse_args(["--no-publish-results"]).no_publish_results
+        )
+
+    @patch("software.station.station_identity.socket.gethostname", return_value="WH-station4")
+    @patch("software.conformance_test_runner._run_git")
+    def test_publish_commits_only_station_run_then_rebases_and_pushes(
+        self, run_git, _hostname
+    ):
+        run_git.return_value = SimpleNamespace(
+            returncode=0, stdout="/repository", stderr=""
+        )
+        repository = Path("/repository")
+        run_directory = repository / "WH-4/test_123"
+
+        published = publish_run_results(
+            run_directory,
+            "ALU-Shed-Recovery",
+            repository=repository,
+        )
+
+        self.assertTrue(published)
+        pathspec = "WH-4/test_123"
+        self.assertEqual(
+            [call.args[1] for call in run_git.call_args_list],
+            [
+                ["rev-parse", "--show-toplevel"],
+                ["add", "--", pathspec],
+                [
+                    "commit", "--only", "-m",
+                    "ALU-Shed-Recovery run WH-4", "--", pathspec,
+                ],
+                ["pull", "--rebase", "--autostash", "origin", "main"],
+                ["push", "origin", "main"],
+            ],
+        )
+
+    @patch("software.station.station_identity.socket.gethostname", return_value="WH-station2")
+    @patch("software.conformance_test_runner._run_git")
+    def test_publish_retries_push_after_refreshing_remote(self, run_git, _hostname):
+        success = SimpleNamespace(returncode=0, stdout="/repository", stderr="")
+        rejected = SimpleNamespace(returncode=1, stdout="", stderr="rejected")
+        run_git.side_effect = [
+            success, success, success, success, rejected, success, success
+        ]
+
+        published = publish_run_results(
+            Path("/repository/WH-2/test_123"),
+            "test",
+            repository=Path("/repository"),
+        )
+
+        self.assertTrue(published)
+        self.assertEqual(
+            [call.args[1][0] for call in run_git.call_args_list],
+            ["rev-parse", "add", "commit", "pull", "push", "pull", "push"],
         )
 
     def test_schedule_summary(self):
@@ -235,8 +409,8 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 return_value=run_directory / "conformance_test_report.xlsx",
             ) as report,
             patch(
-                "software.conformance_test_runner._generate_energy_take_plot",
-                return_value=run_directory / "energy_take_power.png",
+                "software.conformance_test_runner._generate_energy_take_water_plot",
+                return_value=run_directory / "energy_take_power_water.png",
             ) as energy_plot,
             patch(
                 "software.conformance_test_runner._generate_state_verification_plot",
@@ -263,7 +437,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         phase_summary.assert_called_once()
         event_timeline.assert_called_once()
         self.assertIn("CONFORMANCE_REPORT run", output.getvalue())
-        self.assertIn("ENERGY_TAKE_PLOT run", output.getvalue())
+        self.assertIn("ENERGY_TAKE_WATER_PLOT run", output.getvalue())
         self.assertIn("PHASE_SUMMARY run", output.getvalue())
         self.assertIn("STATE_VERIFICATION_PLOT_ERROR ValueError: no states", errors.getvalue())
 

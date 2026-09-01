@@ -14,6 +14,7 @@ from software.schedule_gui import (
     DEFAULT_IDLE_TIMEOUT_HOURS,
     current_run,
     dismiss_current_run,
+    delete_current_stopped_results,
     derive_rows,
     editor_metadata,
     friendly_schedule_name,
@@ -22,12 +23,14 @@ from software.schedule_gui import (
     launch_run,
     normalize_schedule_name,
     positive_hours,
+    run_is_active,
+    request_current_run_stop,
     save_schedule,
     schedule_uses_water,
     ScheduleGuiHandler,
     serve_until_idle,
-    station_schedule_choices,
-    station_schedule_filename,
+    shared_schedule_choices,
+    shared_schedule_filename,
     station_suffix_from_hostname,
     validate_rows,
 )
@@ -44,6 +47,75 @@ def master_rows():
 
 
 class ScheduleGuiTests(unittest.TestCase):
+    def test_active_run_stop_request_is_persisted_for_worker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            run = runs / "run_one"
+            run.mkdir()
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            (run / "status.json").write_text(
+                '{"run_id":"run_one","state":"running"}', encoding="utf-8"
+            )
+
+            status = request_current_run_stop(runs)
+
+            self.assertEqual(status["state"], "stopping")
+            self.assertTrue((run / "stop_requested.json").is_file())
+            saved = json.loads((run / "status.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["state"], "stopping")
+
+    def test_stopped_result_directory_can_be_deleted_after_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs = root / "gui_runs"
+            result_root = root / "results"
+            run = runs / "run_one"
+            result = result_root / "WH-3" / "stopped_run"
+            run.mkdir(parents=True)
+            result.mkdir(parents=True)
+            (result / "measurements.csv").write_text("data", encoding="utf-8")
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            (run / "status.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "run_one",
+                        "state": "stopped",
+                        "result_directory": str(result),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = delete_current_stopped_results(
+                runs, results_root=result_root
+            )
+
+            self.assertFalse(result.exists())
+            self.assertTrue(status["results_deleted"])
+            self.assertTrue(run.is_dir())
+
+    def test_hardware_is_busy_only_for_active_run_states(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            run = runs / "run_one"
+            run.mkdir()
+            (runs / "current.json").write_text('{"run_id":"run_one"}', encoding="utf-8")
+            status = run / "status.json"
+            for state in ("launching", "running", "finalizing", "generating_outputs"):
+                status.write_text(json.dumps({"state": state}), encoding="utf-8")
+                self.assertTrue(run_is_active(runs), state)
+            status.write_text('{"state":"completed"}', encoding="utf-8")
+            self.assertFalse(run_is_active(runs))
+
+    def test_dependent_end_schedule_reports_variable_duration(self):
+        path = REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
+        rows = load_schedule_rows(path)
+        _, summary = validate_rows(rows)
+
+        self.assertTrue(summary["dependent_end"])
+        self.assertEqual(summary["duration_seconds"], 9300)
+        self.assertTrue(summary["duration_estimated"])
+
     def test_station_equipment_is_selected_and_validated_by_hostname(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "WH-station1.json"
@@ -111,7 +183,7 @@ class ScheduleGuiTests(unittest.TestCase):
         self.assertEqual(actions["load_up"]["expected_operational_states"], [3, 6])
         self.assertEqual(
             actions["water_draw"]["fields"],
-            ["target_volume_gal", "expected_flow_gpm"],
+            ["draw_type", "target_volume_gal", "expected_flow_gpm", "temp_drop_f", "max_draw_minutes"],
         )
         self.assertIn("100_wh", metadata["advanced_units"])
         self.assertTrue(metadata["hostname"])
@@ -180,6 +252,22 @@ class ScheduleGuiTests(unittest.TestCase):
 
             self.assertEqual(destination.read_bytes(), original)
 
+    def test_identical_save_preserves_existing_file_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            schedule_directory = Path(directory)
+            destination, _ = save_schedule(
+                schedule_directory, "unchanged", master_rows()
+            )
+            existing = b"\xef\xbb\xbf" + destination.read_bytes().replace(b"\n", b"\r\n")
+            destination.write_bytes(existing)
+
+            saved, _ = save_schedule(
+                schedule_directory, "unchanged", load_schedule_rows(destination)
+            )
+
+            self.assertEqual(saved, destination)
+            self.assertEqual(destination.read_bytes(), existing)
+
     def test_schedule_name_cannot_escape_schedule_directory(self):
         for invalid in ("../outside", "nested/name", "", ".hidden", "name.csv.exe"):
             with self.subTest(invalid=invalid):
@@ -188,41 +276,37 @@ class ScheduleGuiTests(unittest.TestCase):
 
         self.assertEqual(normalize_schedule_name("test-one.csv"), "test-one.csv")
 
-    def test_station_schedule_names_are_automatic_and_reversible(self):
+    def test_schedule_names_are_shared_and_reversible(self):
         self.assertEqual(station_suffix_from_hostname("WH-station1"), "WH_1")
         self.assertEqual(
-            station_schedule_filename("alu_efficiency_test", "WH_1"),
-            "alu_efficiency_test_WH_1.csv",
+            shared_schedule_filename("alu_efficiency_test"),
+            "alu_efficiency_test.csv",
         )
         self.assertEqual(
-            station_schedule_filename("alu_efficiency_test_WH_1.csv", "WH_1"),
-            "alu_efficiency_test_WH_1.csv",
+            shared_schedule_filename("alu_efficiency_test.csv"),
+            "alu_efficiency_test.csv",
         )
         self.assertEqual(
-            friendly_schedule_name("alu_efficiency_test_WH_1.csv", "WH_1"),
+            friendly_schedule_name("alu_efficiency_test.csv"),
             "alu_efficiency_test",
         )
-        with self.assertRaisesRegex(ValueError, "belongs to WH-2"):
-            station_schedule_filename("alu_efficiency_test_WH_2", "WH_1")
 
-    def test_schedule_list_contains_only_current_station(self):
+    def test_schedule_list_contains_all_shared_schedules(self):
         with tempfile.TemporaryDirectory() as directory:
             schedule_directory = Path(directory)
             for filename in (
-                "alpha_WH_1.csv",
-                "beta_WH_1.csv",
-                "alpha_WH_2.csv",
-                "legacy.csv",
+                "alpha.csv",
+                "beta.csv",
             ):
                 (schedule_directory / filename).touch()
 
-            choices = station_schedule_choices(schedule_directory, "WH_1")
+            choices = shared_schedule_choices(schedule_directory)
 
         self.assertEqual(
             choices,
             [
-                {"filename": "alpha_WH_1.csv", "name": "alpha"},
-                {"filename": "beta_WH_1.csv", "name": "beta"},
+                {"filename": "alpha.csv", "name": "alpha"},
+                {"filename": "beta.csv", "name": "beta"},
             ],
         )
 
@@ -247,7 +331,7 @@ class ScheduleGuiTests(unittest.TestCase):
             root = Path(directory)
             schedules = root / "schedules"
             runs = root / "runs"
-            schedule, _ = save_schedule(schedules, "safe_WH_1", master_rows())
+            schedule, _ = save_schedule(schedules, "safe", master_rows())
             fake_process = unittest.mock.Mock()
             with patch("software.schedule_gui.subprocess.Popen", return_value=fake_process) as popen:
                 launched = launch_run(runs, schedule, water=True)
@@ -282,7 +366,7 @@ class ScheduleGuiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             schedule_directory = Path(directory)
             schedule_path, _ = save_schedule(
-                schedule_directory, "stream_test_WH_1", master_rows()
+                schedule_directory, "stream_test", master_rows()
             )
             handler = type(
                 "TestScheduleGuiHandler",

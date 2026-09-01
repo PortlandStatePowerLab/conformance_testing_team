@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import re
 import socket
@@ -29,8 +30,9 @@ try:
     from .schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
-        EXTENDED_SCHEDULE_COLUMNS,
+        DRAW_EXTENDED_SCHEDULE_COLUMNS,
         MAX_DURATION,
+        ScheduleEvent,
         ScheduleValidationError,
         load_schedule,
     )
@@ -45,8 +47,9 @@ except ImportError:
     from schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
-        EXTENDED_SCHEDULE_COLUMNS,
+        DRAW_EXTENDED_SCHEDULE_COLUMNS,
         MAX_DURATION,
+        ScheduleEvent,
         ScheduleValidationError,
         load_schedule,
     )
@@ -63,13 +66,18 @@ DEFAULT_SCHEDULE_DIRECTORY = SOFTWARE_DIRECTORY / "gui_schedules"
 EDITOR_PATH = SOFTWARE_DIRECTORY / "templates" / "schedule_gui.html"
 SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
-STATION_SUFFIX = re.compile(r"_WH_(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
 DEFAULT_IDLE_TIMEOUT_HOURS = 48.0
 DEFAULT_RUN_DIRECTORY = SOFTWARE_DIRECTORY.parent / "runtime_logs" / "gui_runs"
 DEFAULT_EQUIPMENT_DIRECTORY = SOFTWARE_DIRECTORY.parent / "saved_data" / "equipment"
 PACIFIC = ZoneInfo("America/Los_Angeles")
 PREFLIGHT_MAX_AGE_SECONDS = 300
+ACTIVE_RUN_STATES = {
+    "launching", "initializing", "running", "finalizing",
+    "generating_outputs", "publishing_results", "stopping",
+}
+STOPPABLE_RUN_STATES = {"launching", "initializing", "running"}
+TERMINAL_RUN_STATES = {"completed", "failed", "stopped"}
 EQUIPMENT_FIELDS = {
     "manufacturer": str, "model_number": str, "year": int, "voltage": str,
     "capacity_gallons": int, "station_id": str, "date_added": str,
@@ -92,14 +100,15 @@ def load_station_equipment(
     if not isinstance(value, dict):
         raise ValueError("equipment information must be a JSON object")
     missing = sorted(set(EQUIPMENT_FIELDS).difference(value))
-    extra = sorted(set(value).difference(EQUIPMENT_FIELDS))
+    extra = sorted(set(value).difference(set(EQUIPMENT_FIELDS) | {"temperature_setpoint_f"}))
     if missing or extra:
         raise ValueError(
             f"equipment fields invalid; missing={missing}, unexpected={extra}"
         )
     for field, expected_type in EQUIPMENT_FIELDS.items():
         if not isinstance(value[field], expected_type) or isinstance(value[field], bool):
-            raise ValueError(f"equipment field {field} must be {expected_type.__name__}")
+            expected_name = "number" if isinstance(expected_type, tuple) else expected_type.__name__
+            raise ValueError(f"equipment field {field} must be {expected_name}")
     if value["station_id"] != hostname:
         raise ValueError(
             f"equipment station_id {value['station_id']!r} does not match "
@@ -107,6 +116,12 @@ def load_station_equipment(
         )
     if value["year"] < 1900 or value["capacity_gallons"] <= 0:
         raise ValueError("equipment year and capacity must be positive")
+    if "temperature_setpoint_f" in value and (
+        isinstance(value["temperature_setpoint_f"], bool)
+        or not isinstance(value["temperature_setpoint_f"], (int, float))
+        or not math.isfinite(float(value["temperature_setpoint_f"]))
+    ):
+        raise ValueError("equipment temperature_setpoint_f must be finite")
     return value
 
 
@@ -122,7 +137,8 @@ def current_run(run_directory: Path) -> dict[str, Any] | None:
         status = _read_json(run_directory / run_id / "status.json")
         heartbeat = status.get("last_heartbeat_at")
         if heartbeat and status.get("state") in {
-            "launching", "initializing", "running", "finalizing", "generating_outputs"
+            "launching", "initializing", "running", "stopping", "finalizing",
+            "generating_outputs", "publishing_results",
         }:
             age = (datetime.now(PACIFIC) - datetime.fromisoformat(heartbeat)).total_seconds()
             status["status_age_seconds"] = max(0, int(age))
@@ -130,6 +146,11 @@ def current_run(run_directory: Path) -> dict[str, Any] | None:
         return status
     except (KeyError, OSError, ValueError, json.JSONDecodeError):
         return {"state": "unknown", "error": "run status could not be read"}
+
+
+def run_is_active(run_directory: Path) -> bool:
+    run = current_run(run_directory)
+    return bool(run and run.get("state") in ACTIVE_RUN_STATES)
 
 
 def dismiss_current_run(run_directory: Path) -> None:
@@ -140,9 +161,68 @@ def dismiss_current_run(run_directory: Path) -> None:
     current = _read_json(pointer)
     run_id = str(current["run_id"])
     status = _read_json(run_directory / run_id / "status.json")
-    if status.get("state") not in {"completed", "failed"}:
+    if status.get("state") not in TERMINAL_RUN_STATES:
         raise RuntimeError("an active test cannot be dismissed")
     _atomic_json(pointer, {"run_id": run_id, "dismissed": True})
+
+
+def request_current_run_stop(run_directory: Path) -> dict[str, Any]:
+    """Ask the detached worker to interrupt its runner through normal cleanup."""
+    pointer = _read_json(run_directory / "current.json")
+    run_id = str(pointer["run_id"])
+    directory = (run_directory / run_id).resolve()
+    status_path = directory / "status.json"
+    status = _read_json(status_path)
+    if status.get("state") == "stopping":
+        return status
+    if status.get("state") not in STOPPABLE_RUN_STATES:
+        raise RuntimeError("this test is no longer in a stoppable state")
+    requested_at = datetime.now(PACIFIC).isoformat()
+    _atomic_json(
+        directory / "stop_requested.json",
+        {"requested_at": requested_at, "run_id": run_id},
+    )
+    status.update(
+        state="stopping",
+        message="Stop requested; safely shutting down hardware.",
+        stop_requested_at=requested_at,
+    )
+    _atomic_json(status_path, status)
+    return status
+
+
+def delete_current_stopped_results(
+    run_directory: Path,
+    *,
+    results_root: Path = SOFTWARE_DIRECTORY.parent / "saved_data" / "conformance_runs",
+) -> dict[str, Any]:
+    """Delete only the saved result directory for a safely stopped GUI run."""
+    pointer = _read_json(run_directory / "current.json")
+    run_id = str(pointer["run_id"])
+    status_path = run_directory / run_id / "status.json"
+    status = _read_json(status_path)
+    if status.get("state") != "stopped":
+        raise RuntimeError("results can be deleted only after a test is safely stopped")
+    configured = status.get("result_directory")
+    if not configured:
+        raise RuntimeError("the stopped run has no recorded result directory")
+    target = Path(str(configured)).resolve()
+    root = results_root.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError("stopped result directory is outside the results root") from exc
+    if target == root:
+        raise RuntimeError("refusing to delete the results root")
+    if target.exists():
+        shutil.rmtree(target)
+    status.update(
+        results_deleted=True,
+        results_deleted_at=datetime.now(PACIFIC).isoformat(),
+        message="Stopped test results were deleted by the operator.",
+    )
+    _atomic_json(status_path, status)
+    return status
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -162,10 +242,7 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
 
 def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str, Any]:
     active = current_run(run_directory)
-    if active and active.get("state") in {
-        "launching", "initializing", "running", "finalizing",
-        "generating_outputs", "stopping",
-    }:
+    if active and active.get("state") in ACTIVE_RUN_STATES:
         raise RuntimeError("a conformance test is already active on this station")
     now = datetime.now(PACIFIC)
     run_id = f"gui_{now.strftime('%Y_%m_%d_%H%M%S_%f_%Z')}"
@@ -173,14 +250,17 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
     directory.mkdir(parents=True, exist_ok=False)
     snapshot = directory / "schedule.csv"
     shutil.copy2(schedule, snapshot)
-    result_name = STATION_SUFFIX.sub("", schedule.stem)
+    result_name = schedule.stem
     events = load_schedule(snapshot)
-    duration = next(event.offset_seconds for event in events if event.event_type == "test")
+    test_end = next(event for event in events if event.event_type == "test")
+    duration = test_end.offset_seconds
     status = {
         "run_id": run_id, "state": "launching", "schedule": schedule.name,
         "result_name": result_name,
         "schedule_snapshot": str(snapshot), "water_output_enabled": water,
         "requested_at": now.isoformat(), "duration_seconds": duration,
+        "dependent_end": test_end.dependent_end,
+        "duration_estimated": test_end.dependent_end,
         "last_heartbeat_at": now.isoformat(),
     }
     _atomic_json(directory / "status.json", status)
@@ -216,43 +296,26 @@ def station_suffix_from_hostname(hostname: str) -> str:
     return f"WH_{int(match.group(1))}"
 
 
-def station_schedule_filename(name: str, station_suffix: str) -> str:
-    """Build the stored filename for a friendly schedule name and station."""
-    normalized = normalize_schedule_name(name)
-    stem = Path(normalized).stem
-    existing_suffix = STATION_SUFFIX.search(stem)
-    if existing_suffix is not None:
-        existing = f"WH_{int(existing_suffix.group(1))}"
-        if existing != station_suffix:
-            raise ValueError(
-                f"schedule name belongs to {existing.replace('_', '-')}, "
-                f"not {station_suffix.replace('_', '-')}"
-            )
-        stem = stem[: existing_suffix.start()]
-    if len(stem) + len(station_suffix) + 1 > 80:
-        raise ValueError("schedule name is too long after adding the station suffix")
-    return f"{stem}_{station_suffix}.csv"
+def shared_schedule_filename(name: str) -> str:
+    """Build a station-independent stored filename from a friendly name."""
+    return normalize_schedule_name(name)
 
 
-def friendly_schedule_name(filename: str, station_suffix: str) -> str:
-    """Return the browser-visible name of a station-owned schedule."""
-    normalized = normalize_schedule_name(filename)
-    expected = f"_{station_suffix}.csv"
-    if not normalized.lower().endswith(expected.lower()):
-        raise ValueError("schedule does not belong to this station")
-    return normalized[: -len(expected)]
+def friendly_schedule_name(filename: str) -> str:
+    """Return the browser-visible name of a shared schedule."""
+    return Path(normalize_schedule_name(filename)).stem
 
 
-def station_schedule_choices(directory: Path, station_suffix: str) -> list[dict[str, str]]:
-    """List only schedules owned by the current station."""
+def shared_schedule_choices(directory: Path) -> list[dict[str, str]]:
+    """List schedules shared by every water-heater station."""
     if not directory.is_dir():
         return []
     choices = []
-    for path in directory.glob(f"*_{station_suffix}.csv"):
+    for path in directory.glob("*.csv"):
         choices.append(
             {
                 "filename": path.name,
-                "name": friendly_schedule_name(path.name, station_suffix),
+                "name": friendly_schedule_name(path.name),
             }
         )
     return sorted(choices, key=lambda item: item["name"].lower())
@@ -287,7 +350,10 @@ def editor_metadata(hostname: str | None = None) -> dict[str, Any]:
                 "action": "water_draw",
                 "event_type": "water_draw",
                 "expected_operational_states": [],
-                "fields": ["target_volume_gal", "expected_flow_gpm"],
+                "fields": [
+                    "draw_type", "target_volume_gal", "expected_flow_gpm",
+                    "temp_drop_f", "max_draw_minutes",
+                ],
             },
             {
                 "action": "end",
@@ -347,13 +413,13 @@ def _canonical_rows(value: Any) -> list[dict[str, str]]:
     for index, source in enumerate(value, start=1):
         if not isinstance(source, dict):
             raise ValueError(f"row {index} must be an object")
-        unexpected = sorted(set(source).difference(EXTENDED_SCHEDULE_COLUMNS))
+        unexpected = sorted(set(source).difference(DRAW_EXTENDED_SCHEDULE_COLUMNS))
         if unexpected:
             raise ValueError(f"row {index} contains unknown fields: {unexpected}")
         rows.append(
             {
                 column: "" if source.get(column) is None else str(source.get(column, ""))
-                for column in EXTENDED_SCHEDULE_COLUMNS
+                for column in DRAW_EXTENDED_SCHEDULE_COLUMNS
             }
         )
     return rows
@@ -386,13 +452,25 @@ def derive_rows(value: Any) -> list[dict[str, str]]:
 def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+            handle, fieldnames=DRAW_EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
         )
         writer.writeheader()
         writer.writerows(rows)
 
 
-def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
+def _schedule_summary(events: list[ScheduleEvent]) -> dict[str, Any]:
+    test_end = next(event for event in events if event.event_type == "test")
+    return {
+        "enabled_events": len(events),
+        "cta_events": sum(event.event_type == "cta" for event in events),
+        "water_draws": sum(event.event_type == "water_draw" for event in events),
+        "duration_seconds": test_end.offset_seconds,
+        "dependent_end": test_end.dependent_end,
+        "duration_estimated": test_end.dependent_end,
+    }
+
+
+def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, Any]]:
     """Validate browser rows through the existing authoritative CSV parser."""
     rows = derive_rows(value)
     temporary_path: Path | None = None
@@ -402,7 +480,7 @@ def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
         ) as handle:
             temporary_path = Path(handle.name)
             writer = csv.DictWriter(
-                handle, fieldnames=EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+                handle, fieldnames=DRAW_EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
             )
             writer.writeheader()
             writer.writerows(rows)
@@ -410,23 +488,21 @@ def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, int]]:
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
-    summary = {
-        "enabled_events": len(events),
-        "cta_events": sum(event.event_type == "cta" for event in events),
-        "water_draws": sum(event.event_type == "water_draw" for event in events),
-        "duration_seconds": max((event.offset_seconds for event in events), default=0),
-    }
-    return rows, summary
+    return rows, _schedule_summary(events)
 
 
 def save_schedule(
     directory: Path, name: str, value: Any
-) -> tuple[Path, dict[str, int]]:
+) -> tuple[Path, dict[str, Any]]:
     """Validate and atomically save one canonical GUI-authored schedule."""
     filename = normalize_schedule_name(name)
     rows, summary = validate_rows(value)
     directory.mkdir(parents=True, exist_ok=True)
     destination = directory / filename
+    if destination.is_file():
+        existing_rows, _ = validate_rows(load_schedule_rows(destination))
+        if existing_rows == rows:
+            return destination, summary
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -497,7 +573,19 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         return value
 
     def _stream_preflight(self, filename: str) -> None:
-        friendly_schedule_name(filename, self.station_suffix)
+        if run_is_active(self.run_directory):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": "hardware preflight is unavailable while a test is active"},
+            )
+            return
+        if self.wh_information_lock.locked():
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"error": "hardware preflight cannot run during Get WH Info"},
+            )
+            return
+        friendly_schedule_name(filename)
         path = self.schedule_directory / normalize_schedule_name(filename)
         if not path.is_file():
             self._json(HTTPStatus.NOT_FOUND, {"error": "schedule not found"})
@@ -576,9 +664,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.OK,
                 {
-                    "schedules": station_schedule_choices(
-                        self.schedule_directory, self.station_suffix
-                    )
+                    "schedules": shared_schedule_choices(self.schedule_directory)
                 },
             )
             return
@@ -592,17 +678,18 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
         if self.path.startswith(prefix):
             try:
                 requested = unquote(self.path[len(prefix) :])
-                friendly_schedule_name(requested, self.station_suffix)
+                friendly_schedule_name(requested)
                 filename = normalize_schedule_name(requested)
                 path = self.schedule_directory / filename
+                rows = load_schedule_rows(path)
+                _, summary = validate_rows(rows)
                 self._json(
                     HTTPStatus.OK,
                     {
                         "name": filename,
-                        "display_name": friendly_schedule_name(
-                            filename, self.station_suffix
-                        ),
-                        "rows": load_schedule_rows(path),
+                        "display_name": friendly_schedule_name(filename),
+                        "rows": rows,
+                        "summary": summary,
                     },
                 )
             except FileNotFoundError:
@@ -623,9 +710,7 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
             if self.path == "/api/save":
                 destination, summary = save_schedule(
                     self.schedule_directory,
-                    station_schedule_filename(
-                        str(request.get("name", "")), self.station_suffix
-                    ),
+                    shared_schedule_filename(str(request.get("name", ""))),
                     request.get("rows"),
                 )
                 self._json(
@@ -639,11 +724,13 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/runs":
                 filename = str(request.get("filename", ""))
-                friendly_schedule_name(filename, self.station_suffix)
+                friendly_schedule_name(filename)
                 path = self.schedule_directory / normalize_schedule_name(filename)
                 receipt = self.preflight_receipts.get(filename)
                 if receipt is None or time.monotonic() - receipt > PREFLIGHT_MAX_AGE_SECONDS:
                     raise RuntimeError("preflight must pass within five minutes before starting")
+                if self.preflight_lock.locked() or self.wh_information_lock.locked():
+                    raise RuntimeError("another hardware operation is still running")
                 with self.run_lock:
                     result = launch_run(
                         self.run_directory, path, water=schedule_uses_water(path)
@@ -656,7 +743,29 @@ class ScheduleGuiHandler(BaseHTTPRequestHandler):
                     dismiss_current_run(self.run_directory)
                 self._json(HTTPStatus.OK, {"dismissed": True})
                 return
+            if self.path == "/api/runs/current/stop":
+                with self.run_lock:
+                    result = request_current_run_stop(self.run_directory)
+                self._json(HTTPStatus.ACCEPTED, {"run": result})
+                return
+            if self.path == "/api/runs/current/delete-results":
+                with self.run_lock:
+                    result = delete_current_stopped_results(self.run_directory)
+                self._json(HTTPStatus.OK, {"run": result})
+                return
             if self.path == "/api/wh-information":
+                if run_is_active(self.run_directory):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {"error": "Get WH Info is unavailable while a test is active"},
+                    )
+                    return
+                if self.preflight_lock.locked():
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {"error": "Get WH Info cannot run during hardware preflight"},
+                    )
+                    return
                 if not self.wh_information_lock.acquire(blocking=False):
                     self._json(
                         HTTPStatus.CONFLICT,

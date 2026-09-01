@@ -10,9 +10,16 @@ from __future__ import annotations
 import argparse
 import csv
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
+
+try:
+    from .cta_operational_states import CUT_IN_STATES_BY_ACTION
+except ImportError:
+    from cta_operational_states import CUT_IN_STATES_BY_ACTION
+
+CUT_IN_RECOVERY_TIMEOUT_SECONDS = 12 * 60 * 60
 
 
 SCHEDULE_COLUMNS = (
@@ -31,6 +38,13 @@ SCHEDULE_COLUMNS = (
     "notes",
 )
 EXTENDED_SCHEDULE_COLUMNS = SCHEDULE_COLUMNS + ("advanced_efficiency",)
+DRAW_SCHEDULE_COLUMNS = (
+    "enabled", "event_id", "time_after_start", "phase", "draw_type",
+    "event_type", "action", "event_duration_minutes", "advanced_value",
+    "advanced_units", "expected_operational_states", "target_volume_gal",
+    "expected_flow_gpm", "temp_drop_f", "max_draw_minutes", "notes",
+)
+DRAW_EXTENDED_SCHEDULE_COLUMNS = DRAW_SCHEDULE_COLUMNS + ("advanced_efficiency",)
 
 CTA_ACTION_CODES = {
     "advanced_load_up": "a",
@@ -51,7 +65,7 @@ TRUE_VALUES = {"true", "yes", "1"}
 FALSE_VALUES = {"false", "no", "0"}
 MAX_DURATION = "max"
 OUTSIDE_COMMUNICATION_LEAD_SECONDS = 15
-OUTSIDE_COMMUNICATION_REFRESH_SECONDS = 13 * 60 + 30
+OUTSIDE_COMMUNICATION_REFRESH_SECONDS = 10 * 60
 MAX_FINITE_DURATION_BYTE = 0xFE
 MAX_FINITE_DURATION_SECONDS = 2 * MAX_FINITE_DURATION_BYTE**2
 MAX_EVENT_DURATION_MINUTES = 2150
@@ -78,7 +92,9 @@ class ScheduleEvent:
     enabled: bool
     event_id: str
     offset_seconds: int
+    dependent_end: bool
     phase: str
+    draw_type: str | None
     event_type: str
     action: str
     event_duration: EncodedDuration | None
@@ -89,6 +105,8 @@ class ScheduleEvent:
     expected_operational_states: tuple[int, ...]
     target_volume_gal: float | None
     expected_flow_gpm: float | None
+    temp_drop_f: float | None
+    max_draw_minutes: float | None
     notes: str
     source_row: int
 
@@ -96,6 +114,8 @@ class ScheduleEvent:
     def expected_draw_seconds(self) -> float | None:
         if self.event_type != "water_draw":
             return None
+        if self.draw_type in {"cut-in", "temp drop"}:
+            return None if self.max_draw_minutes is None else self.max_draw_minutes * 60.0
         if self.target_volume_gal is None or self.expected_flow_gpm is None:
             return None
         return (self.target_volume_gal / self.expected_flow_gpm) * 60.0
@@ -213,6 +233,9 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     expected_states_text = row["expected_operational_states"].strip()
     volume_text = row["target_volume_gal"].strip()
     flow_text = row["expected_flow_gpm"].strip()
+    draw_type_text = (row.get("draw_type") or "").strip().lower()
+    temp_drop_text = (row.get("temp_drop_f") or "").strip()
+    max_draw_text = (row.get("max_draw_minutes") or "").strip()
 
     if event_type not in EVENT_TYPES:
         raise ValueError(f"event_type must be one of {sorted(EVENT_TYPES)}")
@@ -225,6 +248,9 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     expected_states: tuple[int, ...] = ()
     volume = None
     flow = None
+    draw_type = None
+    temp_drop = None
+    max_draw_minutes = None
 
     if event_type == "cta":
         if action not in CTA_ACTION_CODES:
@@ -265,21 +291,42 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
             if advanced_value_text or advanced_units_text or advanced_efficiency_text:
                 raise ValueError("Basic DR CTA events cannot contain advanced load-up values")
             duration = encode_event_duration(duration_text)
-        if volume_text or flow_text:
+        if volume_text or flow_text or draw_type_text or temp_drop_text or max_draw_text:
             raise ValueError("CTA events cannot contain water-draw values")
     elif event_type == "water_draw":
         if action != "water_draw":
             raise ValueError("water_draw action must be 'water_draw'")
         if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text:
             raise ValueError("water draws cannot contain CTA argument or expectation values")
-        if not volume_text or not flow_text:
-            raise ValueError("water draws require target_volume_gal and expected_flow_gpm")
-        volume = _parse_positive_float(volume_text, "target_volume_gal")
-        flow = _parse_positive_float(flow_text, "expected_flow_gpm")
+        draw_type = draw_type_text or "volume"
+        if draw_type not in {"volume", "cut-in", "temp drop"}:
+            raise ValueError("draw_type must be Volume, Cut-in, or Temp Drop")
+        if draw_type == "volume":
+            if not volume_text or not flow_text:
+                raise ValueError("Volume draws require target_volume_gal and expected_flow_gpm")
+            if temp_drop_text or max_draw_text:
+                raise ValueError("Volume draws cannot contain Temp Drop values")
+            volume = _parse_positive_float(volume_text, "target_volume_gal")
+            flow = _parse_positive_float(flow_text, "expected_flow_gpm")
+        elif draw_type == "temp drop":
+            if volume_text or flow_text:
+                raise ValueError("Temp Drop draws cannot contain Volume draw values")
+            if not temp_drop_text or not max_draw_text:
+                raise ValueError("Temp Drop draws require temp_drop_f and max_draw_minutes")
+            temp_drop = _parse_positive_float(temp_drop_text, "temp_drop_f")
+            max_draw_minutes = _parse_positive_float(max_draw_text, "max_draw_minutes")
+        else:
+            if volume_text or flow_text or temp_drop_text:
+                raise ValueError(
+                    "Cut-in draws cannot contain target volume, expected flow, or Temp Drop values"
+                )
+            if not max_draw_text:
+                raise ValueError("Cut-in draws require max_draw_minutes")
+            max_draw_minutes = _parse_positive_float(max_draw_text, "max_draw_minutes")
     else:
         if action != "end":
             raise ValueError("test action must be 'end'")
-        if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text or volume_text or flow_text:
+        if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text or volume_text or flow_text or draw_type_text or temp_drop_text or max_draw_text:
             raise ValueError("test end cannot contain CTA or water-draw values")
 
     event_id = row["event_id"].strip()
@@ -289,8 +336,10 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
     return ScheduleEvent(
         enabled=_parse_bool(row["enabled"]),
         event_id=event_id,
-        offset_seconds=parse_elapsed_time(row["time_after_start"]),
+        offset_seconds=(-1 if row["time_after_start"].strip().lower() == "tbd" else parse_elapsed_time(row["time_after_start"])),
+        dependent_end=row["time_after_start"].strip().lower() == "tbd",
         phase=row["phase"].strip(),
+        draw_type=draw_type,
         event_type=event_type,
         action=action,
         event_duration=duration,
@@ -301,6 +350,8 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         expected_operational_states=expected_states,
         target_volume_gal=volume,
         expected_flow_gpm=flow,
+        temp_drop_f=temp_drop,
+        max_draw_minutes=max_draw_minutes,
         notes=row["notes"].strip(),
         source_row=row_number,
     )
@@ -318,11 +369,12 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
         normalized_columns = list(actual_columns)
         while normalized_columns and not normalized_columns[-1].strip():
             normalized_columns.pop()
-        if tuple(normalized_columns) not in (SCHEDULE_COLUMNS, EXTENDED_SCHEDULE_COLUMNS):
+        accepted_columns = (SCHEDULE_COLUMNS, EXTENDED_SCHEDULE_COLUMNS, DRAW_SCHEDULE_COLUMNS, DRAW_EXTENDED_SCHEDULE_COLUMNS)
+        if tuple(normalized_columns) not in accepted_columns:
             raise ScheduleValidationError(
                 [
                     "CSV columns must exactly match: "
-                    + ",".join(SCHEDULE_COLUMNS)
+                    + ",".join(DRAW_SCHEDULE_COLUMNS)
                     + " optionally followed by advanced_efficiency",
                     "found: " + ",".join(actual_columns),
                 ]
@@ -330,7 +382,7 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
         for row_number, row in enumerate(reader, start=2):
             unexpected_values: list[str] = []
             for column, value in row.items():
-                if column in EXTENDED_SCHEDULE_COLUMNS:
+                if column in set(DRAW_EXTENDED_SCHEDULE_COLUMNS) | set(EXTENDED_SCHEDULE_COLUMNS):
                     continue
                 if isinstance(value, list):
                     unexpected_values.extend(
@@ -359,10 +411,91 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
         else:
             seen_ids[event.event_id] = event.source_row
 
-    enabled_events = sorted(
-        (event for event in events if event.enabled),
-        key=lambda event: (event.offset_seconds, event.source_row),
+    enabled_in_source_order = [event for event in events if event.enabled]
+    first_cta = next(
+        (event for event in enabled_in_source_order if event.event_type == "cta"),
+        None,
     )
+    previous_draw: ScheduleEvent | None = None
+    for event in tuple(enabled_in_source_order):
+        replacement = event
+        if event.event_type == "water_draw":
+            if event.draw_type == "cut-in":
+                if not event.dependent_end:
+                    errors.append(f"row {event.source_row}: Cut-in start time must be TBD")
+                elif first_cta is None:
+                    errors.append(f"row {event.source_row}: Cut-in requires an enabled CTA command")
+                elif first_cta.action not in CUT_IN_STATES_BY_ACTION:
+                    errors.append(
+                        f"row {event.source_row}: CTA action '{first_cta.action}' does not define Cut-in states"
+                    )
+                else:
+                    previous_draw_end = (
+                        previous_draw.offset_seconds
+                        + int(math.ceil(previous_draw.expected_draw_seconds or 0.0))
+                        if previous_draw is not None
+                        else first_cta.offset_seconds
+                    )
+                    replacement = replace(
+                        event,
+                        offset_seconds=max(first_cta.offset_seconds, previous_draw_end),
+                    )
+            elif event.dependent_end:
+                if event.draw_type != "temp drop" or previous_draw is None or previous_draw.draw_type != "cut-in":
+                    errors.append(
+                        f"row {event.source_row}: TBD is allowed for Temp Drop only immediately after Cut-in"
+                    )
+                else:
+                    assert previous_draw.max_draw_minutes is not None
+                    replacement = replace(
+                        event,
+                        offset_seconds=previous_draw.offset_seconds
+                        + int(math.ceil(previous_draw.max_draw_minutes * 60))
+                        + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+                    )
+            previous_draw = replacement
+        elif event.dependent_end:
+            if event.event_type != "test" or event.action != "end":
+                errors.append(f"row {event.source_row}: unsupported TBD start time")
+            elif previous_draw is None or previous_draw.draw_type != "temp drop":
+                errors.append("TBD test end must immediately follow an enabled Temp Drop water draw")
+            else:
+                assert previous_draw.max_draw_minutes is not None
+                replacement = replace(
+                    event,
+                    offset_seconds=previous_draw.offset_seconds
+                    + int(math.ceil(previous_draw.max_draw_minutes * 60)),
+                )
+        if replacement is not event:
+            events[events.index(event)] = replacement
+            enabled_in_source_order[enabled_in_source_order.index(event)] = replacement
+
+    draws_in_source_order = [
+        event for event in enabled_in_source_order if event.event_type == "water_draw"
+    ]
+    state_controlled_seen = False
+    for index, draw in enumerate(draws_in_source_order):
+        if draw.draw_type in {"cut-in", "temp drop"}:
+            state_controlled_seen = True
+        elif draw.draw_type == "volume" and state_controlled_seen:
+            errors.append(
+                f"row {draw.source_row}: Volume draws cannot follow Cut-in or Temp Drop draws"
+            )
+        if draw.draw_type == "cut-in":
+            following = (
+                draws_in_source_order[index + 1]
+                if index + 1 < len(draws_in_source_order)
+                else None
+            )
+            if (
+                following is None
+                or following.draw_type != "temp drop"
+                or not following.dependent_end
+            ):
+                errors.append(
+                    f"row {draw.source_row}: Cut-in must be immediately followed by a TBD Temp Drop draw"
+                )
+    enabled_events = sorted(enabled_in_source_order, key=lambda event: (event.offset_seconds, event.source_row))
     end_events = [
         event
         for event in enabled_events

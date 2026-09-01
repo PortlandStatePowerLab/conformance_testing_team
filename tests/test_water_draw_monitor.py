@@ -16,12 +16,59 @@ from software.water_draw_monitor import (
     build_parser,
     integrate_volume_gallons,
     run_draw,
+    temperature_arm_threshold_f,
 )
 
 
 class WaterDrawTests(unittest.TestCase):
+    def test_temp_drop_arms_then_requires_twenty_consecutive_low_samples(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "draw.csv"
+            args = build_parser().parse_args([
+                "--event-id", "draw_1", "--draw-type", "temp_drop",
+                "--temp-set-f", "125", "--temp-drop-f", "15",
+                "--max-run-minutes", "60", "--output-csv", str(output),
+                "--enable-output",
+            ])
+            valve = Mock()
+            base = dict(
+                hot_raw_counts=100, cold_raw_counts=200, flow_raw_counts=300,
+                ambient_raw_counts=400, hot_temp_c=50.0, cold_temp_c=20.0,
+                cold_temp_f=68.0, ambient_temp_c=22.0, ambient_temp_f=71.6,
+                flow_gpm=1.0,
+            )
+            temperatures = (
+                [75.0, 115.0]
+                + [109.0] * 19
+                + [111.0]
+                + [110.00000000000006] * 20
+            )
+            snapshots = [SensorSnapshot(hot_temp_f=value, **base) for value in temperatures]
+            sensor_reader = Mock()
+            sensor_reader.get_sensor_snapshot.side_effect = [snapshots[0], *snapshots]
+            session = SimpleNamespace(reader=sensor_reader, close=Mock())
+            times = [0.0] + [index * 0.5 for index in range(1, len(snapshots) + 1)] + [30.0]
+            with (
+                patch("software.water_draw_monitor.build_gpio_valve", return_value=valve),
+                patch("software.water_draw_monitor.build_station_sensor_session", return_value=session),
+                patch("software.water_draw_monitor.time.monotonic", side_effect=times),
+            ):
+                stop_event = Mock()
+                stop_event.is_set.return_value = False
+                result = run_draw(args, stop_event)
+            self.assertEqual(result, EXIT_SUCCESS)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertEqual(rows[-1]["stop_reason"], "temperature_threshold_reached")
+            self.assertEqual(len([row for row in rows if row["status"] == "drawing"]), len(snapshots))
+
     def test_nominal_flow_integration(self):
         self.assertAlmostEqual(integrate_volume_gallons(3.0, 0.5), 0.025)
+
+    def test_arm_temperature_uses_two_thirds_of_selected_drop(self):
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 5.0), 121.6666666667)
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 10.0), 118.3333333333)
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 15.0), 115.0)
 
     def test_adc_conversion_uses_4096_code_divisor(self):
         self.assertAlmostEqual(

@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 from software.event_timeline import (
     _mode,
     _power_points,
+    _water_draw_start_observation,
     build_event_timeline,
     plot_event_timeline,
 )
@@ -24,6 +25,14 @@ def write_csv(path, columns, rows):
 
 
 class EventTimelineTests(unittest.TestCase):
+    def test_temperature_drop_draw_does_not_require_volume_target(self):
+        self.assertEqual(
+            _water_draw_start_observation(
+                {"draw_type": "temp drop", "target_volume_gal": None, "temp_drop_f": 15.0}
+            ),
+            "Temperature drop target 15 °F",
+        )
+
     def test_current_classifier_uses_gray_areas_and_hysteresis(self):
         self.assertEqual(_mode(0.10), "standby")
         self.assertEqual(_mode(0.25), "fan")
@@ -60,6 +69,8 @@ class EventTimelineTests(unittest.TestCase):
             [
                 ["2026-08-17T12:00:00-07:00", "intermediate_response", "advanced_load_up", "success", "", ""],
                 ["2026-08-17T12:00:33-07:00", "operational_state", "query_operational_state", "received", "6", "Idle Heightened"],
+                ["2026-08-17T12:01:03-07:00", "operational_state", "query_operational_state", "received", "3", "Running Heightened"],
+                ["2026-08-17T12:01:33-07:00", "operational_state", "query_operational_state", "received", "3", "Running Heightened"],
                 ["2026-08-17T12:10:00-07:00", "application_ack", "shed", "ack", "", ""],
                 ["2026-08-17T12:10:22-07:00", "operational_state", "query_operational_state", "received", "4", "Idle Curtailed"],
             ],
@@ -112,6 +123,15 @@ class EventTimelineTests(unittest.TestCase):
             self.assertEqual(
                 by_name["Expected operational state first observed"].after_command_seconds,
                 22,
+            )
+            state_changes = [
+                event for event in events
+                if event.milestone == "Operational state changed"
+            ]
+            self.assertEqual(len(state_changes), 1)
+            self.assertEqual(
+                state_changes[0].observation,
+                "State 3: Running Heightened (expected)",
             )
             self.assertEqual(by_name["water_draw_1 completed"].observation, "Measured 2.01 gal")
 

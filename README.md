@@ -1,5 +1,29 @@
 # Water-Heater Conformance Test Runner
 
+This software implements an HTTP GUI to load a test, add a test, validate a test, start a test run, and get real time data from the test run
+
+## Steps to Open the SSH/HTTP GUI
+After cloning the repository to the Raspberry Pi, open an SSH connection to the Pi from your computer
+* $ ssh -L <port number>:127.0.0.1:5000 pi@<Pi IP address> (Use the port number 5000 + Pi number. In the case of Pi 3, we would use 5003)
+A password may need to be entered to access the Pi. Once you are in the Pi, start a Tmux session
+* $  tmux new -s gui
+* $ cd conformance_testing_team
+* $ make schedule-gui
+(Optional) On the terminal, press Ctrl + b, then d to change from the tmux terminal to the normal terminal.
+To access the tmux session again:
+* tmux attach -t gui
+
+Your gui is now running. Go to a web browser and type in http://127.0.0.1:5003/ for station 3 for example. Just change the port number 5003 to any number you chose above if accessing a different water heater.
+You should now see the conformance test schedule open and ready to use
+
+### Important Notes on the tmux GUI session
+* The tmux session is chosen in order to keep the gui running in the background in the event of an SSH connection error or disconnect.
+* The alternative systemctl is not used because this would keep the GUI service active permanently. Starting the testing GUI intentionally is preferred over a constant running process 
+* The specific SSH local-forwarding connection of ssh -L <port number>:127.0.0.1:5000 pi@<Pi IP address> provides access to the GUI without exposing the GUI’s port directly on the network
+* The schedule-gui python script times out after 48 hours of no post or get requests so that the service ends in case someone forgets about the tmux or python script running
+
+
+## Manually run a start a test schedule
 The human-editable test definition is
 `software/conformance_test_schedule_main.xlsx`. Running the test runner imports
 it into the canonical `software/conformance_test_schedule.csv` before
@@ -21,11 +45,23 @@ Zero means off, 1 is least efficient, 9 is most efficient, and 10 requests
 vacation mode (which an SGD is not required to support). Existing XLSX and CSV
 schedules without this optional column retain the original 7-byte request.
 Beginning with the first CTA command prerequisite, the compiler automatically
-refreshes outside communication every 13 minutes 30 seconds for the entire
+refreshes outside communication every 10 minutes for the entire
 test, including run-normal periods. The heartbeat stops at test end. These
 generated refreshes do not repeat or extend user commands; all user-entered CTA
 commands and their 15-second outside-communication prerequisites retain their
 scheduled times.
+
+Water Draw `Time (min)` is represented by `max_draw_minutes` and appears in
+the browser editor as **Max time (min)**. A `Cut-in` draw uses `TBD` for its
+start and requires only Max time. It waits for the first CTA command's fresh
+cut-out OpState, draws until the
+corresponding cut-in OpState, closes the valve, and waits for the subsequent
+cut-out. Its Max time applies only while the valve is open; after cut-in closes
+the valve, a fixed 12-hour watchdog limits the wait for recovery cut-out. It must
+be immediately followed by a `Temp Drop` draw with a `TBD` start; that draw is
+released by the recovery cut-out. Volume draws cannot follow Cut-in or Temp
+Drop draws. The orchestrator consumes the controller's existing 30-second
+`cta_events.csv` OpState records and does not issue additional CTA reads.
 
 The heartbeat is enabled by default. Disable only the recurring refreshes for
 a controlled comparison while retaining every command prerequisite:
@@ -74,6 +110,16 @@ a private immutable launch directory before a detached worker starts the test.
 Refreshing or closing the browser does not stop that worker; reopening the GUI
 restores the current run status. Only one active GUI-launched test is permitted
 per station, and preflight approval expires after five minutes.
+
+While a test is launching, initializing, or running, its status panel includes
+a red **Stop Test** button with a confirmation dialog. A confirmed stop is
+persisted for the detached worker, which interrupts the runner through its
+normal cleanup path: active water is stopped, the CTA device is returned to
+normal, and monitoring processes and logs are closed. Operator-stopped tests
+skip final plot/report generation and automatic Git publishing. Once the GUI
+shows `stopped`, a separately confirmed **Delete stopped results** action can
+remove that run's local saved-result directory; the small GUI status record is
+retained for audit purposes.
 
 Validate the schedule without accessing hardware:
 
@@ -144,7 +190,18 @@ orchestrator events, process logs, and a human-readable
 `conformance_test_report.xlsx` workbook. The workbook is generated when the run
 closes and contains Event Timeline, Device Information, Master Schedule, and
 Commodity Summary sheets. The detailed source CSV files remain unchanged.
-The timeline retains each approximately one-minute operational-state reading.
+The timeline retains the existing approximately 30-second operational-state
+readings; commodity records remain on their one-minute cadence.
+
+The `saved_data/conformance_runs/` directory is its own Git repository. After
+final reports and plots are generated, a hardware run commits only its
+`WH-n/<run-directory>` inside that repository and publishes it to that
+repository's `origin/main`. The publisher verifies the nested repository root,
+pulls with rebase before each push, and retries concurrent station pushes up to
+five times. Git authentication is noninteractive; if a pull, rebase,
+authentication, or push fails, the test result remains saved and committed
+locally for a later synchronization. Pass `--no-publish-results` to keep a run
+local intentionally.
 
 Regenerate the workbook for an existing run with:
 

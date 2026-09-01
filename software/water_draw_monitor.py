@@ -33,6 +33,10 @@ DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.5
 DEFAULT_MAX_RUN_MINUTES = 10.0
 DEFAULT_LOW_FLOW_GPM = 0.05
 DEFAULT_LOW_FLOW_TIMEOUT_SECONDS = 20.0
+TEMP_ARM_FRACTION_OF_DROP = 2.0 / 3.0
+TEMP_CONFIRMATION_SAMPLES = 20
+MAX_INVALID_TEMP_SAMPLES = 20
+TEMPERATURE_COMPARISON_EPSILON_F = 1e-6
 
 EXIT_SUCCESS = 0
 EXIT_MAX_RUNTIME = 2
@@ -92,7 +96,12 @@ def build_parser() -> argparse.ArgumentParser:
     repository_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--event-id", required=True)
-    parser.add_argument("--target-gal", required=True, type=positive_float)
+    parser.add_argument(
+        "--draw-type", choices=("volume", "cut_in", "temp_drop"), default="volume"
+    )
+    parser.add_argument("--target-gal", type=positive_float)
+    parser.add_argument("--temp-set-f", type=float)
+    parser.add_argument("--temp-drop-f", type=positive_float)
     parser.add_argument("--output-csv", type=Path)
     parser.add_argument(
         "--sensor-configuration",
@@ -142,6 +151,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def validate_draw_arguments(args: argparse.Namespace) -> None:
+    if args.draw_type == "volume" and args.target_gal is None:
+        raise ValueError("Volume draw requires --target-gal")
+    if args.draw_type == "temp_drop":
+        if args.temp_set_f is None or not math.isfinite(args.temp_set_f):
+            raise ValueError("Temp Drop draw requires finite --temp-set-f")
+        if args.temp_drop_f is None:
+            raise ValueError("Temp Drop draw requires --temp-drop-f")
+
+
 def default_output_path(event_id: str, directory: Path) -> Path:
     safe_event_id = "".join(
         character if character.isalnum() or character in "-_" else "_"
@@ -155,6 +174,11 @@ def integrate_volume_gallons(flow_gpm: float, elapsed_seconds: float) -> float:
     return max(flow_gpm, 0.0) * elapsed_seconds / 60.0
 
 
+def temperature_arm_threshold_f(temp_set_f: float, temp_drop_f: float) -> float:
+    """Return the unrounded temperature that arms Temp Drop shutdown logic."""
+    return temp_set_f - temp_drop_f * TEMP_ARM_FRACTION_OF_DROP
+
+
 def _row(
     *,
     event_id: str,
@@ -162,7 +186,7 @@ def _row(
     status: str,
     stop_reason: str,
     valve_state: str,
-    target_volume_gal: float,
+    target_volume_gal: float | None,
     volume_gal: float,
     snapshot: SensorSnapshot | None,
 ) -> dict[str, Any]:
@@ -189,6 +213,7 @@ def _row(
 
 
 def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
+    validate_draw_arguments(args)
     output_path = args.output_csv or default_output_path(
         args.event_id, args.default_output_directory
     )
@@ -231,9 +256,12 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
         valve = None
         volume_gal = 0.0
         last_snapshot = None
-        start = time.monotonic()
-        previous_sample_time = start
+        start = 0.0
+        previous_sample_time = 0.0
         low_flow_start: float | None = None
+        temperature_armed = False
+        stop_temp_count = 0
+        invalid_temp_count = 0
         stop_reason = "sensor_error"
         exit_code = EXIT_SENSOR_ERROR
 
@@ -258,11 +286,20 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                         "event_id": args.event_id,
                         "output_csv": str(output_path),
                         "timestamp_pacific": pacific_timestamp(),
+                        "draw_type": args.draw_type,
+                        "temp_set_f": args.temp_set_f,
+                        "temp_drop_f": args.temp_drop_f,
+                        "stop_temp_f": (
+                            args.temp_set_f - args.temp_drop_f
+                            if args.draw_type == "temp_drop" else None
+                        ),
                     }
                 ),
                 flush=True,
             )
 
+            start = time.monotonic()
+            previous_sample_time = start
             valve.open()
             print(
                 "WATER_DRAW_VALVE_OPEN "
@@ -286,20 +323,59 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                     exit_code = EXIT_TERMINATED
                     break
                 if elapsed >= args.max_run_minutes * 60.0:
-                    stop_reason = "max_runtime"
-                    exit_code = EXIT_MAX_RUNTIME
+                    stop_reason = "time_limit_reached" if args.draw_type == "temp_drop" else "max_runtime"
+                    exit_code = EXIT_SUCCESS if args.draw_type == "temp_drop" else EXIT_MAX_RUNTIME
                     break
 
                 try:
                     snapshot = sensor_reader.get_sensor_snapshot()
-                except Exception as exc:
-                    stop_reason = f"sensor_error:{type(exc).__name__}"
-                    exit_code = EXIT_SENSOR_ERROR
-                    break
+                except Exception:
+                    if args.draw_type != "temp_drop":
+                        raise
+                    invalid_temp_count += 1
+                    if invalid_temp_count >= MAX_INVALID_TEMP_SAMPLES:
+                        stop_reason = "temperature_sensor_unavailable"
+                        exit_code = EXIT_SENSOR_ERROR
+                        break
+                    stop_event.wait(args.sample_interval_seconds)
+                    continue
                 last_snapshot = snapshot
                 volume_gal += integrate_volume_gallons(
                     snapshot.flow_gpm, sample_delta
                 )
+
+                if args.draw_type == "temp_drop":
+                    hot_temp_f = snapshot.hot_temp_f
+                    if not math.isfinite(hot_temp_f):
+                        invalid_temp_count += 1
+                        if invalid_temp_count >= MAX_INVALID_TEMP_SAMPLES:
+                            stop_reason = "temperature_sensor_unavailable"
+                            exit_code = EXIT_SENSOR_ERROR
+                    else:
+                        invalid_temp_count = 0
+                        arm_temp_f = temperature_arm_threshold_f(
+                            args.temp_set_f, args.temp_drop_f
+                        )
+                        stop_temp_f = args.temp_set_f - args.temp_drop_f
+                        if not temperature_armed and hot_temp_f >= arm_temp_f:
+                            temperature_armed = True
+                            print(
+                                "WATER_DRAW_TEMP_ARMED "
+                                + json.dumps(
+                                    {
+                                        "event_id": args.event_id,
+                                        "hot_temp_f": hot_temp_f,
+                                        "arm_temp_f": round(arm_temp_f, 1),
+                                    }
+                                ),
+                                flush=True,
+                            )
+                        if temperature_armed:
+                            stop_temp_count = (
+                                stop_temp_count + 1
+                                if hot_temp_f <= stop_temp_f + TEMPERATURE_COMPARISON_EPSILON_F
+                                else 0
+                            )
 
                 if snapshot.flow_gpm < args.low_flow_gpm:
                     if low_flow_start is None:
@@ -326,8 +402,14 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
 
                 if exit_code == EXIT_LOW_FLOW:
                     break
-                if volume_gal >= args.target_gal:
+                if stop_reason == "temperature_sensor_unavailable":
+                    break
+                if args.draw_type == "volume" and volume_gal >= args.target_gal:
                     stop_reason = "target_reached"
+                    exit_code = EXIT_SUCCESS
+                    break
+                if args.draw_type == "temp_drop" and stop_temp_count >= TEMP_CONFIRMATION_SAMPLES:
+                    stop_reason = "temperature_threshold_reached"
                     exit_code = EXIT_SUCCESS
                     break
                 stop_event.wait(args.sample_interval_seconds)
@@ -372,6 +454,9 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
                         "timestamp_pacific": pacific_timestamp(),
                         "stop_reason": stop_reason,
                         "volume_gal": volume_gal,
+                        "final_hot_temp_f": (
+                            last_snapshot.hot_temp_f if last_snapshot is not None else None
+                        ),
                         "exit_code": exit_code,
                     }
                 ),

@@ -1,0 +1,5 @@
+enabled,event_id,time_after_start,phase,draw_type,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,temp_drop_f,max_draw_minutes,notes,advanced_efficiency
+TRUE,grid_emergency_1,00:00:00,pre_event,,cta,grid_emergency,max,,,2|4,,,,,,
+TRUE,water_draw_1,TBD,event,Cut-in,water_draw,water_draw,,,,,,,,180,,
+TRUE,water_draw_2,TBD,event,Temp Drop,water_draw,water_draw,,,,,,,15,60,,
+TRUE,test_end,TBD,recovery,,test,end,,,,,,,,,,

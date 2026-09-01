@@ -24,6 +24,18 @@
     th, td { border: 1px solid #d8dde7; padding: .35rem; vertical-align: top; }
     th { background: #e8edf5; white-space: nowrap; text-align: left; }
     td input, td select { width: 8.5rem; }
+    td[data-field="enabled"] input, td[data-field="enabled"] select { width: 5.5rem; }
+    td[data-field="time_after_start"] input { width: 7.25rem; }
+    td[data-field="phase"] select { width: 7.25rem; }
+    td[data-field="action"] select { width: 9.5rem; }
+    td[data-field="event_duration_minutes"] input,
+    td[data-field="advanced_value"] input,
+    td[data-field="advanced_units"] select,
+    td[data-field="target_volume_gal"] input,
+    td[data-field="temp_set_f"] input,
+    td[data-field="temp_drop_f"] input,
+    td[data-field="max_draw_minutes"] input,
+    td[data-field="stop_temp_f"] input { width: 7.25rem; }
     td .notes { width: 13rem; }
     td.irrelevant > * { display: none; }
     td.irrelevant::after { content: "—"; color: #8b949e; }
@@ -37,6 +49,12 @@
     #run-status { border-left: .4rem solid #0969da; }
     #run-status.failed { border-left-color: #cf222e; }
     #run-status.completed { border-left-color: #238636; }
+    #run-status.stopped { border-left-color: #d97706; }
+    .run-status-layout { display: flex; align-items: start; gap: 1rem; }
+    .run-status-main { flex: 1; min-width: 0; }
+    .run-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+    .danger { color: white; background: #cf222e; border: 1px solid #a40e26; border-radius: .3rem; font-weight: 700; }
+    .danger:hover { background: #a40e26; }
     dialog { border: 0; border-radius: .75rem; padding: 1.5rem; max-width: 34rem; box-shadow: 0 8px 30px #0005; }
     dialog::backdrop { background: #0008; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; }
@@ -74,8 +92,8 @@
   </div>
 
   <div class="toolbar">
-    <label>Schedule name<input id="name" maxlength="75" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
-    <label>Saved schedule<select id="saved"><option value="">New schedule</option></select></label>
+    <label>Schedule name<input id="name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="my_test" required></label>
+    <label>Shared saved schedule<select id="saved"><option value="">New schedule</option></select></label>
     <button id="load" type="button">Load</button>
     <button id="validate" type="button">Validate schedule</button>
     <button id="save" type="button">Save validated CSV</button>
@@ -90,9 +108,17 @@
     <div id="preflight-failures"></div>
   </div>
   <div id="run-status" class="status" hidden>
-    <strong id="run-heading">No active test.</strong>
-    <div id="run-details" class="muted"></div>
-    <button id="refresh-run" type="button">Refresh status</button>
+    <div class="run-status-layout">
+      <div class="run-status-main">
+        <strong id="run-heading">No active test.</strong>
+        <div id="run-details" class="muted"></div>
+      </div>
+      <div class="run-actions">
+        <button id="refresh-run" type="button">Refresh status</button>
+        <button id="delete-stopped-results" class="danger" type="button" hidden>Delete stopped results</button>
+        <button id="stop-test" class="danger" type="button" hidden>Stop Test</button>
+      </div>
+    </div>
   </div>
 
   <div class="cards">
@@ -103,7 +129,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Efficiency (optional)</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Start Time</th><th>Phase</th><th>Command</th><th>Duration (min)</th><th>Advanced value</th><th>Units</th><th>Efficiency (optional)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="cta-rows"></tbody>
         </table>
       </div>
@@ -117,7 +143,7 @@
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Enabled</th><th>Time after start</th><th>Phase</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Enabled</th><th>Start Time</th><th>Phase</th><th>Draw Type</th><th>Target (gal)</th><th>Expected flow (GPM)</th><th>Estimated duration</th><th>Temp Set (°F)</th><th>Temp Drop (°F)</th><th>Max time (min)</th><th>Stop Temp (°F)</th><th>Notes</th><th></th></tr></thead>
           <tbody id="water-rows"></tbody>
         </table>
       </div>
@@ -127,7 +153,7 @@
     <section class="card">
       <div class="card-heading"><div><h2>Test End</h2><span class="muted">Exactly one enabled end event is required.</span></div></div>
       <div class="end-fields">
-        <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]"></label>
+        <label>Time after start<input id="end-time" value="01:00:00" placeholder="HH:MM:SS or TBD"></label>
         <label>Phase<select id="end-phase"><option>pre_event</option><option>event</option><option selected>recovery</option></select></label>
         <label>Notes<input id="end-notes"></label>
       </div>
@@ -152,8 +178,26 @@
     <button id="begin-countdown" type="button">Begin 10-second countdown</button>
   </div>
 </dialog>
+<dialog id="stop-dialog">
+  <h2>Stop this running test?</h2>
+  <p><strong>The valve will be closed and the CTA device will be returned to normal.</strong></p>
+  <p>Final plots and automatic Git publishing will be skipped. Existing measurements will remain available unless you delete them afterward.</p>
+  <div class="dialog-actions">
+    <button id="cancel-stop" type="button">Keep test running</button>
+    <button id="confirm-stop" class="danger" type="button">Yes, stop test</button>
+  </div>
+</dialog>
+<dialog id="delete-results-dialog">
+  <h2>Delete stopped test results?</h2>
+  <p><strong>This permanently deletes the saved measurement and CTA result directory for this stopped test.</strong></p>
+  <p>The small GUI status record is retained as an audit that the test was stopped.</p>
+  <div class="dialog-actions">
+    <button id="cancel-delete-results" type="button">Keep results</button>
+    <button id="confirm-delete-results" class="danger" type="button">Delete results</button>
+  </div>
+</dialog>
 <script>
-const canonicalColumns = ["enabled","event_id","time_after_start","phase","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","notes","advanced_efficiency"];
+const canonicalColumns = ["enabled","event_id","time_after_start","phase","draw_type","event_type","action","event_duration_minutes","advanced_value","advanced_units","expected_operational_states","target_volume_gal","expected_flow_gpm","temp_drop_f","max_draw_minutes","notes","advanced_efficiency"];
 const status = document.querySelector("#status");
 const messages = document.querySelector("#messages");
 const ctaBody = document.querySelector("#cta-rows");
@@ -161,6 +205,7 @@ const waterBody = document.querySelector("#water-rows");
 let actionDefinitions = [];
 let units = [];
 let efficiencies = [];
+let temperatureSetpointF = null;
 const phases = ["pre_event", "event", "recovery"];
 const saveButton = document.querySelector("#save");
 const preflightButton = document.querySelector("#preflight");
@@ -171,15 +216,23 @@ const preflightFailures = document.querySelector("#preflight-failures");
 const startButton = document.querySelector("#start-test");
 const startDialog = document.querySelector("#start-dialog");
 const countdown = document.querySelector("#countdown");
+const stopTestButton = document.querySelector("#stop-test");
+const deleteStoppedResultsButton = document.querySelector("#delete-stopped-results");
+const stopDialog = document.querySelector("#stop-dialog");
+const deleteResultsDialog = document.querySelector("#delete-results-dialog");
 const runStatus = document.querySelector("#run-status");
 const runHeading = document.querySelector("#run-heading");
 const runDetails = document.querySelector("#run-details");
 const refreshRunButton = document.querySelector("#refresh-run");
 let validatedSignature = null;
+let validatedSummary = null;
 let savedSignature = null;
+let savedSummary = null;
 let savedFilename = "";
+let knownScheduleFilenames = new Set();
 let preflightRunning = false;
 let preflightPassed = false;
+let whInformationRunning = false;
 let countdownTimer = null;
 let activeRun = null;
 const whInformationButton = document.querySelector("#get-wh-information");
@@ -256,15 +309,26 @@ function addCta(source = {}) {
 function addWater(source = {}) {
   const row = document.createElement("tr");
   cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
-  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
+  const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS or TBD", pattern:"(?:[0-9]+:[0-5][0-9]:[0-5][0-9]|[Tt][Bb][Dd])"}), "time_after_start");
   cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "event"), "phase");
+  const normalizedDrawType = (source.draw_type || "volume").toLowerCase();
+  const selectedDrawType = normalizedDrawType === "cut-in" ? "Cut-in" : normalizedDrawType === "temp drop" ? "Temp Drop" : "Volume";
+  const drawType = cell(row, selectControl(["Volume", "Cut-in", "Temp Drop"], selectedDrawType), "draw_type");
   cell(row, inputControl(source.target_volume_gal || "", {type:"number", min:"0.000001", step:"any"}), "target_volume_gal");
   cell(row, inputControl(source.expected_flow_gpm || "", {type:"number", min:"0.000001", step:"any"}), "expected_flow_gpm");
   const estimate = document.createElement("span"); cell(row, estimate, "estimate");
+  const tempSet = inputControl(temperatureSetpointF ?? "", {type:"number", readOnly:true}); cell(row, tempSet, "temp_set_f");
+  cell(row, inputControl(source.temp_drop_f || "", {type:"number", min:"0.000001", step:"any"}), "temp_drop_f");
+  cell(row, inputControl(source.max_draw_minutes || "", {type:"number", min:"0.000001", step:"any"}), "max_draw_minutes");
+  const stopTemp = inputControl("", {type:"number", readOnly:true}); cell(row, stopTemp, "stop_temp_f");
   const notes = inputControl(source.notes || ""); notes.className = "notes"; cell(row, notes, "notes");
   removeCell(row, waterBody);
   waterBody.append(row);
   time.firstElementChild.oninput = updateView;
+  drawType.firstElementChild.onchange = () => {
+    if (rowValue(row, "draw_type") === "Cut-in") time.firstElementChild.value = "TBD";
+    updateView();
+  };
   row.oninput = updateView;
   updateView();
 }
@@ -284,7 +348,7 @@ function scheduleRows() {
     rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"cta", action:rowValue(row,"action"), event_duration_minutes:rowValue(row,"event_duration_minutes"), advanced_value:rowValue(row,"advanced_value"), advanced_units:rowValue(row,"advanced_units"), advanced_efficiency:rowValue(row,"advanced_efficiency"), notes:rowValue(row,"notes")});
   }
   for (const row of waterBody.rows) {
-    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), notes:rowValue(row,"notes")});
+    rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), draw_type:rowValue(row,"draw_type"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), temp_drop_f:rowValue(row,"temp_drop_f"), max_draw_minutes:rowValue(row,"max_draw_minutes"), notes:rowValue(row,"notes")});
   }
   rows.push({...blankCanonicalRow(), enabled:"TRUE", time_after_start:document.querySelector("#end-time").value, phase:document.querySelector("#end-phase").value, event_type:"test", action:"end", notes:document.querySelector("#end-notes").value});
   return rows;
@@ -296,9 +360,14 @@ function draftSignature() {
 
 function updateWorkflowState() {
   const signature = draftSignature();
-  saveButton.disabled = validatedSignature !== signature;
-  preflightButton.disabled = preflightRunning || !savedFilename || savedSignature !== signature;
-  startButton.disabled = preflightRunning || !preflightPassed || !savedFilename || savedSignature !== signature || (activeRun && ["launching","initializing","running","finalizing","generating_outputs","stopping"].includes(activeRun.state));
+  const hardwareBusy = activeRun && ["launching","initializing","running","stopping","finalizing","generating_outputs","publishing_results"].includes(activeRun.state);
+  saveButton.disabled = validatedSignature !== signature || (Boolean(savedFilename) && savedSignature === signature);
+  preflightButton.disabled = hardwareBusy || whInformationRunning || preflightRunning || !savedFilename || savedSignature !== signature;
+  preflightButton.title = hardwareBusy ? "Unavailable while a hardware test is active" : "";
+  whInformationButton.disabled = Boolean(hardwareBusy || preflightRunning || whInformationRunning);
+  whInformationButton.title = hardwareBusy ? "Unavailable while a hardware test is active" : "";
+  const validSavedDuration = savedSummary && Number.isFinite(Number(savedSummary.duration_seconds)) && Number(savedSummary.duration_seconds) >= 0;
+  startButton.disabled = hardwareBusy || whInformationRunning || preflightRunning || !preflightPassed || !savedFilename || !validSavedDuration || savedSignature !== signature;
 }
 
 function elapsedSeconds(value) {
@@ -325,9 +394,31 @@ function updateView() {
     }
   }
   for (const row of waterBody.rows) {
+    const isTempDrop = rowValue(row, "draw_type") === "Temp Drop";
+    const isCutIn = rowValue(row, "draw_type") === "Cut-in";
+    const isVolume = !isTempDrop && !isCutIn;
+    for (const field of ["target_volume_gal", "estimate"]) {
+      const td = row.querySelector(`[data-field="${field}"]`);
+      td.classList.toggle("irrelevant", !isVolume);
+      if (td.firstElementChild && field !== "estimate") td.firstElementChild.disabled = !isVolume;
+    }
+    const flowCell = row.querySelector('[data-field="expected_flow_gpm"]');
+    flowCell.classList.toggle("irrelevant", !isVolume);
+    flowCell.firstElementChild.disabled = !isVolume;
+    for (const field of ["temp_set_f", "temp_drop_f", "stop_temp_f"]) {
+      const td = row.querySelector(`[data-field="${field}"]`);
+      td.classList.toggle("irrelevant", !isTempDrop);
+      if (td.firstElementChild && field === "temp_drop_f") td.firstElementChild.disabled = !isTempDrop;
+    }
+    const maxTimeCell = row.querySelector('[data-field="max_draw_minutes"]');
+    maxTimeCell.classList.toggle("irrelevant", isVolume);
+    maxTimeCell.firstElementChild.disabled = isVolume;
     const volume = Number(rowValue(row, "target_volume_gal"));
     const flow = Number(rowValue(row, "expected_flow_gpm"));
     row.querySelector('[data-field="estimate"] span').textContent = formatDuration((volume / flow) * 60);
+    const drop = Number(rowValue(row, "temp_drop_f"));
+    row.querySelector('[data-field="temp_set_f"] input').value = temperatureSetpointF ?? "";
+    row.querySelector('[data-field="stop_temp_f"] input').value = Number.isFinite(temperatureSetpointF) && drop > 0 ? (temperatureSetpointF - drop).toFixed(1) : "";
   }
   document.querySelector("#cta-empty").hidden = ctaBody.rows.length !== 0;
   document.querySelector("#water-empty").hidden = waterBody.rows.length !== 0;
@@ -336,7 +427,11 @@ function updateView() {
     counts[row.action] = (counts[row.action] || 0) + 1;
     const id = row.action === "end" ? "test_end" : `${row.action}_${counts[row.action]}`;
     let details = row.phase || "";
-    if (row.action === "water_draw") details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    if (row.action === "water_draw") {
+      if (row.draw_type === "Temp Drop") details = `${row.temp_drop_f || "?"}°F drop; max ${row.max_draw_minutes || "?"} min`;
+      else if (row.draw_type === "Cut-in") details = `cut-in; valve-open max ${row.max_draw_minutes || "?"} min; 12 h recovery watchdog`;
+      else details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
+    }
     else if (row.event_type === "cta") {
       const duration = row.event_duration_minutes || "?";
       details = `duration ${duration}${duration.toLowerCase() === "max" ? "" : " min"}${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
@@ -362,7 +457,10 @@ async function request(path, body) {
 
 function show(result, valid) {
   status.className = `status ${valid ? "valid" : "invalid"}`;
-  if (result.summary) messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${result.summary.duration_seconds} seconds.`;
+  if (result.summary) {
+    const duration = result.summary.duration_estimated ? `${result.summary.duration_seconds} seconds estimated maximum` : `${result.summary.duration_seconds} seconds`;
+    messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${duration}.`;
+  }
   else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
 }
 
@@ -377,6 +475,7 @@ function resetPreflightDisplay() {
 
 async function refreshSchedules(selected = "") {
   const result = await fetch("/api/schedules").then(response => response.json());
+  knownScheduleFilenames = new Set(result.schedules.map(schedule => schedule.filename.toLowerCase()));
   const saved = document.querySelector("#saved");
   saved.replaceChildren(new Option("New schedule", ""), ...result.schedules.map(schedule => new Option(schedule.name, schedule.filename)));
   saved.value = selected;
@@ -407,9 +506,11 @@ document.querySelector("#validate").onclick = async () => {
   try {
     const result = await request("/api/validate", {rows:scheduleRows()});
     validatedSignature = draftSignature();
+    validatedSummary = result.summary;
     show(result, true);
   } catch (error) {
     validatedSignature = null;
+    validatedSummary = null;
     show(error, false);
   }
   updateWorkflowState();
@@ -421,10 +522,13 @@ document.querySelector("#save").onclick = async () => {
     show({error:"Validate the current schedule before saving."}, false);
     return;
   }
+  const destination = `${name.value}.csv`.toLowerCase();
+  if (knownScheduleFilenames.has(destination) && !window.confirm(`Replace the shared schedule ${name.value}.csv for every water-heater station?`)) return;
   try {
     const result = await request("/api/save", {name:name.value, rows:scheduleRows()});
     savedFilename = result.saved;
     savedSignature = draftSignature();
+    savedSummary = result.summary;
     show(result, true);
     await refreshSchedules(result.saved);
   } catch (error) { show(error, false); }
@@ -437,14 +541,18 @@ document.querySelector("#load").onclick = async () => {
     const response = await fetch(`/api/schedules/${encodeURIComponent(selected)}`);
     const result = await response.json();
     if (!response.ok) throw result;
-    loadRows(result.rows);
     document.querySelector("#name").value = result.display_name;
-    validatedSignature = null;
-    savedSignature = null;
+    loadRows(result.rows);
     savedFilename = result.name;
-    messages.textContent = `Loaded ${result.display_name}. Validate before saving changes.`;
-    status.className = "status";
+    const signature = draftSignature();
+    validatedSignature = signature;
+    validatedSummary = result.summary;
+    savedSignature = signature;
+    savedSummary = result.summary;
+    messages.textContent = `Loaded and validated ${result.display_name}. No changes need to be saved.`;
+    status.className = "status valid";
     resetPreflightDisplay();
+    preflightLines.textContent = "Loaded schedule is already saved and validated. Run preflight when ready.";
     await dismissTerminalRun();
     updateWorkflowState();
   } catch (error) { show(error, false); }
@@ -520,7 +628,9 @@ preflightButton.onclick = async () => {
 };
 
 function clockText(seconds) {
-  const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const numeric = Number(seconds);
+  if (!Number.isFinite(numeric)) return "calculating";
+  const value = Math.max(0, Math.ceil(numeric));
   const hours = Math.floor(value / 3600);
   const minutes = Math.floor((value % 3600) / 60);
   const secs = value % 60;
@@ -540,8 +650,23 @@ function renderRun(run) {
   }
   const heartbeat = run.last_heartbeat_at ? new Date(run.last_heartbeat_at).toLocaleString() : "not yet available";
   const lifecycle = run.message ? `${run.message} · ` : "";
-  runDetails.textContent = `${lifecycle}Remaining ${clockText(remaining)} · expected finish ${run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating"} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}`;
-  refreshRunButton.textContent = ["completed", "failed"].includes(run.state) ? "Dismiss completed test" : "Refresh status";
+  const remainingLabel = run.duration_estimated ? "Estimated remaining" : "Remaining";
+  const finishLabel = run.duration_estimated ? "estimated latest finish" : "expected finish";
+  const finishText = run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating";
+  const warnings = Array.isArray(run.communication_warnings) && run.communication_warnings.length
+    ? ` · Earlier CTA warning${run.communication_warnings.length === 1 ? "" : "s"}: ${run.communication_warnings.join("; ")}`
+    : "";
+  const recoveryRemaining = run.recovery_deadline_at
+    ? Math.max(0, (Date.parse(run.recovery_deadline_at) - Date.now()) / 1000)
+    : null;
+  const recovery = run.cut_in_phase === "recovery" && recoveryRemaining !== null
+    ? ` · Recovery watchdog remaining ${clockText(recoveryRemaining)}`
+    : "";
+  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)}${recovery} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}${warnings}`;
+  const terminal = ["completed", "failed", "stopped"].includes(run.state);
+  refreshRunButton.textContent = terminal ? "Dismiss test" : "Refresh status";
+  stopTestButton.hidden = !["launching", "initializing", "running"].includes(run.state);
+  deleteStoppedResultsButton.hidden = run.state !== "stopped" || !run.result_directory || Boolean(run.results_deleted);
   updateWorkflowState();
 }
 
@@ -561,21 +686,57 @@ async function refreshRunStatus({dismissTerminal = false} = {}) {
 }
 
 async function dismissTerminalRun() {
-  if (!activeRun || !["completed", "failed"].includes(activeRun.state)) return;
+  if (!activeRun || !["completed", "failed", "stopped"].includes(activeRun.state)) return;
   await request("/api/runs/current/dismiss", {});
   renderRun(null);
 }
 
 refreshRunButton.onclick = async () => {
-  if (activeRun && ["completed", "failed"].includes(activeRun.state)) {
+  if (activeRun && ["completed", "failed", "stopped"].includes(activeRun.state)) {
     await dismissTerminalRun();
   } else {
     await refreshRunStatus();
   }
 };
+stopTestButton.onclick = () => stopDialog.showModal();
+document.querySelector("#cancel-stop").onclick = () => stopDialog.close();
+stopDialog.oncancel = () => stopDialog.close();
+document.querySelector("#confirm-stop").onclick = async () => {
+  document.querySelector("#confirm-stop").disabled = true;
+  try {
+    const result = await request("/api/runs/current/stop", {});
+    stopDialog.close();
+    renderRun(result.run);
+  } catch (error) {
+    show(error, false);
+  } finally {
+    document.querySelector("#confirm-stop").disabled = false;
+  }
+};
+deleteStoppedResultsButton.onclick = () => deleteResultsDialog.showModal();
+document.querySelector("#cancel-delete-results").onclick = () => deleteResultsDialog.close();
+deleteResultsDialog.oncancel = () => deleteResultsDialog.close();
+document.querySelector("#confirm-delete-results").onclick = async () => {
+  document.querySelector("#confirm-delete-results").disabled = true;
+  try {
+    const result = await request("/api/runs/current/delete-results", {});
+    deleteResultsDialog.close();
+    renderRun(result.run);
+  } catch (error) {
+    show(error, false);
+  } finally {
+    document.querySelector("#confirm-delete-results").disabled = false;
+  }
+};
 startButton.onclick = () => {
-  const duration = elapsedSeconds(document.querySelector("#end-time").value);
-  document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${clockText(duration)} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
+  const duration = Number(savedSummary?.duration_seconds);
+  if (!Number.isFinite(duration) || duration < 0) {
+    show({error:"The saved schedule has no valid Python-validated duration. Validate and save it again before starting."}, false);
+    updateWorkflowState();
+    return;
+  }
+  const durationText = savedSummary.duration_estimated ? `${clockText(duration)} estimated maximum` : clockText(duration);
+  document.querySelector("#start-review").textContent = `Station: ${document.querySelector("#station-hostname").textContent} · Schedule: ${savedFilename} · Duration: ${durationText} · Water output: ${scheduleRows().some(row => row.action === "water_draw" && row.enabled === "TRUE") ? "ENABLED" : "disabled"}`;
   countdown.hidden = true;
   document.querySelector("#begin-countdown").hidden = false;
   startDialog.showModal();
@@ -613,7 +774,8 @@ document.querySelector("#begin-countdown").onclick = () => {
 };
 
 whInformationButton.onclick = async () => {
-  whInformationButton.disabled = true;
+  whInformationRunning = true;
+  updateWorkflowState();
   whInformationButton.textContent = "Getting WH Info…";
   whInformationResult.textContent = "Requesting information from the water heater…";
   whVersion.textContent = "CTA-2045 version: requesting…";
@@ -633,8 +795,9 @@ whInformationButton.onclick = async () => {
     whVersion.textContent = "CTA-2045 version: unavailable";
     whInformationResult.textContent = error.error || String(error);
   } finally {
-    whInformationButton.disabled = false;
+    whInformationRunning = false;
     whInformationButton.textContent = "Get WH Info";
+    updateWorkflowState();
   }
 };
 
@@ -644,6 +807,7 @@ async function initialize() {
   const equipment = document.querySelector("#station-equipment");
   if (metadata.equipment) {
     const item = metadata.equipment;
+    temperatureSetpointF = Number.isFinite(Number(item.temperature_setpoint_f)) ? Number(item.temperature_setpoint_f) : null;
     equipment.textContent = `${item.manufacturer} ${item.model_number}\n${item.year} · ${item.voltage} · ${item.capacity_gallons} gallons · Added ${item.date_added}`;
   } else {
     equipment.textContent = metadata.equipment_error || "Water-heater information not configured.";
