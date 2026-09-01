@@ -433,6 +433,7 @@ class ScheduleGuiTests(unittest.TestCase):
             "cta2045_version": "B",
             "bitmap": "0x00000141",
             "raw_bitmap": "0x00000141",
+            "dr_ready": True,
             "capabilities": [
                 {"bit": 0, "name": "Cycling"},
                 {"bit": 6, "name": "Advanced Load Up"},

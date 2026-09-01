@@ -43,6 +43,13 @@ def decode_capabilities(raw_hex: str) -> list[dict[str, object]]:
     ]
 
 
+def decode_dr_readiness(operational_state: int | None) -> bool | None:
+    """Classify the current operational state for the concise GUI status."""
+    if operational_state is None:
+        return None
+    return operational_state not in (11, 12)
+
+
 def read_wh_information(
     *,
     cta_binary: Path = DEFAULT_CTA_BINARY,
@@ -57,11 +64,12 @@ def read_wh_information(
     with tempfile.TemporaryDirectory(prefix="wh_information_") as directory:
         temporary = Path(directory)
         information_path = temporary / "cta_device_information.csv"
+        event_path = temporary / "cta_events.csv"
         environment = os.environ.copy()
         environment.update(
             {
                 "CTA_DEVICE_INFO_LOG_PATH": str(information_path),
-                "CTA_EVENT_LOG_PATH": str(temporary / "cta_events.csv"),
+                "CTA_EVENT_LOG_PATH": str(event_path),
                 "CTA_COMMODITY_LOG_PATH": str(temporary / "cta_commodity.csv"),
                 "CTA_RAW_MESSAGE_LOG_PATH": str(temporary / "cta_raw_messages.csv"),
             }
@@ -96,6 +104,20 @@ def read_wh_information(
         if len(rows) != 1:
             raise RuntimeError("expected exactly one device-information response")
 
+        operational_state = None
+        if event_path.is_file():
+            with event_path.open("r", encoding="utf-8-sig", newline="") as handle:
+                for event in csv.DictReader(handle):
+                    raw_state = (event.get("operational_state") or "").strip()
+                    if event.get("event") != "operational_state" or not raw_state:
+                        continue
+                    try:
+                        candidate = int(raw_state)
+                    except ValueError:
+                        continue
+                    if 0 <= candidate <= 255:
+                        operational_state = candidate
+
     row = rows[0]
     if row.get("response_code") != "0":
         raise RuntimeError(
@@ -112,4 +134,5 @@ def read_wh_information(
         "bitmap": f"0x{logical_bitmap:08X}",
         "raw_bitmap": f"0x{raw_bitmap.upper()}",
         "capabilities": capabilities,
+        "dr_ready": decode_dr_readiness(operational_state),
     }
