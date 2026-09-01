@@ -127,11 +127,11 @@ def snapshot_from_reading(message: dict[str, Any]) -> SensorSnapshot:
         hot_temp_c=float_values["hot_temp_c"],
         hot_temp_f=float_values["hot_temp_f"],
         cold_temp_c=float_values["cold_temp_c"],
-        cold_temp_f=float_values["cold_temp_c"],
+        cold_temp_f=float_values["cold_temp_f"],
         ambient_temp_c=float_values["ambient_temp_c"],
         ambient_temp_f=float_values["ambient_temp_f"],
         flow_gpm=float_values["flow_gpm"],
-        cold_source_station=str(message["cold_source_station"]),
+        cold_source_station=str(message["source_station"]),
         cold_source_timestamp_pacific=str(message["timestamp_pacific"])
 )
 

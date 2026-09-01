@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from software.cold_water.client import _StreamSnapshotClient
+from software.cold_water.protocol import reading_message, snapshot_from_reading
 from software.cold_water.service import SnapshotService
 from software.cold_water.station_sensor_source import CompositeSensorReader
 from software.cold_water import station_sensor_source
@@ -61,6 +62,14 @@ class ColdWaterServiceTest(unittest.TestCase):
         self.assertEqual(combined.cold_raw_counts, 200)
         self.assertEqual(combined.hot_temp_c, 50.0)
         self.assertEqual(combined.flow_gpm, 3.0)
+
+    def test_protocol_preserves_cold_fahrenheit_and_source_station(self):
+        message = reading_message(snapshot(cold_temp_c=24.5), sequence=1)
+
+        decoded = snapshot_from_reading(message)
+
+        self.assertEqual(decoded.cold_temp_f, 76.1)
+        self.assertEqual(decoded.cold_source_station, "WH-station1")
 
     def test_station1_client_never_constructs_an_adc(self):
         client = mock.Mock()
