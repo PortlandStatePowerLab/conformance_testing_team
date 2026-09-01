@@ -15,7 +15,7 @@ from software.station.station_hardware_map import (
     CH_HOT,
 )
 from software.commands import check_sensors_command as sensor_check
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 
 class FakeAdc:
     """Provide deterministic grouped counts without importing Pi hardware."""

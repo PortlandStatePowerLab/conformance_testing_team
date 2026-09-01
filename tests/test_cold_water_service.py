@@ -12,7 +12,7 @@ from software.cold_water.client import _StreamSnapshotClient
 from software.cold_water.service import SnapshotService
 from software.cold_water.station_sensor_source import CompositeSensorReader
 from software.cold_water import station_sensor_source
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 from software.station.station_identity import station_number, station_results_directory
 
 

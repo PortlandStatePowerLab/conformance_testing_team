@@ -10,7 +10,7 @@ from software.helpers.sensor_conversion import (
     NOMINAL_SENSOR_CONFIG,
     counts_to_voltage,
 )
-from software.sensors.sensor_reader import SensorSnapshot
+from software.sensors import SensorSnapshot
 from software.water_draw_monitor import (
     EXIT_SUCCESS,
     build_parser,
