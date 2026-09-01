@@ -1,4 +1,4 @@
-"""Finite, dependency-injected WH1 controlled water-draw workflow."""
+"""Manual commissioning workflow for one finite WH controlled water draw."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ from software.exception_notes import add_exception_note
 from software.sensors import SensorSnapshot
 from software.valve import Valve
 
-MAX_RUN_MINUTES = 5.0
-MIN_FLOW_GPM = 0.05
-LOW_FLOW_TIMEOUT_S = 20.0
-PRINT_PERIOD_S = 0.5
+_DEFAULT_MAX_RUN_MINUTES = 5.0
+_MIN_FLOW_GPM = 0.05
+_LOW_FLOW_TIMEOUT_S = 20.0
+_PRINT_PERIOD_S = 0.5
 
 
 class SensorSnapshotReader(Protocol):
@@ -29,14 +29,37 @@ def run_controlled_water_draw(
     *,
     sensor_reader: SensorSnapshotReader,
     valve: Valve,
-    max_run_minutes: float = MAX_RUN_MINUTES,
+    max_run_minutes: float | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> float:
-    """Open the valve, integrate measured flow, and close at the target."""
+    """Run one manually requested, finite target-volume water draw.
+
+    Args:
+        target_volume_gal (float): Requested water volume in gallons.
+        sensor_reader (SensorSnapshotReader): Borrowed grouped-sensor reader.
+        valve (Valve): Borrowed valve controller. The caller retains ownership.
+        max_run_minutes (float | None): Optional positive runtime limit in minutes.
+            When omitted, the workflow uses its private commissioning default.
+        monotonic (Callable[[], float]): Monotonic clock returning seconds.
+        sleep (Callable[[float], None]): Delay function receiving seconds.
+
+    Returns:
+        Integrated water volume in gallons.
+
+    Safety:
+        The workflow always attempts to close the valve before returning or
+        propagating an error. The caller remains responsible for final cleanup.
+    """
     if target_volume_gal <= 0.0:
         raise ValueError("target volume must be greater than 0 gallons")
-    if max_run_minutes <= 0.0:
+
+    effective_max_run_minutes = (
+        _DEFAULT_MAX_RUN_MINUTES
+        if max_run_minutes is None
+        else max_run_minutes
+    )
+    if effective_max_run_minutes <= 0.0:
         raise ValueError("maximum run time must be greater than 0 minutes")
 
     print(f"Target: {target_volume_gal:.3f} gal")
@@ -57,7 +80,7 @@ def run_controlled_water_draw(
             delta_s = now - previous
             previous = now
 
-            if elapsed_s > max_run_minutes * 60.0:
+            if elapsed_s > effective_max_run_minutes * 60.0:
                 print("[!] Timeout reached. Stopping.")
                 break
 
@@ -74,16 +97,16 @@ def run_controlled_water_draw(
 
             volume_gal += max(snapshot.flow_gpm, 0.0) * (delta_s / 60.0)
 
-            if snapshot.flow_gpm < MIN_FLOW_GPM:
+            if snapshot.flow_gpm < _MIN_FLOW_GPM:
                 if low_flow_start is None:
                     low_flow_start = now
-                elif now - low_flow_start >= LOW_FLOW_TIMEOUT_S:
+                elif now - low_flow_start >= _LOW_FLOW_TIMEOUT_S:
                     print("[!] Low flow persisted. Stopping.")
                     break
             else:
                 low_flow_start = None
 
-            if now - last_log >= PRINT_PERIOD_S:
+            if now - last_log >= _PRINT_PERIOD_S:
                 print(
                     f"T_hot={snapshot.hot_temp_c:.1f} C  "
                     f"T_cold={snapshot.cold_temp_c:.1f} C  "

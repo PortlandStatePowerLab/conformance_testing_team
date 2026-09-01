@@ -1,4 +1,4 @@
-"""Command-line entrypoint for one controlled WH1 water draw."""
+"""Command-line entrypoint for one manual commissioning water draw."""
 
 from __future__ import annotations
 
@@ -9,17 +9,21 @@ from software.cold_water.station_sensor_source import (
     build_station_sensor_session,
 )
 from software.exception_notes import add_exception_note
-from software.runtime.controlled_water_draw_workflow import (
-    MAX_RUN_MINUTES,
-    run_controlled_water_draw,
-)
+from software.runtime import run_controlled_water_draw
 from software.valve import build_gpio_valve
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run one controlled WH1 water draw")
+    parser = argparse.ArgumentParser(
+        description="Run one manual commissioning water draw"
+    )
     parser.add_argument("--target-gal", type=float, required=True)
-    parser.add_argument("--max-run-minutes", type=float, default=MAX_RUN_MINUTES)
+    parser.add_argument(
+        "--max-run-minutes",
+        type=float,
+        default=None,
+        help="override the controlled water-draw runtime limit",
+    )
     return parser.parse_args(argv)
 
 
@@ -27,7 +31,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     if args.target_gal <= 0.0:
         raise SystemExit("--target-gal must be greater than zero")
-    if args.max_run_minutes <= 0.0:
+    if args.max_run_minutes is not None and args.max_run_minutes <= 0.0:
         raise SystemExit("--max-run-minutes must be greater than zero")
 
     sensor_session = build_station_sensor_session()
