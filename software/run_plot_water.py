@@ -76,6 +76,11 @@ def _is_wh4(directory: Path) -> bool:
     return directory.parent.name.upper().replace("_", "-") == "WH-4"
 
 
+def _legend_entries(axis):
+    """Read legend entries through the cross-version Axes API."""
+    return axis.get_legend_handles_labels()
+
+
 def add_operational_state_band(
     figure, directory: Path, actual_start, actual_end, display_start
 ):
@@ -243,9 +248,9 @@ def plot_run_with_water(
             color=WATER_COLOR,
         )
 
-    legend = energy_axis.get_legend()
-    handles = list(legend.legend_handles) if legend is not None else []
-    labels = [handle.get_label() for handle in handles]
+    # Use the long-standing Axes API rather than version-specific Legend
+    # attributes (legend_handles is unavailable on older station Matplotlib).
+    handles, labels = _legend_entries(energy_axis)
     energy_axis.legend(handles + [water_line], labels + ["Water Draw"], loc="upper left")
     figure.subplots_adjust(left=0.09, right=0.845, bottom=0.19, top=0.86)
     add_operational_state_band(
