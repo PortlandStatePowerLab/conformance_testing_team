@@ -20,7 +20,7 @@ from software.cold_water.protocol import (
     snapshot_from_reading,
 )
 from software.sensors import SensorSnapshot
-from software.helpers import _unix_socket_family
+from software.cold_water.unix_socket_helper import _unix_socket_family
 
 
 DEFAULT_SOCKET_PATH = Path("/run/cold-water/cold-water.sock")

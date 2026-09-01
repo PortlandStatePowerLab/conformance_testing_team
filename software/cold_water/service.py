@@ -22,7 +22,7 @@ from software.cold_water.protocol import (
 )
 from software.sensors import SensorReader
 from software.station.station_identity import station_number
-from software.helpers import _unix_socket_family
+from software.cold_water.unix_socket_helper import _unix_socket_family
 
 
 DEFAULT_SAMPLE_PERIOD_SECONDS = 0.5
