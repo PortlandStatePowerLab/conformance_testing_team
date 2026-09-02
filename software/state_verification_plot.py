@@ -48,6 +48,7 @@ class StateReport:
 class VerificationData:
     phases: tuple[ExpectedPhase, ...]
     reports: tuple[StateReport, ...]
+    verification_end: datetime | None = None
 
 
 def _enabled(value: str) -> bool:
@@ -101,6 +102,7 @@ def load_verification_data(run_directory: Path | str) -> VerificationData:
                     )
                 )
 
+    verification_end = None
     for phase in _command_phases(event_rows):
         if scheduled[phase.command]:
             phases.append(
@@ -112,6 +114,29 @@ def load_verification_data(run_directory: Path | str) -> VerificationData:
                     phase.result,
                 )
             )
+        elif (
+            phase.command == "run_normal"
+            and phase.accepted
+            and phases
+            and verification_end is None
+        ):
+            # The runner sends an unscheduled run_normal during final cleanup.
+            # Its acknowledgement ends verification of the last test phase.
+            verification_end = phase.timestamp
+
+    # Consecutive Normal acknowledgements are intentionally collapsed by the
+    # phase parser. Detect a cleanup Normal that follows the final scheduled
+    # phase directly from the event records as well.
+    if phases and verification_end is None:
+        cleanup_times = [
+            _timestamp(row["timestamp_pacific"])
+            for row in event_rows
+            if row.get("command", "").strip().lower() == "run_normal"
+            and _acknowledged(row)
+            and _timestamp(row["timestamp_pacific"]) > phases[-1].timestamp
+        ]
+        if cleanup_times:
+            verification_end = min(cleanup_times)
 
     if not phases:
         raise ValueError("no acknowledged scheduled CTA phases found")
@@ -120,6 +145,7 @@ def load_verification_data(run_directory: Path | str) -> VerificationData:
     return VerificationData(
         tuple(sorted(phases, key=lambda item: item.timestamp)),
         tuple(sorted(reports, key=lambda item: item.timestamp)),
+        verification_end,
     )
 
 
@@ -179,6 +205,8 @@ def plot_state_verification(
     data = load_verification_data(directory)
     actual_start = min(data.reports[0].timestamp, data.phases[0].timestamp)
     actual_end = max(data.reports[-1].timestamp, data.phases[-1].timestamp)
+    if data.verification_end is not None:
+        actual_end = min(actual_end, data.verification_end)
     display_start = _duck_curve_display_start(
         actual_start, data.phases, scenario_start=scenario_start
     )
@@ -199,6 +227,7 @@ def plot_state_verification(
             _shift(item.timestamp, actual_start, display_start), item.code, item.name
         )
         for item in data.reports
+        if item.timestamp < actual_end
     )
     if (phases[0].timestamp - display_start).total_seconds() <= grace_seconds:
         first = phases[0]

@@ -115,6 +115,10 @@ def add_operational_state_band(
         report
         for report in verification.reports
         if actual_start <= report.timestamp <= actual_end
+        and (
+            verification.verification_end is None
+            or report.timestamp < verification.verification_end
+        )
     ]
     is_wh4 = _is_wh4(directory)
     if not is_wh4:
@@ -154,16 +158,10 @@ def add_operational_state_band(
         if fraction >= 0.035:
             midpoint = shifted_start + (shifted_end - shifted_start) / 2
             state_name = "\n".join(name.split())
-            show_status = status != "Pass" or is_wh4
-            label = (
-                f"{state_name}\n{status}"
-                if fraction >= 0.06 and show_status
-                else state_name
-            )
             state_axis.text(
                 midpoint,
                 0.5,
-                label,
+                state_name,
                 ha="center",
                 va="center",
                 fontsize=7 if fraction < 0.06 else 7.5,

@@ -82,6 +82,27 @@ class PhaseSummaryPlotTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             self.assertEqual(len(figure.axes), 2)
 
+    def test_cleanup_run_normal_does_not_fail_last_phase(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.create_run(directory)
+            with (directory / "master_schedule.csv").open(
+                encoding="utf-8", newline=""
+            ) as handle:
+                rows = list(csv.reader(handle))
+            rows[-1][-1] = "0|1"
+            write_csv(directory / "master_schedule.csv", rows[0], rows[1:])
+            with (directory / "cta_events.csv").open("a", encoding="utf-8", newline="") as handle:
+                csv.writer(handle).writerows([
+                    ["2026-08-17T15:00:00-07:00", "application_ack", "run_normal", "ack", "", ""],
+                    ["2026-08-17T15:00:30-07:00", "operational_state", "query_operational_state", "received", "5", "SGD Error Condition"],
+                ])
+
+            summaries = summarize_run_phases(directory)
+
+            self.assertEqual(summaries[-1].state_result, "Pass")
+            self.assertEqual(summaries[-1].duration_seconds, 60)
+
 
 if __name__ == "__main__":
     unittest.main()

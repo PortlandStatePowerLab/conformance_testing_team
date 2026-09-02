@@ -145,6 +145,21 @@ class EventTimelineTests(unittest.TestCase):
             self.assertTrue(image.is_file())
             self.assertTrue(csv_path.is_file())
 
+    def test_excludes_state_changes_after_cleanup_run_normal(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "WH-3" / "run"
+            directory.mkdir(parents=True)
+            self.create_run(directory)
+            with (directory / "cta_events.csv").open("a", encoding="utf-8", newline="") as handle:
+                csv.writer(handle).writerows([
+                    ["2026-08-17T12:10:30-07:00", "application_ack", "run_normal", "ack", "", ""],
+                    ["2026-08-17T12:10:40-07:00", "operational_state", "query_operational_state", "received", "1", "Running Normal"],
+                ])
+
+            observations = [event.observation for event in build_event_timeline(directory)]
+
+            self.assertFalse(any("State 1:" in observation for observation in observations))
+
 
 if __name__ == "__main__":
     unittest.main()

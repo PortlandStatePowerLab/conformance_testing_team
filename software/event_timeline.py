@@ -206,6 +206,8 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
         plot_data.energy[-1].timestamp,
         plot_data.power[-1].timestamp,
     )
+    if verification.verification_end is not None:
+        run_end = min(run_end, verification.verification_end)
     events: list[TimelineEvent] = []
     first_expected_timestamps: set[datetime] = set()
 
@@ -281,7 +283,7 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
         if not changed or report.timestamp in first_expected_timestamps:
             continue
         phase = _active_phase(phases, report.timestamp)
-        if phase is None or report.timestamp > run_end:
+        if phase is None or report.timestamp >= run_end:
             continue
         expected_text = " or ".join(str(code) for code in sorted(phase.expected_states))
         expectation = (
@@ -301,6 +303,8 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
     points = _power_points(_read_csv(directory / "power.csv"))
     previous_mode = points[0].mode if points else "standby"
     for point in points[1:]:
+        if point.timestamp >= run_end:
+            continue
         if point.mode == previous_mode:
             continue
         phase = _active_phase(phases, point.timestamp)
@@ -327,7 +331,7 @@ def build_event_timeline(run_directory: Path | str) -> tuple[TimelineEvent, ...]
             except (ValueError, json.JSONDecodeError):
                 continue
             phase = _active_phase(phases, timestamp)
-            if phase is None:
+            if phase is None or timestamp >= run_end:
                 continue
             event_id = row.get("event_id", "").strip() or "Water draw"
             if kind == "water_draw_started":

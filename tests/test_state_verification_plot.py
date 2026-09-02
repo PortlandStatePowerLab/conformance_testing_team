@@ -57,6 +57,10 @@ class StateVerificationPlotTests(unittest.TestCase):
             data = load_verification_data(directory)
             self.assertEqual([phase.name for phase in data.phases], ["ALU", "Shed", "Normal"])
             self.assertEqual(data.phases[0].expected_states, frozenset({3, 6}))
+            self.assertEqual(
+                data.verification_end,
+                datetime(2026, 8, 17, 16, 10),
+            )
 
     def test_grace_pass_and_fail(self):
         with tempfile.TemporaryDirectory() as temporary:

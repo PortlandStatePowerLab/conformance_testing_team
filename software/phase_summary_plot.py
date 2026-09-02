@@ -129,6 +129,8 @@ def summarize_run_phases(
         plot_data.power[-1].timestamp,
         verification.reports[-1].timestamp,
     )
+    if verification.verification_end is not None:
+        run_end = min(run_end, verification.verification_end)
 
     totals = Counter(phase.name for phase in verification.phases)
     seen: dict[str, int] = defaultdict(int)
