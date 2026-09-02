@@ -3,6 +3,7 @@ CTA_DCS_DIR ?= $(HOME)/cta_2045_controller/dcs
 SENSOR_CONFIGURATION ?=
 SENSOR_CALIBRATION ?=
 SCHEDULE ?=
+FOLDER ?=
 HEARTBEAT ?= true
 HEARTBEAT_FLAG = $(if $(filter false,$(HEARTBEAT)),--disable-outside-communication-heartbeat,)
 PREFLIGHT_SCHEDULE_FLAG = $(if $(SCHEDULE),--schedule "$(SCHEDULE)",)
@@ -67,6 +68,9 @@ run-water-configured:
 # Backward-compatible alias for the earlier target and variable names.
 run-water-calibrated:
 	@$(MAKE) run-water-configured SENSOR_CONFIGURATION="$(SENSOR_CALIBRATION)"
+
+verify_plot:
+	$(PYTHON) -m software.state_verification_plot $(FOLDER)
 
 build_cta:
 	$(MAKE) -C $(CTA_DCS_DIR) controller
