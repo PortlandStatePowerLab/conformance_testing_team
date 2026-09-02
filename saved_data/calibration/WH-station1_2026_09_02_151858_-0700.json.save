@@ -36,30 +36,5 @@
     "thermometer_used": "Bomata T101A",
     "thermometer_accuracy_f": 1.8,
     "last_cal_time": "2026-09-01T19:06:16-07:00"
-  },
-  "cold_water_temp": {
-    "method": "three_reading_average_offset",
-    "correction_offset_f": -1.642,
-    "average_reference_temp_f": 66.233,
-    "average_uncalibrated_temp_f": 67.875,
-    "average_raw_counts": 1151.333,
-    "reference_readings_f": [
-      66.6,
-      66.6,
-      65.5
-    ],
-    "uncalibrated_readings_f": [
-      68.187,
-      68.187,
-      67.25
-    ],
-    "raw_count_readings": [
-      1153,
-      1153,
-      1148
-    ],
-    "thermometer_used": "Bomata T101A",
-    "thermometer_accuracy_f": 1.8,
-    "last_cal_time": "2026-09-02T15:18:58-07:00"
   }
 }
