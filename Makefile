@@ -76,7 +76,7 @@ all_plots:
 	$(PYTHON) -m software.state_verification_plot $(FOLDER)
 	$(PYTHON) -m software.phase_summary_plot $(FOLDER)
 	$(PYTHON) -m software.run_plot_water $(FOLDER)
-	$(PYTHON) -m software.event_timeline$(FOLDER)
+	$(PYTHON) -m software.event_timeline $(FOLDER)
 
 build_cta:
 	$(MAKE) -C $(CTA_DCS_DIR) controller
