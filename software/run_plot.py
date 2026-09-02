@@ -13,10 +13,16 @@ from typing import Iterable
 from matplotlib.figure import Figure
 
 from .equipment_metadata import equipment_title_line
-from .time_axis import apply_clock_ticks
+from .time_axis import apply_even_clock_ticks
 
 
 PLOT_FILENAME = "energy_take_power.png"
+HEATER_ON_THRESHOLD_W = 200.0
+HEATER_OFF_THRESHOLD_W = 150.0
+ELEMENT_ON_THRESHOLD_W = 3000.0
+ELEMENT_OFF_THRESHOLD_W = 2500.0
+COMBINED_ON_THRESHOLD_W = 4800.0
+COMBINED_OFF_THRESHOLD_W = 4500.0
 
 
 @dataclass(frozen=True)
@@ -231,6 +237,35 @@ def _without_startup_spikes(samples: tuple[Sample, ...]) -> tuple[Sample, ...]:
     return tuple(filtered)
 
 
+def _heater_mode(power_w: float, previous: str = "off") -> str:
+    """Classify heating mode from filtered real power with hysteresis."""
+    if previous == "combined" and power_w > COMBINED_OFF_THRESHOLD_W:
+        return "combined"
+    if power_w >= COMBINED_ON_THRESHOLD_W:
+        return "combined"
+    if previous == "element" and power_w > ELEMENT_OFF_THRESHOLD_W:
+        return "element"
+    if power_w >= ELEMENT_ON_THRESHOLD_W:
+        return "element"
+    if previous == "heat pump" and power_w > HEATER_OFF_THRESHOLD_W:
+        return "heat pump"
+    if power_w >= HEATER_ON_THRESHOLD_W:
+        return "heat pump"
+    return "off"
+
+
+def _heater_transitions(samples: tuple[Sample, ...]) -> tuple[tuple[datetime, str], ...]:
+    """Return heat-pump, element, combined, and off mode transitions."""
+    transitions: list[tuple[datetime, str]] = []
+    mode = _heater_mode(samples[0].value) if samples else "off"
+    for sample in samples[1:]:
+        next_mode = _heater_mode(sample.value, mode)
+        if next_mode != mode:
+            transitions.append((sample.timestamp, next_mode))
+            mode = next_mode
+    return tuple(transitions)
+
+
 def plot_run(
     run_directory: Path | str,
     *,
@@ -239,6 +274,7 @@ def plot_run(
     show: bool = False,
     suppress_startup_spikes: bool = True,
     energy_change_from_start: bool = False,
+    annotate_heater_transitions: bool = True,
 ) -> tuple[Figure, Path | None]:
     """Create a third-example-style run plot and optionally save/display it."""
     directory = Path(run_directory).resolve()
@@ -353,7 +389,37 @@ def plot_run(
     power_axis.set_ylabel("Real Power (kW)", color="red")
     energy_axis.tick_params(axis="y", colors="green")
     power_axis.tick_params(axis="y", colors="red")
-    apply_clock_ticks(energy_axis, display_start, plot_end)
+    apply_even_clock_ticks(energy_axis, display_start, plot_end, count=6)
+    transitions = _heater_transitions(plotted_power) if annotate_heater_transitions else ()
+    for index, (timestamp, _) in enumerate(transitions):
+        shifted_timestamp = _shift(timestamp, actual_start, display_start)
+        energy_axis.axvline(
+            shifted_timestamp,
+            color="#444444",
+            linewidth=0.8,
+            linestyle="--",
+            alpha=0.8,
+            zorder=6,
+        )
+        energy_axis.text(
+            shifted_timestamp,
+            0.98 if index % 2 == 0 else 0.86,
+            shifted_timestamp.strftime("%I:%M:%S %p").lstrip("0"),
+            transform=energy_axis.get_xaxis_transform(),
+            rotation=90,
+            ha="right",
+            va="top",
+            fontsize=10,
+            fontweight="bold",
+            color="#333333",
+            clip_on=True,
+            bbox={
+                "facecolor": "white",
+                "edgecolor": "none",
+                "alpha": 0.72,
+                "pad": 1.5,
+            },
+        )
     energy_axis.grid(True, color="#b0b0b0", alpha=0.45)
     energy_axis.legend(handles=[energy_line, power_line], loc="upper left")
     equipment_line = equipment_title_line(directory)

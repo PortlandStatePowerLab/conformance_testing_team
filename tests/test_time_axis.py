@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta
 
-from software.time_axis import time_tick_interval_minutes
+from software.time_axis import apply_even_clock_ticks, time_tick_interval_minutes
 
 
 class TimeAxisTests(unittest.TestCase):
@@ -25,6 +25,21 @@ class TimeAxisTests(unittest.TestCase):
     def test_rejects_impossible_label_limit(self):
         with self.assertRaises(ValueError):
             time_tick_interval_minutes(self.start, self.start, maximum_labels=1)
+
+    def test_even_ticks_use_requested_count(self):
+        class Axis:
+            class XAxis:
+                def set_major_locator(self, locator):
+                    self.locator = locator
+
+                def set_major_formatter(self, formatter):
+                    self.formatter = formatter
+
+            xaxis = XAxis()
+
+        axis = Axis()
+        apply_even_clock_ticks(axis, self.start, self.start + timedelta(hours=3))
+        self.assertEqual(len(axis.xaxis.locator.locs), 6)
 
 
 if __name__ == "__main__":

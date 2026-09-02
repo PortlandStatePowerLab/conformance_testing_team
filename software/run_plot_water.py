@@ -212,6 +212,7 @@ def plot_run_with_water(
         directory,
         scenario_start=scenario_start,
         suppress_startup_spikes=suppress_startup_spikes,
+        annotate_heater_transitions=False,
     )
     figure.set_size_inches(13.5, 6.75)
     energy_axis = figure.axes[1]

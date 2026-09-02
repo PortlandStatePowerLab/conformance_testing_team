@@ -12,6 +12,8 @@ from software.run_plot import (
     Phase,
     Sample,
     _duck_curve_display_start,
+    _heater_mode,
+    _heater_transitions,
     _without_startup_spikes,
     load_run_plot_data,
     plot_run,
@@ -27,6 +29,36 @@ def write_csv(path, columns, rows):
 
 
 class RunPlotTests(unittest.TestCase):
+    def test_heater_transitions_distinguish_heating_modes(self):
+        from datetime import datetime, timedelta
+
+        start = datetime(2026, 9, 1, 12, 0)
+        samples = tuple(
+            Sample(start + timedelta(seconds=index), value)
+            for index, value in enumerate(
+                (20, 80, 210, 175, 3200, 2800, 4900, 4600, 4400, 2400, 140, 75)
+            )
+        )
+
+        self.assertEqual(
+            _heater_transitions(samples),
+            (
+                (start + timedelta(seconds=2), "heat pump"),
+                (start + timedelta(seconds=4), "element"),
+                (start + timedelta(seconds=6), "combined"),
+                (start + timedelta(seconds=8), "element"),
+                (start + timedelta(seconds=9), "heat pump"),
+                (start + timedelta(seconds=10), "off"),
+            ),
+        )
+
+    def test_heater_mode_excludes_fan_and_holds_hysteresis(self):
+        self.assertEqual(_heater_mode(80), "off")
+        self.assertEqual(_heater_mode(210), "heat pump")
+        self.assertEqual(_heater_mode(175, "heat pump"), "heat pump")
+        self.assertEqual(_heater_mode(3200), "element")
+        self.assertEqual(_heater_mode(4600, "combined"), "combined")
+
     def test_aligns_end_of_shed_cp_or_ge_to_nine_ten_pm(self):
         from datetime import datetime, timedelta
 

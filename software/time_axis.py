@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import matplotlib.dates as mdates
+from matplotlib.ticker import FixedLocator
 
 
 TICK_INTERVALS_MINUTES = (5, 10, 15, 20, 30, 60, 120, 180, 240, 360, 720, 1440)
@@ -40,3 +41,16 @@ def apply_clock_ticks(axis, start: datetime, end: datetime) -> int:
     axis.xaxis.set_major_locator(locator)
     axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
     return interval
+
+
+def apply_even_clock_ticks(axis, start: datetime, end: datetime, *, count: int = 6) -> None:
+    """Apply an exact number of evenly distributed clock labels."""
+    if count < 2:
+        raise ValueError("count must be at least 2")
+    start_number = mdates.date2num(start)
+    end_number = mdates.date2num(end)
+    step = (end_number - start_number) / (count - 1)
+    axis.xaxis.set_major_locator(
+        FixedLocator([start_number + index * step for index in range(count)])
+    )
+    axis.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p"))
