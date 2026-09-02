@@ -21,7 +21,7 @@ from software.cold_water.protocol import (
     reading_message,
 )
 from software.sensors import SensorReader
-from software.sensors.hot_water_calibration_loader import station_calibration_path
+from software.sensors.water_temp_calibration_loader import station_calibration_path
 from software.station.station_identity import station_number
 from software.cold_water.unix_socket_helper import _unix_socket_family
 

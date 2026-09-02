@@ -39,7 +39,8 @@ from software.adc import SensorAdc
 from software.sensors.sensor_configuration_loader import (
     load_sensor_configuration,
 )
-from software.sensors.hot_water_calibration_loader import (
+from software.sensors.water_temp_calibration_loader import (
+    load_cold_water_offset_f,
     load_hot_water_offset_f,
 )
 
@@ -149,6 +150,7 @@ class SensorReader:
         calibration_path: Path | None = None,
         station_calibration_path: Path | None = None,
         apply_hot_water_calibration: bool = True,
+        apply_cold_water_calibration: bool = True,
     ) -> None:
         if configuration_path is not None and calibration_path is not None:
             raise ValueError(
@@ -168,6 +170,12 @@ class SensorReader:
             else 0.0
         )
         self._hot_water_offset_c = self._hot_water_offset_f * 5.0 / 9.0
+        self._cold_water_offset_f = (
+            load_cold_water_offset_f(station_calibration_path)
+            if apply_cold_water_calibration
+            else 0.0
+        )
+        self._cold_water_offset_c = self._cold_water_offset_f * 5.0 / 9.0
 
     # endregion Initialization
 
@@ -241,11 +249,12 @@ class SensorReader:
             Uses the effective temperature span and electrical configuration.
         """
         cold_voltage_v = self.get_adc_voltage(CH_COLD)
-        return voltage_to_linear_loop_value(
+        nominal_temp_c = voltage_to_linear_loop_value(
             cold_voltage_v,
             self._temperature_span,
             self._conversion_config,
         )
+        return nominal_temp_c + self._cold_water_offset_c
 
     # Reads flow voltage ``flow_voltage_v`` and converts it with ``_flow_span``.
     def get_flow_gpm(self) -> float:
@@ -320,6 +329,12 @@ class SensorReader:
             self._conversion_config,
         )
         hot_temp_c = nominal_hot_temp_c + self._hot_water_offset_c
+        nominal_cold_temp_c = voltage_to_linear_loop_value(
+            cold_voltage_v,
+            self._temperature_span,
+            self._conversion_config,
+        )
+        cold_temp_c = nominal_cold_temp_c + self._cold_water_offset_c
 
         return SensorSnapshot(
             hot_raw_counts=hot_raw_counts,
@@ -328,16 +343,8 @@ class SensorReader:
             ambient_raw_counts=ambient_raw_counts,
             hot_temp_c=hot_temp_c,
             hot_temp_f=(hot_temp_c * 9.0 / 5.0) + 32.0,
-            cold_temp_c=voltage_to_linear_loop_value(
-                cold_voltage_v,
-                self._temperature_span,
-                self._conversion_config,
-            ),
-            cold_temp_f=voltage_to_linear_loop_value(
-                cold_voltage_v,
-                self._temperature_span_f,
-                self._conversion_config,
-            ),
+            cold_temp_c=cold_temp_c,
+            cold_temp_f=(cold_temp_c * 9.0 / 5.0) + 32.0,
             ambient_temp_c=lm35_voltage_to_temp_c(ambient_voltage_v),
             ambient_temp_f=lm35_voltage_to_temp_f(ambient_voltage_v),
             flow_gpm=voltage_to_linear_loop_value(

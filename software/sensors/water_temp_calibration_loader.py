@@ -1,4 +1,4 @@
-"""Load the hot-water offset from a station calibration document."""
+"""Load water-temperature offsets from a station calibration document."""
 
 from __future__ import annotations
 
@@ -19,8 +19,10 @@ def station_calibration_path(station_number: int) -> Path:
     return DEFAULT_CALIBRATION_DIRECTORY / f"WH-station{station_number}.json"
 
 
-def load_hot_water_offset_f(calibration_path: Path | None) -> float:
-    """Return a finite hot-water Fahrenheit correction, defaulting to zero."""
+def _load_temperature_offset_f(
+    calibration_path: Path | None,
+    section_name: str,
+) -> float:
     if calibration_path is None:
         return 0.0
     if not calibration_path.is_file():
@@ -28,15 +30,25 @@ def load_hot_water_offset_f(calibration_path: Path | None) -> float:
     document = json.loads(calibration_path.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
         raise ValueError("station calibration JSON must contain an object")
-    section = document.get("hot_water_temp")
+    section = document.get(section_name)
     if section is None:
         return 0.0
     if not isinstance(section, dict):
-        raise ValueError("hot_water_temp calibration must contain an object")
+        raise ValueError(f"{section_name} calibration must contain an object")
     value = section.get("correction_offset_f", 0.0)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError("hot_water_temp.correction_offset_f must be a number")
+        raise ValueError(f"{section_name}.correction_offset_f must be a number")
     offset = float(value)
     if not math.isfinite(offset):
-        raise ValueError("hot_water_temp.correction_offset_f must be finite")
+        raise ValueError(f"{section_name}.correction_offset_f must be finite")
     return offset
+
+
+def load_hot_water_offset_f(calibration_path: Path | None) -> float:
+    """Return a finite hot-water Fahrenheit correction, defaulting to zero."""
+    return _load_temperature_offset_f(calibration_path, "hot_water_temp")
+
+
+def load_cold_water_offset_f(calibration_path: Path | None) -> float:
+    """Return a finite cold-water Fahrenheit correction, defaulting to zero."""
+    return _load_temperature_offset_f(calibration_path, "cold_water_temp")

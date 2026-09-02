@@ -119,6 +119,7 @@ class ColdWaterServiceTest(unittest.TestCase):
             adc,
             configuration_path=None,
             apply_hot_water_calibration=False,
+            apply_cold_water_calibration=False,
         )
 
     def test_station2_combines_one_local_adc_with_remote_cold(self):

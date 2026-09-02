@@ -18,7 +18,7 @@ from software.cold_water.client import (
 )
 from software.exception_notes import add_exception_note
 from software.sensors import SensorReader, SensorSnapshot
-from software.sensors.hot_water_calibration_loader import station_calibration_path
+from software.sensors.water_temp_calibration_loader import station_calibration_path
 from software.station.station_identity import station_number
 
 
@@ -91,6 +91,7 @@ def build_station_sensor_session(
     configuration_path: Path | None = None,
     station_calibration: Path | None = None,
     apply_hot_water_calibration: bool = True,
+    apply_cold_water_calibration: bool = True,
     active_station_number: int | None = None,
     socket_path: Path = DEFAULT_SOCKET_PATH,
     remote_host: str | None = None,
@@ -100,12 +101,13 @@ def build_station_sensor_session(
     """Build the correct local/remote sensor composition for station 1-4."""
     number = active_station_number or station_number()
     if number == 1:
-        if not apply_hot_water_calibration:
+        if not apply_hot_water_calibration or not apply_cold_water_calibration:
             adc = build_station_adc()
             reader = SensorReader(
                 adc,
                 configuration_path=configuration_path,
                 apply_hot_water_calibration=False,
+                apply_cold_water_calibration=False,
             )
             return StationSensorSession(reader=reader, remote_client=adc)
         client = LocalSnapshotClient(socket_path)
@@ -137,6 +139,7 @@ def build_station_sensor_session(
             configuration_path=configuration_path,
             station_calibration_path=active_calibration,
             apply_hot_water_calibration=apply_hot_water_calibration,
+            apply_cold_water_calibration=apply_cold_water_calibration,
         )
         reader = CompositeSensorReader(local_reader, client)
         return StationSensorSession(

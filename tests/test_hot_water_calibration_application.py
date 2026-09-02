@@ -77,6 +77,49 @@ class HotWaterCalibrationApplicationTests(unittest.TestCase):
         self.assertEqual(legacy.hot_temp_c, nominal.hot_temp_c)
         self.assertEqual(legacy.hot_temp_f, nominal.hot_temp_f)
 
+    def test_cold_offset_corrects_both_units_without_changing_raw_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calibration = Path(directory) / "WH-station1.json"
+            calibration.write_text(
+                json.dumps(
+                    {"cold_water_temp": {"correction_offset_f": -1.642}}
+                ),
+                encoding="utf-8",
+            )
+            nominal = SensorReader(FakeAdc()).get_sensor_snapshot()
+            corrected = SensorReader(
+                FakeAdc(), station_calibration_path=calibration
+            ).get_sensor_snapshot()
+
+        self.assertAlmostEqual(corrected.cold_temp_f, nominal.cold_temp_f - 1.642)
+        self.assertAlmostEqual(
+            corrected.cold_temp_c,
+            nominal.cold_temp_c + (-1.642 * 5.0 / 9.0),
+        )
+        self.assertAlmostEqual(
+            corrected.cold_temp_f,
+            corrected.cold_temp_c * 9.0 / 5.0 + 32.0,
+        )
+        self.assertEqual(corrected.cold_raw_counts, nominal.cold_raw_counts)
+        self.assertEqual(corrected.hot_temp_f, nominal.hot_temp_f)
+
+    def test_cold_calibration_can_be_bypassed_by_calibration_tool(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calibration = Path(directory) / "WH-station1.json"
+            calibration.write_text(
+                '{"cold_water_temp":{"correction_offset_f":-1.642}}',
+                encoding="utf-8",
+            )
+            nominal = SensorReader(FakeAdc()).get_sensor_snapshot()
+            bypassed = SensorReader(
+                FakeAdc(),
+                station_calibration_path=calibration,
+                apply_cold_water_calibration=False,
+            ).get_sensor_snapshot()
+
+        self.assertEqual(bypassed.cold_temp_c, nominal.cold_temp_c)
+        self.assertEqual(bypassed.cold_temp_f, nominal.cold_temp_f)
+
 
 if __name__ == "__main__":
     unittest.main()

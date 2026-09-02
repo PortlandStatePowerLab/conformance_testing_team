@@ -230,6 +230,7 @@ def run(args: argparse.Namespace) -> int:
         sensor_session = build_station_sensor_session(
             active_station_number=1,
             apply_hot_water_calibration=False,
+            apply_cold_water_calibration=False,
         )
         sensor_session.reader.get_sensor_snapshot()
         confirm_faucet_ready()
