@@ -154,6 +154,29 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             self.assertEqual(archived, run / "equipment.json")
             self.assertEqual((run / "equipment.json").read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
 
+    def test_archives_station_calibration_for_recording_reproducibility(self):
+        from software.conformance_test_runner import _archive_station_calibration
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run = root / "run"
+            calibrations = root / "calibration"
+            run.mkdir()
+            calibrations.mkdir()
+            source = calibrations / "WH-station4.json"
+            source.write_text(
+                '{"hot_water_temp":{"correction_offset_f":2.133}}',
+                encoding="utf-8",
+            )
+            archived = _archive_station_calibration(
+                run,
+                hostname="WH-station4",
+                calibration_directory=calibrations,
+            )
+
+            self.assertEqual(archived, run / "station_calibration.json")
+            self.assertEqual(archived.read_bytes(), source.read_bytes())
+
     def test_test_end_stops_active_water_draw_as_hard_boundary(self):
         active_draw = SimpleNamespace(event_id="water_draw_1")
         logger = Mock()
@@ -398,6 +421,27 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         configuration_index = command.index("--sensor-configuration")
         self.assertEqual(command[configuration_index + 1], str(configuration))
         self.assertIn("--enable-output", command)
+
+    def test_water_draw_receives_archived_station_calibration(self):
+        event = SimpleNamespace(event_id="water_draw_1", target_volume_gal=5.0)
+        with tempfile.TemporaryDirectory() as directory:
+            run_directory = Path(directory)
+            calibration = run_directory / "station_calibration.json"
+            calibration.write_text("{}", encoding="utf-8")
+            with patch(
+                "software.conformance_test_runner.start_process"
+            ) as start_process:
+                _launch_water_draw(
+                    event,
+                    run_directory,
+                    enable_output=True,
+                    sensor_configuration=None,
+                    station_calibration=calibration,
+                )
+
+        command = start_process.call_args.args[1]
+        calibration_index = command.index("--station-calibration")
+        self.assertEqual(command[calibration_index + 1], str(calibration))
 
     def test_final_outputs_attempt_every_artifact_independently(self):
         output = io.StringIO()

@@ -21,6 +21,7 @@ from software.cold_water.protocol import (
     reading_message,
 )
 from software.sensors import SensorReader
+from software.sensors.hot_water_calibration_loader import station_calibration_path
 from software.station.station_identity import station_number
 from software.cold_water.unix_socket_helper import _unix_socket_family
 
@@ -195,7 +196,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     adc = build_station_adc()
     service = SnapshotService(
         listener,
-        SensorReader(adc, configuration_path=args.sensor_configuration),
+        SensorReader(
+            adc,
+            configuration_path=args.sensor_configuration,
+            station_calibration_path=(
+                station_calibration_path(1)
+                if station_calibration_path(1).is_file()
+                else None
+            ),
+        ),
         sample_period_seconds=args.sample_period_seconds,
         idle_timeout_seconds=args.idle_timeout_seconds,
     )

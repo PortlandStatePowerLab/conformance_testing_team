@@ -113,6 +113,11 @@ def build_parser() -> argparse.ArgumentParser:
             "nominal values are used when omitted"
         ),
     )
+    parser.add_argument(
+        "--station-calibration",
+        type=Path,
+        help="station calibration JSON containing the hot-water correction",
+    )
     parser.add_argument("--station-number", type=int, choices=(1, 2, 3, 4))
     parser.add_argument(
         "--cold-water-socket",
@@ -270,6 +275,7 @@ def run_draw(args: argparse.Namespace, stop_event: threading.Event) -> int:
 
             sensor_session = build_station_sensor_session(
                 configuration_path=args.sensor_configuration,
+                station_calibration=args.station_calibration,
                 active_station_number=args.station_number,
                 socket_path=args.cold_water_socket,
                 remote_host=args.cold_water_host,

@@ -39,6 +39,9 @@ from software.adc import SensorAdc
 from software.sensors.sensor_configuration_loader import (
     load_sensor_configuration,
 )
+from software.sensors.hot_water_calibration_loader import (
+    load_hot_water_offset_f,
+)
 
 # endregion Imports
 
@@ -144,6 +147,8 @@ class SensorReader:
         *,
         configuration_path: Path | None = None,
         calibration_path: Path | None = None,
+        station_calibration_path: Path | None = None,
+        apply_hot_water_calibration: bool = True,
     ) -> None:
         if configuration_path is not None and calibration_path is not None:
             raise ValueError(
@@ -157,6 +162,12 @@ class SensorReader:
         self._temperature_span = self._conversion_config.temperature_span
         self._temperature_span_f = self._conversion_config.temperature_span_f
         self._flow_span = self._conversion_config.flow_span
+        self._hot_water_offset_f = (
+            load_hot_water_offset_f(station_calibration_path)
+            if apply_hot_water_calibration
+            else 0.0
+        )
+        self._hot_water_offset_c = self._hot_water_offset_f * 5.0 / 9.0
 
     # endregion Initialization
 
@@ -212,11 +223,12 @@ class SensorReader:
             Uses the effective temperature span and electrical configuration.
         """
         hot_voltage_v = self.get_adc_voltage(CH_HOT)
-        return voltage_to_linear_loop_value(
+        nominal_temp_c = voltage_to_linear_loop_value(
             hot_voltage_v,
             self._temperature_span,
             self._conversion_config,
         )
+        return nominal_temp_c + self._hot_water_offset_c
 
     # Reads cold-water voltage ``cold_voltage_v`` and converts it with ``_temperature_span``.
     def get_cold_temp_c(self) -> float:
@@ -302,21 +314,20 @@ class SensorReader:
             self._conversion_config,
         )
 
+        nominal_hot_temp_c = voltage_to_linear_loop_value(
+            hot_voltage_v,
+            self._temperature_span,
+            self._conversion_config,
+        )
+        hot_temp_c = nominal_hot_temp_c + self._hot_water_offset_c
+
         return SensorSnapshot(
             hot_raw_counts=hot_raw_counts,
             cold_raw_counts=cold_raw_counts,
             flow_raw_counts=flow_raw_counts,
             ambient_raw_counts=ambient_raw_counts,
-            hot_temp_c=voltage_to_linear_loop_value(
-                hot_voltage_v,
-                self._temperature_span,
-                self._conversion_config,
-            ),
-            hot_temp_f=voltage_to_linear_loop_value(
-                hot_voltage_v,
-                self._temperature_span_f,
-                self._conversion_config,
-            ),
+            hot_temp_c=hot_temp_c,
+            hot_temp_f=(hot_temp_c * 9.0 / 5.0) + 32.0,
             cold_temp_c=voltage_to_linear_loop_value(
                 cold_voltage_v,
                 self._temperature_span,

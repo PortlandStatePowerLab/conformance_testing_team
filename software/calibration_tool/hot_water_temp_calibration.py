@@ -25,7 +25,7 @@ from software.valve import Valve, build_gpio_valve
 
 
 CHECK_COUNT = 3
-CALIBRATION_TIMEOUT_SECONDS = 120.0
+CALIBRATION_TIMEOUT_SECONDS = 240.0
 PACIFIC = ZoneInfo("America/Los_Angeles")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CALIBRATION_DIRECTORY = REPOSITORY_ROOT / "saved_data" / "calibration"
@@ -75,10 +75,10 @@ def calculate_hot_water_calibration(
 
     for check_number in range(1, CHECK_COUNT + 1):
         if clock() >= deadline:
-            raise CalibrationTimedOut("hot-water calibration exceeded 120 seconds")
+            raise CalibrationTimedOut("hot-water calibration exceeded 240 seconds")
         reference_temp_f = float(reference_reader(check_number, deadline))
         if clock() >= deadline:
-            raise CalibrationTimedOut("hot-water calibration exceeded 120 seconds")
+            raise CalibrationTimedOut("hot-water calibration exceeded 240 seconds")
         snapshot = sensor_reader.get_sensor_snapshot()
         references.append(reference_temp_f)
         sensor_temperatures.append(float(snapshot.hot_temp_f))
@@ -174,7 +174,7 @@ def console_reference_reader(check_number: int, deadline: float) -> float:
     """Read one thermometer value from stdin without exceeding the deadline."""
     remaining = deadline - time.monotonic()
     if remaining <= 0.0:
-        raise CalibrationTimedOut("hot-water calibration exceeded 120 seconds")
+        raise CalibrationTimedOut("hot-water calibration exceeded 240 seconds")
     print(
         f"Check {check_number}/{CHECK_COUNT}: enter Bomata T101A temperature in °F: ",
         end="",
@@ -185,7 +185,7 @@ def console_reference_reader(check_number: int, deadline: float) -> float:
         selector.register(sys.stdin, selectors.EVENT_READ)
         if not selector.select(remaining):
             print()
-            raise CalibrationTimedOut("hot-water calibration exceeded 120 seconds")
+            raise CalibrationTimedOut("hot-water calibration exceeded 240 seconds")
         text = sys.stdin.readline()
     finally:
         selector.close()
@@ -229,12 +229,13 @@ def run(args: argparse.Namespace) -> int:
     try:
         valve = build_gpio_valve()
         sensor_session = build_station_sensor_session(
-            active_station_number=station_number
+            active_station_number=station_number,
+            apply_hot_water_calibration=False,
         )
         sensor_session.reader.get_sensor_snapshot()
         valve.open()
         deadline = time.monotonic() + CALIBRATION_TIMEOUT_SECONDS
-        print("Valve open. Complete all three checks within two minutes.")
+        print("Valve open. Complete all three checks within four minutes.")
         result = calculate_hot_water_calibration(
             sensor_session.reader,
             console_reference_reader,

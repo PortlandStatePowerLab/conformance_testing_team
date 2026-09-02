@@ -157,7 +157,7 @@ class HotWaterTemperatureCalibrationTests(unittest.TestCase):
                 ),
                 patch(
                     "software.calibration_tool.hot_water_temp_calibration.time.monotonic",
-                    side_effect=[0.0, 120.0],
+                    side_effect=[0.0, 240.0],
                 ),
             ):
                 with self.assertRaises(CalibrationTimedOut):

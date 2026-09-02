@@ -58,6 +58,7 @@ DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule_main.x
 DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule.csv"
 DEFAULT_RESULTS_ROOT = CONFORMANCE_REPOSITORY / "saved_data" / "conformance_runs"
 DEFAULT_EQUIPMENT_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "equipment"
+DEFAULT_CALIBRATION_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "calibration"
 DEFAULT_CTA_DIRECTORY = ROOT_DIRECTORY / "cta_2045_controller" / "dcs" / "controller"
 DEFAULT_CTA_BINARY = (
     ROOT_DIRECTORY
@@ -92,6 +93,28 @@ def _archive_station_equipment(
     if not source.is_file():
         return None
     destination = run_directory / "equipment.json"
+    shutil.copy2(source, destination)
+    return destination
+
+
+def _archive_station_calibration(
+    run_directory: Path,
+    *,
+    hostname: str | None = None,
+    calibration_directory: Path = DEFAULT_CALIBRATION_DIRECTORY,
+) -> Path | None:
+    """Copy the active station calibration into a new run."""
+    active_hostname = hostname or socket.gethostname()
+    try:
+        from software.station.station_identity import station_number
+
+        number = station_number(active_hostname)
+    except ValueError:
+        return None
+    source = calibration_directory / f"WH-station{number}.json"
+    if not source.is_file():
+        return None
+    destination = run_directory / "station_calibration.json"
     shutil.copy2(source, destination)
     return destination
 
@@ -818,6 +841,7 @@ def _launch_water_draw(
     *,
     enable_output: bool,
     sensor_configuration: Path | None,
+    station_calibration: Path | None = None,
     equipment_configuration: Path | None = None,
 ) -> ManagedProcess:
     output_csv = run_directory / f"{event.event_id}.csv"
@@ -857,6 +881,8 @@ def _launch_water_draw(
         command.extend(["--target-gal", str(event.target_volume_gal)])
     if sensor_configuration is not None:
         command.extend(["--sensor-configuration", str(sensor_configuration)])
+    if station_calibration is not None:
+        command.extend(["--station-calibration", str(station_calibration)])
     if enable_output:
         command.append("--enable-output")
     return start_process(
@@ -907,6 +933,7 @@ def run_hardware_test(
         result_directory=str(run_directory),
     )
     archived_equipment = _archive_station_equipment(run_directory)
+    archived_station_calibration = _archive_station_calibration(run_directory)
     if archived_equipment is None:
         print("EQUIPMENT_SNAPSHOT_WARNING station equipment not available", file=sys.stderr)
     if any(event.draw_type == "temp drop" for event in events):
@@ -1150,6 +1177,7 @@ def run_hardware_test(
                         run_directory,
                         enable_output=args.enable_water_output,
                         sensor_configuration=archived_sensor_configuration,
+                        station_calibration=archived_station_calibration,
                         equipment_configuration=archived_equipment,
                     )
                     cut_in_deadline = (
@@ -1356,6 +1384,7 @@ def run_hardware_test(
                     run_directory,
                     enable_output=args.enable_water_output,
                     sensor_configuration=archived_sensor_configuration,
+                    station_calibration=archived_station_calibration,
                     equipment_configuration=archived_equipment,
                 )
                 logger.record(

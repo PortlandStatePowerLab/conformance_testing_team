@@ -91,6 +91,36 @@ class ColdWaterServiceTest(unittest.TestCase):
         self.assertIs(session.reader, client)
         build_adc.assert_not_called()
 
+    def test_station1_calibration_bypass_reads_local_uncorrected_sensor(self):
+        adc = mock.Mock()
+        local_reader = mock.Mock()
+        with (
+            mock.patch.object(
+                station_sensor_source,
+                "build_station_adc",
+                return_value=adc,
+            ),
+            mock.patch.object(
+                station_sensor_source,
+                "SensorReader",
+                return_value=local_reader,
+            ) as reader_type,
+            mock.patch.object(station_sensor_source, "LocalSnapshotClient") as client,
+        ):
+            session = station_sensor_source.build_station_sensor_session(
+                active_station_number=1,
+                apply_hot_water_calibration=False,
+            )
+
+        self.assertIs(session.reader, local_reader)
+        self.assertIs(session.remote_client, adc)
+        client.assert_not_called()
+        reader_type.assert_called_once_with(
+            adc,
+            configuration_path=None,
+            apply_hot_water_calibration=False,
+        )
+
     def test_station2_combines_one_local_adc_with_remote_cold(self):
         client = mock.Mock()
         adc = mock.Mock()
