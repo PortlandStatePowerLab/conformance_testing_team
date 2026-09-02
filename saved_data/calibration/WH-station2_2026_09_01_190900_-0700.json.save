@@ -10,27 +10,27 @@
   "clamp_irms_used": 21.06,
   "hot_water_temp": {
     "method": "three_reading_average_offset",
-    "correction_offset_f": 1.858,
-    "average_reference_temp_f": 122.733,
-    "average_uncalibrated_temp_f": 120.875,
-    "average_raw_counts": 1434.0,
+    "correction_offset_f": 5.917,
+    "average_reference_temp_f": 122.667,
+    "average_uncalibrated_temp_f": 116.75,
+    "average_raw_counts": 1412.0,
     "reference_readings_f": [
-      122.8,
+      122.4,
       122.7,
-      122.7
+      122.9
     ],
     "uncalibrated_readings_f": [
-      120.875,
-      120.875,
-      120.875
+      113.562,
+      118.063,
+      118.625
     ],
     "raw_count_readings": [
-      1434,
-      1434,
-      1434
+      1395,
+      1419,
+      1422
     ],
     "thermometer_used": "Bomata T101A",
     "thermometer_accuracy_f": 1.8,
-    "last_cal_time": "2026-09-01T19:09:00-07:00"
+    "last_cal_time": "2026-09-01T18:53:19-07:00"
   }
 }
