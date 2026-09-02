@@ -221,7 +221,9 @@ def plot_phase_summary(
     colors = ["#62ad62" if value >= 0 else "#df8a58" for value in changes]
     bars = bar_axis.barh(positions, changes, color=colors, edgecolor="#555555", linewidth=0.7)
     bar_axis.axvline(0, color="#333333", linewidth=1)
-    bar_axis.set_yticks(positions, [summary.phase for summary in summaries])
+    # Two calls support both the Pi's older Matplotlib and current releases.
+    bar_axis.set_yticks(positions)
+    bar_axis.set_yticklabels([summary.phase for summary in summaries])
     bar_axis.invert_yaxis()
     bar_axis.set_xlabel("Net EnergyTake Change (kWh)")
     bar_axis.grid(axis="x", alpha=0.3)
