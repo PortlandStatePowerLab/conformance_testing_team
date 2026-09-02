@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import json
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -13,6 +15,41 @@ from software import hardware_preflight
 
 
 class HardwarePreflightTest(unittest.TestCase):
+    def test_nested_power_identity_must_match_installed_equipment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            saved_data = Path(directory)
+            calibration = saved_data / "calibration"
+            equipment = saved_data / "equipment"
+            calibration.mkdir()
+            equipment.mkdir()
+            (calibration / "WH-station3.json").write_text(
+                json.dumps(
+                    {
+                        "power": {
+                            "manufacturer": "Old Brand",
+                            "model_number": "Old Model",
+                            "vrms_scale": 0.01,
+                            "irms_scale": 0.002,
+                            "vrms_offset": 10,
+                            "irms_offset": 20,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (equipment / "WH-station3.json").write_text(
+                json.dumps(
+                    {"manufacturer": "New Brand", "model_number": "New Model"}
+                ),
+                encoding="utf-8",
+            )
+            with patch(
+                "software.hardware_preflight.socket.gethostname",
+                return_value="WH-station3",
+            ):
+                with self.assertRaisesRegex(ValueError, "recalibrate power"):
+                    hardware_preflight._power_configuration_details(calibration)
+
     def test_schedule_requires_water_draw_only_in_water_mode(self):
         schedule = Path("schedule.csv")
         events = [

@@ -126,10 +126,20 @@ def _power_configuration_details(calibration_directory: Path) -> str:
     if not path.is_file():
         raise FileNotFoundError(path)
     data = json.loads(path.read_text(encoding="utf-8"))
+    power = data.get("power", data) if isinstance(data, dict) else {}
     required = {"vrms_scale", "irms_scale", "vrms_offset", "irms_offset"}
-    missing = sorted(required.difference(data))
+    missing = sorted(required.difference(power))
     if missing:
         raise ValueError(f"missing power configuration fields: {missing}")
+    equipment_path = calibration_directory.parent / "equipment" / path.name
+    if equipment_path.is_file():
+        equipment = json.loads(equipment_path.read_text(encoding="utf-8"))
+        for field in ("manufacturer", "model_number"):
+            if power.get(field) != equipment.get(field):
+                raise ValueError(
+                    f"power calibration {field} does not match installed equipment; "
+                    "recalibrate power"
+                )
     return str(path.resolve())
 
 

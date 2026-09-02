@@ -1,13 +1,17 @@
 {
-  "vrms_scale": 0.008748813782027885,
-  "irms_scale": 0.0018574704533427411,
-  "vrms_offset": 119,
-  "irms_offset": 29,
-  "vrms_offset_volts": 1.0411088400613182,
-  "irms_offset_amps": 0.053866643146939494,
-  "last_cal_time": "2026-08-03T14:42:44",
-  "line_vrms_used": 239.7,
-  "clamp_irms_used": 21.06,
+  "power": {
+    "manufacturer": "AO Smith",
+    "model_number": "HPTU-50N",
+    "vrms_scale": 0.008748813782027885,
+    "irms_scale": 0.0018574704533427411,
+    "vrms_offset": 119,
+    "irms_offset": 29,
+    "vrms_offset_volts": 1.0411088400613182,
+    "irms_offset_amps": 0.053866643146939494,
+    "last_cal_time": "2026-08-03T14:42:44",
+    "line_vrms_used": 239.7,
+    "clamp_irms_used": 21.06
+  },
   "hot_water_temp": {
     "method": "three_reading_average_offset",
     "correction_offset_f": 1.858,

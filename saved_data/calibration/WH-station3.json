@@ -1,13 +1,17 @@
 {
-  "vrms_scale": 0.009745005684586649,
-  "irms_scale": 0.0018116105714931104,
-  "vrms_offset": 1431,
-  "irms_offset": 42,
-  "last_cal_time": "2026-08-03T14:52:12",
-  "line_vrms_used": 120.0,
-  "clamp_irms_used": 8.02,
-  "vrms_offset_volts": 13.945103134643494,
-  "irms_offset_amps": 0.07608764400271063,
+  "power": {
+    "manufacturer": "AO Smith",
+    "model_number": "HPTV-50",
+    "vrms_scale": 0.009745005684586649,
+    "irms_scale": 0.0018116105714931104,
+    "vrms_offset": 1431,
+    "irms_offset": 42,
+    "last_cal_time": "2026-08-03T14:52:12",
+    "line_vrms_used": 120.0,
+    "clamp_irms_used": 8.02,
+    "vrms_offset_volts": 13.945103134643494,
+    "irms_offset_amps": 0.07608764400271063
+  },
   "hot_water_temp": {
     "method": "three_reading_average_offset",
     "correction_offset_f": 3.325,

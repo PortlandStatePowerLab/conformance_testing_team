@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-from smbus2 import SMBus
-import time, json, os, re, socket
+import time, json, os, re, socket, shutil, tempfile
 from datetime import datetime
+from pathlib import Path
 
-from helpers.hardware_map import (
+try:
+    from software.helpers.hardware_map import (
         I2C_BUS,
         ACS37800_I2C_ADDR,
         REG_VRMS_REGISTER,
@@ -14,7 +15,20 @@ from helpers.hardware_map import (
         NOISE_FLOOR_V_VOLTS,
         NOISE_FLOOR_I_AMPS,
         POWER_ABS,
-)
+    )
+except ImportError:
+    from helpers.hardware_map import (
+        I2C_BUS,
+        ACS37800_I2C_ADDR,
+        REG_VRMS_REGISTER,
+        REG_POWER_REGISTER,
+        REG_POWER_FACTOR_REGISTER,
+        NOISE_FLOOR_VRMS_CODES,
+        NOISE_FLOOR_IRMS_CODES,
+        NOISE_FLOOR_V_VOLTS,
+        NOISE_FLOOR_I_AMPS,
+        POWER_ABS,
+    )
 
 # These are helper functions specific to capturing and caclulating power elements
 
@@ -168,6 +182,8 @@ def read_raw_measurement_values(bus):
 
 def _get_default_calibration():
     return {
+        "manufacturer": None,
+        "model_number": None,
         # scales convert (raw - offset) -> engineering units
         "vrms_scale": None,     # V per code
         "irms_scale": None,     # A per code
@@ -182,6 +198,41 @@ def _get_default_calibration():
         "line_vrms_used": None,
         "clamp_irms_used": None
     }
+
+POWER_CALIBRATION_KEYS = frozenset(_get_default_calibration())
+REQUIRED_POWER_CALIBRATION_KEYS = frozenset(
+    ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")
+)
+
+
+def _power_section(document):
+    """Return nested power data, with backward compatibility for flat files."""
+    if not isinstance(document, dict):
+        return None
+    nested = document.get("power")
+    if isinstance(nested, dict):
+        return nested
+    if REQUIRED_POWER_CALIBRATION_KEYS.issubset(document):
+        return {
+            key: document[key]
+            for key in POWER_CALIBRATION_KEYS
+            if key in document
+        }
+    return None
+
+
+def _equipment_identity(calibration_directory, hostname):
+    equipment_path = Path(calibration_directory).parent / "equipment" / f"{hostname}.json"
+    if not equipment_path.is_file():
+        return None
+    equipment = json.loads(equipment_path.read_text(encoding="utf-8"))
+    if not isinstance(equipment, dict):
+        return None
+    manufacturer = equipment.get("manufacturer")
+    model_number = equipment.get("model_number")
+    if not isinstance(manufacturer, str) or not isinstance(model_number, str):
+        return None
+    return manufacturer, model_number
 
 def get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER):
     """Load calibration settings for the current Pi from disk.
@@ -203,9 +254,10 @@ def get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER):
         print(f"Warning: could not load calibration file {calibration_file}: {exc}")
         return calibration
 
-    # Expect the file to contain the calibration dict directly
-    if isinstance(loaded_data, dict) and all(key in loaded_data for key in ("vrms_scale", "irms_scale", "vrms_offset", "irms_offset")):
-        return loaded_data
+    power = _power_section(loaded_data)
+    if power is not None and REQUIRED_POWER_CALIBRATION_KEYS.issubset(power):
+        calibration.update(power)
+        return calibration
 
     return calibration
 
@@ -216,13 +268,53 @@ def set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     Writes the calibration dictionary to a per-host file in the calibration
     directory. Each Pi maintains its own <hostname>.json file.
     """
+    del OUTPUT_FOLDER
     os.makedirs(CALIBRATION_DIR, exist_ok=True)
     host_name = hostname or socket.gethostname()
-    calibration_file = os.path.join(CALIBRATION_DIR, f"{host_name}.json")
+    calibration_file = Path(CALIBRATION_DIR) / f"{host_name}.json"
+    document = {}
+    if calibration_file.is_file():
+        document = json.loads(calibration_file.read_text(encoding="utf-8"))
+        if not isinstance(document, dict):
+            raise ValueError("station calibration JSON must contain an object")
+        backup_timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S_%f")
+        backup = calibration_file.with_name(
+            f"{calibration_file.stem}_{backup_timestamp}.json.save"
+        )
+        shutil.copy2(calibration_file, backup)
 
-    with open(calibration_file, "w", encoding="utf-8") as f:
-        json.dump(calibration, f, indent=2)
-        f.write("\n")
+    power = {
+        key: calibration[key]
+        for key in POWER_CALIBRATION_KEYS
+        if key in calibration
+    }
+    identity = _equipment_identity(CALIBRATION_DIR, host_name)
+    if identity is not None:
+        power["manufacturer"], power["model_number"] = identity
+
+    for key in POWER_CALIBRATION_KEYS:
+        document.pop(key, None)
+    document["power"] = power
+
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=calibration_file.parent,
+            prefix=f".{calibration_file.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            json.dump(document, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+        json.loads(temporary_path.read_text(encoding="utf-8"))
+        os.replace(temporary_path, calibration_file)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 def read_measurement_values2(bus, calibration):
     """Read raw sensor registers.
