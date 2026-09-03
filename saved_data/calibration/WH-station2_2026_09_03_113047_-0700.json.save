@@ -1,0 +1,40 @@
+{
+  "power": {
+    "manufacturer": "AO Smith",
+    "model_number": "HPTU-50N",
+    "vrms_scale": 0.008748813782027885,
+    "irms_scale": 0.0018574704533427411,
+    "vrms_offset": 119,
+    "irms_offset": 29,
+    "vrms_offset_volts": 1.0411088400613182,
+    "irms_offset_amps": 0.053866643146939494,
+    "last_cal_time": "2026-08-03T14:42:44",
+    "line_vrms_used": 239.7,
+    "clamp_irms_used": 21.06
+  },
+  "hot_water_temp": {
+    "method": "three_reading_average_offset",
+    "correction_offset_f": 1.858,
+    "average_reference_temp_f": 122.733,
+    "average_uncalibrated_temp_f": 120.875,
+    "average_raw_counts": 1434.0,
+    "reference_readings_f": [
+      122.8,
+      122.7,
+      122.7
+    ],
+    "uncalibrated_readings_f": [
+      120.875,
+      120.875,
+      120.875
+    ],
+    "raw_count_readings": [
+      1434,
+      1434,
+      1434
+    ],
+    "thermometer_used": "Bomata T101A",
+    "thermometer_accuracy_f": 1.8,
+    "last_cal_time": "2026-09-01T19:09:00-07:00"
+  }
+}
