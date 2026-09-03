@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from software.calibration_tool.hot_water_temp_calibration import (
+from software.calibration_tools.hot_water_temp_calibration import (
     CalibrationTimedOut,
     calculate_hot_water_calibration,
     calibration_section,
@@ -107,19 +107,19 @@ class HotWaterTemperatureCalibrationTests(unittest.TestCase):
             references = iter([125.0, 125.0, 125.0])
             with (
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.build_gpio_valve",
+                    "software.calibration_tools.hot_water_temp_calibration.build_gpio_valve",
                     return_value=valve,
                 ),
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.build_station_sensor_session",
+                    "software.calibration_tools.hot_water_temp_calibration.build_station_sensor_session",
                     return_value=session,
                 ),
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.console_reference_reader",
+                    "software.calibration_tools.hot_water_temp_calibration.console_reference_reader",
                     side_effect=lambda _check, _deadline: next(references),
                 ),
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.time.monotonic",
+                    "software.calibration_tools.hot_water_temp_calibration.time.monotonic",
                     return_value=0.0,
                 ),
             ):
@@ -148,15 +148,15 @@ class HotWaterTemperatureCalibrationTests(unittest.TestCase):
             session = SimpleNamespace(reader=sensor_reader, close=Mock())
             with (
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.build_gpio_valve",
+                    "software.calibration_tools.hot_water_temp_calibration.build_gpio_valve",
                     return_value=valve,
                 ),
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.build_station_sensor_session",
+                    "software.calibration_tools.hot_water_temp_calibration.build_station_sensor_session",
                     return_value=session,
                 ),
                 patch(
-                    "software.calibration_tool.hot_water_temp_calibration.time.monotonic",
+                    "software.calibration_tools.hot_water_temp_calibration.time.monotonic",
                     side_effect=[0.0, 240.0],
                 ),
             ):

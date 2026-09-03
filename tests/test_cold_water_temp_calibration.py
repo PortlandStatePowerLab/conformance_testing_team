@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from software.calibration_tool.cold_water_temp_calibration import (
+from software.calibration_tools.cold_water_temp_calibration import (
     CalibrationTimedOut,
     calculate_cold_water_calibration,
     calibration_section,
@@ -67,7 +67,7 @@ class ColdWaterTempCalibrationTests(unittest.TestCase):
             calibration_dir=Path("calibration"),
         )
         with patch(
-            "software.calibration_tool.cold_water_temp_calibration.build_gpio_valve"
+            "software.calibration_tools.cold_water_temp_calibration.build_gpio_valve"
         ) as build_valve:
             with self.assertRaisesRegex(ValueError, "only on WH-station1"):
                 run(args)

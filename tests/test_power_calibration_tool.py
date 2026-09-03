@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from software.calibration_tool import power_calibration
+from software.calibration_tools import power_calibration
 
 
 class PowerCalibrationToolTests(unittest.TestCase):
