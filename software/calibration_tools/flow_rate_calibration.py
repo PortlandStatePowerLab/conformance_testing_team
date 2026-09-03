@@ -7,7 +7,6 @@ import argparse
 import json
 import re
 import selectors
-import shutil
 import socket
 import sys
 import tempfile
@@ -18,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from software.calibration_backup import replace_station_backup
 from software.exception_notes import add_exception_note
 from software.sensors import SensorReader
 from software.station.station_adc_builder import build_station_adc
@@ -196,7 +196,7 @@ def save_flow_calibration(
         backup_path = calibration_path.with_name(
             f"{calibration_path.stem}_{suffix}.json.save"
         )
-        shutil.copy2(calibration_path, backup_path)
+        replace_station_backup(calibration_path, backup_path)
     document["flow_rate"] = section
     calibration_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
@@ -283,6 +283,7 @@ def run(args: argparse.Namespace) -> int:
             adc,
             apply_hot_water_calibration=False,
             apply_cold_water_calibration=False,
+            apply_flow_calibration=False,
         )
         sensor_reader.get_sensor_snapshot()
         print(

@@ -41,6 +41,7 @@ from software.sensors.sensor_configuration_loader import (
 )
 from software.sensors.water_temp_calibration_loader import (
     load_cold_water_offset_f,
+    load_flow_calibration,
     load_hot_water_offset_f,
 )
 
@@ -151,6 +152,7 @@ class SensorReader:
         station_calibration_path: Path | None = None,
         apply_hot_water_calibration: bool = True,
         apply_cold_water_calibration: bool = True,
+        apply_flow_calibration: bool = True,
     ) -> None:
         if configuration_path is not None and calibration_path is not None:
             raise ValueError(
@@ -176,6 +178,11 @@ class SensorReader:
             else 0.0
         )
         self._cold_water_offset_c = self._cold_water_offset_f * 5.0 / 9.0
+        self._flow_calibration = (
+            load_flow_calibration(station_calibration_path)
+            if apply_flow_calibration
+            else None
+        )
 
     # endregion Initialization
 
@@ -266,7 +273,17 @@ class SensorReader:
         Calibration:
             Uses the effective flow span and electrical configuration.
         """
-        flow_voltage_v = self.get_adc_voltage(CH_FLOW)
+        flow_raw_counts = self.get_adc_raw(CH_FLOW)
+        if self._flow_calibration is not None:
+            scale_gpm_per_count, offset_gpm = self._flow_calibration
+            return max(
+                0.0,
+                flow_raw_counts * scale_gpm_per_count + offset_gpm,
+            )
+        flow_voltage_v = adc_counts_to_voltage(
+            flow_raw_counts,
+            self._conversion_config,
+        )
         return voltage_to_linear_loop_value(
             flow_voltage_v,
             self._flow_span,
@@ -347,10 +364,18 @@ class SensorReader:
             cold_temp_f=(cold_temp_c * 9.0 / 5.0) + 32.0,
             ambient_temp_c=lm35_voltage_to_temp_c(ambient_voltage_v),
             ambient_temp_f=lm35_voltage_to_temp_f(ambient_voltage_v),
-            flow_gpm=voltage_to_linear_loop_value(
-                flow_voltage_v,
-                self._flow_span,
-                self._conversion_config,
+            flow_gpm=(
+                max(
+                    0.0,
+                    flow_raw_counts * self._flow_calibration[0]
+                    + self._flow_calibration[1],
+                )
+                if self._flow_calibration is not None
+                else voltage_to_linear_loop_value(
+                    flow_voltage_v,
+                    self._flow_span,
+                    self._conversion_config,
+                )
             ),
         )
 

@@ -120,6 +120,62 @@ class HotWaterCalibrationApplicationTests(unittest.TestCase):
         self.assertEqual(bypassed.cold_temp_c, nominal.cold_temp_c)
         self.assertEqual(bypassed.cold_temp_f, nominal.cold_temp_f)
 
+    def test_flow_calibration_uses_raw_counts_for_single_and_grouped_reads(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calibration = Path(directory) / "WH-station1.json"
+            calibration.write_text(
+                json.dumps(
+                    {
+                        "flow_rate": {
+                            "scale_gpm_per_count": 0.005,
+                            "offset_gpm": -2.4,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            reader = SensorReader(
+                FakeAdc(), station_calibration_path=calibration
+            )
+
+            single = reader.get_flow_gpm()
+            grouped = reader.get_sensor_snapshot()
+
+        expected = 1033 * 0.005 - 2.4
+        self.assertAlmostEqual(single, expected)
+        self.assertAlmostEqual(grouped.flow_gpm, expected)
+        self.assertEqual(grouped.flow_raw_counts, 1033)
+
+    def test_flow_calibration_clamps_below_zero_noise(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calibration = Path(directory) / "WH-station1.json"
+            calibration.write_text(
+                '{"flow_rate":{"scale_gpm_per_count":0.005,"offset_gpm":-6}}',
+                encoding="utf-8",
+            )
+            reader = SensorReader(
+                FakeAdc(), station_calibration_path=calibration
+            )
+
+            self.assertEqual(reader.get_flow_gpm(), 0.0)
+            self.assertEqual(reader.get_sensor_snapshot().flow_gpm, 0.0)
+
+    def test_flow_calibration_can_be_bypassed_by_calibration_tool(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calibration = Path(directory) / "WH-station1.json"
+            calibration.write_text(
+                '{"flow_rate":{"scale_gpm_per_count":0.005,"offset_gpm":-2.4}}',
+                encoding="utf-8",
+            )
+            nominal = SensorReader(FakeAdc()).get_sensor_snapshot()
+            bypassed = SensorReader(
+                FakeAdc(),
+                station_calibration_path=calibration,
+                apply_flow_calibration=False,
+            ).get_sensor_snapshot()
+
+        self.assertEqual(bypassed.flow_gpm, nominal.flow_gpm)
+
 
 if __name__ == "__main__":
     unittest.main()

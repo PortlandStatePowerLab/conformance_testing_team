@@ -6,7 +6,6 @@ import argparse
 import json
 import re
 import selectors
-import shutil
 import socket
 import sys
 import tempfile
@@ -18,6 +17,7 @@ from pathlib import Path
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
+from software.calibration_backup import replace_station_backup
 from software.cold_water.station_sensor_source import build_station_sensor_session
 from software.exception_notes import add_exception_note
 from software.sensors import SensorSnapshot
@@ -144,7 +144,7 @@ def save_hot_water_calibration(
             raise ValueError("station calibration JSON must contain an object")
         document = loaded
         backup_path = _backup_path(calibration_path, timestamp)
-        shutil.copy2(calibration_path, backup_path)
+        replace_station_backup(calibration_path, backup_path)
 
     document["hot_water_temp"] = section
     calibration_path.parent.mkdir(parents=True, exist_ok=True)

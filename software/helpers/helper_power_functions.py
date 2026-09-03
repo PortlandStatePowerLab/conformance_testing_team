@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import time, json, os, re, socket, shutil, tempfile
+import time, json, os, re, socket, tempfile
 from datetime import datetime
 from pathlib import Path
+
+from software.calibration_backup import replace_station_backup
 
 try:
     from software.helpers.hardware_map import (
@@ -281,7 +283,7 @@ def set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
         backup = calibration_file.with_name(
             f"{calibration_file.stem}_{backup_timestamp}.json.save"
         )
-        shutil.copy2(calibration_file, backup)
+        replace_station_backup(calibration_file, backup)
 
     power = {
         key: calibration[key]
