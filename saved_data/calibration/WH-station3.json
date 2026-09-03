@@ -36,5 +36,76 @@
     "thermometer_used": "Bomata T101A",
     "thermometer_accuracy_f": 1.8,
     "last_cal_time": "2026-09-01T18:51:21-07:00"
+  },
+  "flow_rate": {
+    "method": "zero_and_three_reading_average_scale",
+    "scale_gpm_per_count": 0.005267411,
+    "offset_gpm": -2.513872,
+    "zero_raw_counts": 477.25,
+    "zero_raw_max_counts": 480,
+    "average_reference_gpm": 2.9333,
+    "average_flowing_raw_counts": 1034.133,
+    "average_uncalibrated_gpm": 3.0284,
+    "zero_raw_count_readings": [
+      474,
+      473,
+      477,
+      478,
+      480,
+      475,
+      480,
+      475,
+      477,
+      480,
+      477,
+      478,
+      480,
+      477,
+      480,
+      475,
+      478,
+      480,
+      475,
+      476
+    ],
+    "zero_uncalibrated_gpm_readings": [
+      0.169375,
+      0.164271,
+      0.184688,
+      0.189792,
+      0.2,
+      0.174479,
+      0.2,
+      0.174479,
+      0.184688,
+      0.2,
+      0.184688,
+      0.189792,
+      0.2,
+      0.184688,
+      0.2,
+      0.174479,
+      0.189792,
+      0.2,
+      0.174479,
+      0.179583
+    ],
+    "reference_readings_gpm": [
+      2.9,
+      3.0,
+      2.9
+    ],
+    "flowing_raw_count_averages": [
+      1025.4,
+      1041.0,
+      1036.0
+    ],
+    "uncalibrated_readings_gpm": [
+      2.983813,
+      3.063438,
+      3.037917
+    ],
+    "reference_device": "McMaster-Carr SBN234",
+    "last_cal_time": "2026-09-03T11:35:39-07:00"
   }
 }
