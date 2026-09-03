@@ -1,0 +1,40 @@
+{
+  "power": {
+    "manufacturer": "American Standard",
+    "model_number": "ASHPWH-50",
+    "vrms_scale": 0.008676985243713244,
+    "irms_scale": 0.0005820029446577557,
+    "vrms_offset": 3,
+    "irms_offset": 118,
+    "vrms_offset_volts": 0.026030955731139734,
+    "irms_offset_amps": 0.06867634746961518,
+    "last_cal_time": "2026-08-13T16:23:57",
+    "line_vrms_used": 240.5,
+    "clamp_irms_used": 20.16
+  },
+  "hot_water_temp": {
+    "method": "three_reading_average_offset",
+    "correction_offset_f": 2.133,
+    "average_reference_temp_f": 116.133,
+    "average_uncalibrated_temp_f": 114.0,
+    "average_raw_counts": 1397.333,
+    "reference_readings_f": [
+      116.1,
+      116.2,
+      116.1
+    ],
+    "uncalibrated_readings_f": [
+      113.75,
+      114.125,
+      114.125
+    ],
+    "raw_count_readings": [
+      1396,
+      1398,
+      1398
+    ],
+    "thermometer_used": "Bomata T101A",
+    "thermometer_accuracy_f": 1.8,
+    "last_cal_time": "2026-09-01T18:31:32-07:00"
+  }
+}
