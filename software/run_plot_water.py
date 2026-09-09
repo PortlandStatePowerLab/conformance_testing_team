@@ -23,6 +23,8 @@ from .time_axis import apply_clock_ticks
 PLOT_FILENAME = "energy_take_power_water.png"
 WATER_COLOR = "#1677b8"
 FLOW_STARTUP_SECONDS = 8.0
+MINIMUM_POWER_AXIS_MAX_KW = 0.1
+AXIS_HEADROOM_FRACTION = 0.18
 STATUS_COLORS = {
     "Pass": "#9fd39f",
     "Grace": "#ffe29a",
@@ -78,6 +80,12 @@ def _is_wh4(directory: Path) -> bool:
 def _legend_entries(axis):
     """Read legend entries through the cross-version Axes API."""
     return axis.get_legend_handles_labels()
+
+
+def _upper_with_headroom(values, *, minimum: float = 0.0) -> float:
+    """Return a zero-based axis maximum with room for the horizontal legend."""
+    maximum = max((float(value) for value in values), default=0.0)
+    return max(minimum, maximum * (1.0 + AXIS_HEADROOM_FRACTION))
 
 
 def add_operational_state_band(
@@ -216,6 +224,7 @@ def plot_run_with_water(
     )
     figure.set_size_inches(13.5, 6.75)
     energy_axis = figure.axes[1]
+    power_axis = figure.axes[2]
     water_axis = energy_axis.twinx()
     water_axis.spines["right"].set_position(("outward", 62))
     times = [_shift(timestamp, actual_start, display_start) for timestamp, _ in water]
@@ -247,8 +256,26 @@ def plot_run_with_water(
 
     # Use the long-standing Axes API rather than version-specific Legend
     # attributes (legend_handles is unavailable on older station Matplotlib).
+    energy_values = [value for line in energy_axis.lines for value in line.get_ydata()]
+    power_values = [value for line in power_axis.lines for value in line.get_ydata()]
+    energy_axis.set_ylim(0, _upper_with_headroom(energy_values, minimum=0.1))
+    power_axis.set_ylim(
+        0,
+        _upper_with_headroom(
+            power_values,
+            minimum=MINIMUM_POWER_AXIS_MAX_KW,
+        ),
+    )
+    water_axis.set_ylim(0, _upper_with_headroom(flow, minimum=1.0))
+
     handles, labels = _legend_entries(energy_axis)
-    energy_axis.legend(handles + [water_line], labels + ["Water Draw"], loc="upper left")
+    power_handles, power_labels = _legend_entries(power_axis)
+    energy_axis.legend(
+        handles + power_handles + [water_line],
+        labels + power_labels + ["Water Draw"],
+        loc="upper center",
+        ncol=3,
+    )
     figure.subplots_adjust(left=0.09, right=0.845, bottom=0.19, top=0.86)
     add_operational_state_band(
         figure, directory, actual_start, actual_end, display_start
