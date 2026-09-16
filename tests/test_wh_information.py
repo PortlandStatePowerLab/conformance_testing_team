@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from software.wh_information import (
     decode_capabilities,
-    decode_dr_readiness,
+    decode_customer_override,
     read_wh_information,
 )
 
@@ -22,12 +22,11 @@ DEVICE_INFORMATION_COLUMNS = (
 
 
 class WaterHeaterInformationTests(unittest.TestCase):
-    def test_only_opted_out_states_are_not_dr_ready(self):
-        self.assertTrue(decode_dr_readiness(0))
-        self.assertTrue(decode_dr_readiness(5))
-        self.assertFalse(decode_dr_readiness(11))
-        self.assertFalse(decode_dr_readiness(12))
-        self.assertIsNone(decode_dr_readiness(None))
+    def test_only_opted_out_states_have_customer_override(self):
+        for state in range(256):
+            with self.subTest(state=state):
+                self.assertEqual(decode_customer_override(state), state in (11, 12))
+        self.assertIsNone(decode_customer_override(None))
 
     def test_capability_bits_are_decoded_across_protocol_bytes(self):
         self.assertEqual(
@@ -90,7 +89,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
         self.assertEqual(result["bitmap"], "0x00000141")
         self.assertEqual(result["cta2045_version"], "B")
         self.assertEqual(result["raw_bitmap"], "0x00000141")
-        self.assertFalse(result["dr_ready"])
+        self.assertTrue(result["customer_override"])
         self.assertEqual([item["bit"] for item in result["capabilities"]], [0, 6, 8])
 
     def test_timeout_is_reported_concisely(self):

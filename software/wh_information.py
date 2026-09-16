@@ -43,11 +43,11 @@ def decode_capabilities(raw_hex: str) -> list[dict[str, object]]:
     ]
 
 
-def decode_dr_readiness(operational_state: int | None) -> bool | None:
-    """Classify the current operational state for the concise GUI status."""
+def decode_customer_override(operational_state: int | None) -> bool | None:
+    """Report customer override only for opted-out states 11 and 12."""
     if operational_state is None:
         return None
-    return operational_state not in (11, 12)
+    return operational_state in (11, 12)
 
 
 def read_wh_information(
@@ -134,5 +134,5 @@ def read_wh_information(
         "bitmap": f"0x{logical_bitmap:08X}",
         "raw_bitmap": f"0x{raw_bitmap.upper()}",
         "capabilities": capabilities,
-        "dr_ready": decode_dr_readiness(operational_state),
+        "customer_override": decode_customer_override(operational_state),
     }
