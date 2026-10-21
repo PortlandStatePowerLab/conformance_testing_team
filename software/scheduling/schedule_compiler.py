@@ -6,16 +6,21 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+
 try:
-    from .pacific_time import pacific_datetime
+    from software.pacific_time import pacific_datetime
     from .schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 except ImportError:
-    from pacific_time import pacific_datetime
+    from software.pacific_time import pacific_datetime
     from schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 
 
@@ -203,13 +208,13 @@ def compile_cta_schedule(
 
 
 def main() -> int:
-    software_directory = Path(__file__).resolve().parent
+    software_directory = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "master_schedule",
         nargs="?",
         type=Path,
-        default=software_directory / "conformance_test_schedule.csv",
+        default=software_directory / "schedules" / "conformance_test_schedule.csv",
     )
     parser.add_argument("--test-start", required=True, type=parse_test_start)
     parser.add_argument("--controller-output", required=True, type=Path)

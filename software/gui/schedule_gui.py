@@ -25,9 +25,14 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from urllib.parse import unquote
 
+# Support both module and direct-script launches.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+
 try:
-    from .cta_operational_states import EXPECTED_STATES_BY_ACTION
-    from .schedule_parser import (
+    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.scheduling.schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
         DRAW_EXTENDED_SCHEDULE_COLUMNS,
@@ -36,15 +41,15 @@ try:
         ScheduleValidationError,
         load_schedule,
     )
-    from .hardware_preflight import (
+    from software.hardware_preflight import (
         PreflightCheck,
         build_parser as build_preflight_parser,
         run_preflight,
     )
-    from .wh_information import read_wh_information
+    from software.wh_information import read_wh_information
 except ImportError:
-    from cta_operational_states import EXPECTED_STATES_BY_ACTION
-    from schedule_parser import (
+    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.scheduling.schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
         DRAW_EXTENDED_SCHEDULE_COLUMNS,
@@ -53,17 +58,18 @@ except ImportError:
         ScheduleValidationError,
         load_schedule,
     )
-    from hardware_preflight import (
+    from software.hardware_preflight import (
         PreflightCheck,
         build_parser as build_preflight_parser,
         run_preflight,
     )
-    from wh_information import read_wh_information
+    from software.wh_information import read_wh_information
 
 
-SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
-DEFAULT_SCHEDULE_DIRECTORY = SOFTWARE_DIRECTORY / "gui_schedules"
-EDITOR_PATH = SOFTWARE_DIRECTORY / "templates" / "schedule_gui.html"
+GUI_DIRECTORY = Path(__file__).resolve().parent
+SOFTWARE_DIRECTORY = GUI_DIRECTORY.parent
+DEFAULT_SCHEDULE_DIRECTORY = GUI_DIRECTORY / "gui_schedules"
+EDITOR_PATH = GUI_DIRECTORY / "templates" / "schedule_gui.html"
 SAFE_SCHEDULE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
@@ -265,7 +271,7 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
     }
     _atomic_json(directory / "status.json", status)
     _atomic_json(run_directory / "current.json", {"run_id": run_id})
-    command = [sys.executable, "-m", "software.gui_run_worker",
+    command = [sys.executable, "-m", "software.gui.gui_run_worker",
                "--run-directory", str(directory), "--schedule", str(snapshot),
                "--repository-root", str(SOFTWARE_DIRECTORY.parent),
                "--result-name", result_name]

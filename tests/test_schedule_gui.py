@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 from software.hardware_preflight import PreflightCheck
-from software.schedule_gui import (
+from software.gui.schedule_gui import (
     DEFAULT_IDLE_TIMEOUT_HOURS,
     current_run,
     dismiss_current_run,
@@ -34,11 +34,11 @@ from software.schedule_gui import (
     station_suffix_from_hostname,
     validate_rows,
 )
-from software.schedule_parser import ScheduleValidationError, load_schedule
+from software.scheduling.schedule_parser import ScheduleValidationError, load_schedule
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
+MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "schedules" / "conformance_test_schedule.csv"
 
 
 def master_rows():
@@ -108,7 +108,7 @@ class ScheduleGuiTests(unittest.TestCase):
             self.assertFalse(run_is_active(runs))
 
     def test_dependent_end_schedule_reports_variable_duration(self):
-        path = REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
+        path = REPOSITORY_ROOT / "software" / "gui" / "gui_schedules" / "FHR-Normal.csv"
         rows = load_schedule_rows(path)
         _, summary = validate_rows(rows)
 
@@ -333,7 +333,7 @@ class ScheduleGuiTests(unittest.TestCase):
             runs = root / "runs"
             schedule, _ = save_schedule(schedules, "safe", master_rows())
             fake_process = unittest.mock.Mock()
-            with patch("software.schedule_gui.subprocess.Popen", return_value=fake_process) as popen:
+            with patch("software.gui.schedule_gui.subprocess.Popen", return_value=fake_process) as popen:
                 launched = launch_run(runs, schedule, water=True)
                 snapshot = Path(launched["schedule_snapshot"])
                 self.assertEqual(snapshot.read_bytes(), schedule.read_bytes())
@@ -399,7 +399,7 @@ class ScheduleGuiTests(unittest.TestCase):
                     method="POST",
                 )
                 with patch(
-                    "software.schedule_gui.run_preflight",
+                    "software.gui.schedule_gui.run_preflight",
                     side_effect=fake_preflight,
                 ):
                     with urlopen(request, timeout=5) as response:
@@ -447,7 +447,7 @@ class ScheduleGuiTests(unittest.TestCase):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with patch("software.schedule_gui.read_wh_information", return_value=expected):
+            with patch("software.gui.schedule_gui.read_wh_information", return_value=expected):
                 with urlopen(request, timeout=5) as response:
                     result = json.load(response)
         finally:

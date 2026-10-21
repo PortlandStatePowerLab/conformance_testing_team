@@ -2,12 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from software.schedule_parser import load_schedule
-from software.xlsx_schedule_importer import import_xlsx_schedule, workbook_rows
+from software.scheduling.schedule_parser import load_schedule
+from software.scheduling.xlsx_schedule_importer import import_xlsx_schedule, workbook_rows
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-WORKBOOK = REPOSITORY_ROOT / "software" / "conformance_test_schedule_main.xlsx"
+WORKBOOK = REPOSITORY_ROOT / "software" / "schedules" / "conformance_test_schedule_main.xlsx"
 
 
 class XlsxScheduleImporterTests(unittest.TestCase):

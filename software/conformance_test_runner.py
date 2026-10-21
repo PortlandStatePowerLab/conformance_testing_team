@@ -25,8 +25,8 @@ if __package__ in (None, ""):
 try:
     from .cta_operational_states import CUT_IN_STATES_BY_ACTION
     from .conformance_report import generate_conformance_report
-    from .schedule_compiler import compile_cta_schedule
-    from .schedule_parser import (
+    from .scheduling.schedule_compiler import compile_cta_schedule
+    from .scheduling.schedule_parser import (
         CUT_IN_RECOVERY_TIMEOUT_SECONDS,
         ScheduleEvent,
         load_schedule,
@@ -34,18 +34,18 @@ try:
     from .sensors.sensor_configuration_loader import (
         load_sensor_configuration,
     )
-    from .xlsx_schedule_importer import import_xlsx_schedule
+    from .scheduling.xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
     from cta_operational_states import CUT_IN_STATES_BY_ACTION
     from conformance_report import generate_conformance_report
-    from schedule_compiler import compile_cta_schedule
-    from schedule_parser import (
+    from software.scheduling.schedule_compiler import compile_cta_schedule
+    from software.scheduling.schedule_parser import (
         CUT_IN_RECOVERY_TIMEOUT_SECONDS,
         ScheduleEvent,
         load_schedule,
     )
     from sensors.sensor_configuration_loader import load_sensor_configuration
-    from xlsx_schedule_importer import import_xlsx_schedule
+    from software.scheduling.xlsx_schedule_importer import import_xlsx_schedule
 
 from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
 from software.station.station_identity import station_results_directory
@@ -54,8 +54,8 @@ from software.station.station_identity import station_results_directory
 SOFTWARE_DIRECTORY = Path(__file__).resolve().parent
 CONFORMANCE_REPOSITORY = SOFTWARE_DIRECTORY.parent
 ROOT_DIRECTORY = CONFORMANCE_REPOSITORY.parent
-DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule_main.xlsx"
-DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "conformance_test_schedule.csv"
+DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "schedules" / "conformance_test_schedule_main.xlsx"
+DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "schedules" / "conformance_test_schedule.csv"
 DEFAULT_RESULTS_ROOT = CONFORMANCE_REPOSITORY / "saved_data" / "conformance_runs"
 DEFAULT_EQUIPMENT_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "equipment"
 DEFAULT_CALIBRATION_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "calibration"

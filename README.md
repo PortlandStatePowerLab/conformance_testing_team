@@ -25,8 +25,8 @@ You should now see the conformance test schedule open and ready to use
 
 ## Manually run a start a test schedule
 The human-editable test definition is
-`software/conformance_test_schedule_main.xlsx`. Running the test runner imports
-it into the canonical `software/conformance_test_schedule.csv` before
+`software/schedules/conformance_test_schedule_main.xlsx`. Running the test runner imports
+it into the canonical `software/schedules/conformance_test_schedule.csv` before
 validation. The importer uses only the Python standard library, so no Excel
 package is required on the Raspberry Pi.
 
@@ -77,9 +77,9 @@ preflight, or run an existing canonical CSV instead, pass the same optional
 `SCHEDULE` variable:
 
 ```bash
-make validate SCHEDULE=software/gui_schedules/my_test.csv
-make preflight-water SCHEDULE=software/gui_schedules/my_test.csv
-make run-water SCHEDULE=software/gui_schedules/my_test.csv
+make validate SCHEDULE=software/gui/gui_schedules/my_test.csv
+make preflight-water SCHEDULE=software/gui/gui_schedules/my_test.csv
+make run-water SCHEDULE=software/gui/gui_schedules/my_test.csv
 ```
 
 For run targets, the selected CSV is passed to both preflight and the test
@@ -92,7 +92,7 @@ make schedule-gui
 ```
 
 It listens on `127.0.0.1:5000` by default and saves validated canonical CSV
-files under `software/gui_schedules`. From another computer, use an SSH tunnel
+files under `software/gui/gui_schedules`. From another computer, use an SSH tunnel
 to the test station and open `http://127.0.0.1:5000` locally. The editor does
 not read or modify the XLSX workbook and does not launch hardware tests. After
 validating and saving a schedule, the GUI can run the existing hardware
@@ -101,7 +101,7 @@ schedule contains an enabled water draw.
 
 The GUI exits after 48 hours without a GET or POST request. Decimal-hour
 overrides are supported for shorter sessions or testing; for example,
-`python3 -m software.schedule_gui --idle-timeout-hours 0.2` uses a 12-minute
+`python3 -m software.gui.schedule_gui --idle-timeout-hours 0.2` uses a 12-minute
 idle timeout.
 
 After a saved schedule passes hardware preflight, the GUI offers a Start Test
@@ -162,9 +162,9 @@ explicitly enables scheduled valve output.
 To import the workbook without invoking the runner:
 
 ```bash
-python3 software/xlsx_schedule_importer.py \
-  software/conformance_test_schedule_main.xlsx \
-  software/conformance_test_schedule.csv
+python3 software/scheduling/xlsx_schedule_importer.py \
+  software/schedules/conformance_test_schedule_main.xlsx \
+  software/schedules/conformance_test_schedule.csv
 ```
 
 On the Raspberry Pi, run an integration test while leaving valve output disabled:

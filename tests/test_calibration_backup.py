@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from software.calibration_backup import replace_station_backup
+from software.calibration_tools.calibration_backup import replace_station_backup
 
 
 class CalibrationBackupTests(unittest.TestCase):

@@ -3,7 +3,7 @@ import time, json, os, re, socket, tempfile
 from datetime import datetime
 from pathlib import Path
 
-from software.calibration_backup import replace_station_backup
+from software.calibration_tools.calibration_backup import replace_station_backup
 
 try:
     from software.helpers.hardware_map import (

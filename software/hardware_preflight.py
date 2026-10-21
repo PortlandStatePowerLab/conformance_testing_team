@@ -28,7 +28,7 @@ from software.conformance_test_runner import (
 from software.cold_water.station_sensor_source import (
     build_station_sensor_session,
 )
-from software.schedule_parser import load_schedule
+from software.scheduling.schedule_parser import load_schedule
 from software.sensors.sensor_configuration_loader import (
     load_sensor_configuration,
 )

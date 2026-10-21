@@ -7,17 +7,22 @@ import argparse
 import csv
 import math
 import os
+import sys
 import tempfile
 import zipfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from xml.etree import ElementTree
 
 try:
-    from .cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
     from .schedule_parser import SCHEDULE_COLUMNS, load_schedule
 except ImportError:
-    from cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
     from schedule_parser import SCHEDULE_COLUMNS, load_schedule
 
 

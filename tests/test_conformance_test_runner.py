@@ -24,12 +24,12 @@ from software.conformance_test_runner import (
     schedule_summary,
     stop_water_draw_at_test_end,
 )
-from software.schedule_parser import load_schedule
+from software.scheduling.schedule_parser import load_schedule
 from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
+MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "schedules" / "conformance_test_schedule.csv"
 
 
 class ConformanceTestRunnerTests(unittest.TestCase):
@@ -128,7 +128,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
 
     def test_dependent_end_progress_reports_variable_duration(self):
         events = load_schedule(
-            REPOSITORY_ROOT / "software" / "gui_schedules" / "FHR-Normal.csv"
+            REPOSITORY_ROOT / "software" / "gui" / "gui_schedules" / "FHR-Normal.csv"
         )
 
         summary = schedule_summary(events)
@@ -318,7 +318,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             run_directory = _create_run_directory(
                 Path(directory),
                 None,
-                Path("software/gui_schedules/professor_demo.csv"),
+                Path("software/gui/gui_schedules/professor_demo.csv"),
             )
 
         self.assertEqual(
@@ -331,7 +331,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             run_directory = _create_run_directory(
                 Path(directory),
                 "requested_name",
-                Path("software/gui_schedules/professor_demo.csv"),
+                Path("software/gui/gui_schedules/professor_demo.csv"),
             )
 
         self.assertEqual(run_directory.name, "requested_name")

@@ -4,8 +4,8 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from software.schedule_compiler import compile_cta_schedule, parse_test_start
-from software.schedule_parser import (
+from software.scheduling.schedule_compiler import compile_cta_schedule, parse_test_start
+from software.scheduling.schedule_parser import (
     EXTENDED_SCHEDULE_COLUMNS,
     SCHEDULE_COLUMNS,
     load_schedule,
@@ -13,7 +13,7 @@ from software.schedule_parser import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
+MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "schedules" / "conformance_test_schedule.csv"
 
 
 class ScheduleCompilerTests(unittest.TestCase):

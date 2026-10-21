@@ -37,7 +37,7 @@ validate:
 	$(PYTHON) software/conformance_test_runner.py $(RUNNER_SCHEDULE_FLAG)
 
 schedule-gui:
-	$(PYTHON) -m software.schedule_gui
+	$(PYTHON) -m software.gui.schedule_gui
 
 report:
 	@test -n "$(RUN_DIRECTORY)" || (echo "RUN_DIRECTORY is required"; exit 2)

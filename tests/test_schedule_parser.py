@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from software.schedule_parser import (
+from software.scheduling.schedule_parser import (
     CUT_IN_RECOVERY_TIMEOUT_SECONDS,
     EXTENDED_SCHEDULE_COLUMNS,
     DRAW_EXTENDED_SCHEDULE_COLUMNS,
@@ -20,7 +20,7 @@ from software.cta_operational_states import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "conformance_test_schedule.csv"
+MASTER_SCHEDULE = REPOSITORY_ROOT / "software" / "schedules" / "conformance_test_schedule.csv"
 
 
 class DurationEncodingTests(unittest.TestCase):

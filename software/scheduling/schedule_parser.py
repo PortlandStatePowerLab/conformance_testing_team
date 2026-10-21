@@ -10,14 +10,19 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+
 try:
-    from .cta_operational_states import CUT_IN_STATES_BY_ACTION
+    from software.cta_operational_states import CUT_IN_STATES_BY_ACTION
 except ImportError:
-    from cta_operational_states import CUT_IN_STATES_BY_ACTION
+    from software.cta_operational_states import CUT_IN_STATES_BY_ACTION
 
 CUT_IN_RECOVERY_TIMEOUT_SECONDS = 12 * 60 * 60
 
@@ -639,7 +644,7 @@ def generate_cta_events(
 
 
 def main() -> int:
-    default_schedule = Path(__file__).with_name("conformance_test_schedule.csv")
+    default_schedule = Path(__file__).resolve().parents[1] / "schedules" / "conformance_test_schedule.csv"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("schedule", nargs="?", type=Path, default=default_schedule)
     args = parser.parse_args()

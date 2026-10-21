@@ -16,8 +16,13 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .schedule_parser import load_schedule
-from .pacific_time import pacific_filename_timestamp
+# Support both module and direct-script launches.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+
+from software.scheduling.schedule_parser import load_schedule
+from software.pacific_time import pacific_filename_timestamp
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
 

@@ -99,8 +99,8 @@ dmypy.json
 # =========================
 *.log
 *.csv
-!software/conformance_test_schedule.csv
-!software/gui_schedules/*.csv
+!software/schedules/conformance_test_schedule.csv
+!software/gui/gui_schedules/*.csv
 
 # =========================
 # OS files
