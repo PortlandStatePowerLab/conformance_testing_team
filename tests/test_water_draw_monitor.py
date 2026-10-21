@@ -11,7 +11,7 @@ from software.helpers.sensor_conversion import (
     counts_to_voltage,
 )
 from software.sensors import SensorSnapshot
-from software.water_draw_monitor import (
+from software.monitoring.water_draw_monitor import (
     EXIT_SUCCESS,
     build_parser,
     integrate_volume_gallons,
@@ -49,9 +49,9 @@ class WaterDrawTests(unittest.TestCase):
             session = SimpleNamespace(reader=sensor_reader, close=Mock())
             times = [0.0] + [index * 0.5 for index in range(1, len(snapshots) + 1)] + [30.0]
             with (
-                patch("software.water_draw_monitor.build_gpio_valve", return_value=valve),
-                patch("software.water_draw_monitor.build_station_sensor_session", return_value=session),
-                patch("software.water_draw_monitor.time.monotonic", side_effect=times),
+                patch("software.monitoring.water_draw_monitor.build_gpio_valve", return_value=valve),
+                patch("software.monitoring.water_draw_monitor.build_station_sensor_session", return_value=session),
+                patch("software.monitoring.water_draw_monitor.time.monotonic", side_effect=times),
             ):
                 stop_event = Mock()
                 stop_event.is_set.return_value = False
@@ -138,15 +138,15 @@ class WaterDrawTests(unittest.TestCase):
 
             with (
                 patch(
-                    "software.water_draw_monitor.build_gpio_valve",
+                    "software.monitoring.water_draw_monitor.build_gpio_valve",
                     return_value=valve,
                 ) as build_valve,
                 patch(
-                    "software.water_draw_monitor.build_station_sensor_session",
+                    "software.monitoring.water_draw_monitor.build_station_sensor_session",
                     return_value=sensor_session,
                 ) as build_sensors,
                 patch(
-                    "software.water_draw_monitor.time.monotonic",
+                    "software.monitoring.water_draw_monitor.time.monotonic",
                     side_effect=[0.0, 60.0, 60.0],
                 ),
             ):

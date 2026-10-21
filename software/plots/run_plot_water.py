@@ -9,15 +9,15 @@ import statistics
 from datetime import time, timedelta
 from pathlib import Path
 
-from .run_plot import (
+from software.plots.run_plot import (
     _duck_curve_display_start,
     _shift,
     _timestamp,
     load_run_plot_data,
     plot_run,
 )
-from .state_verification_plot import load_verification_data, verification_status
-from .time_axis import apply_clock_ticks
+from software.plots.state_verification_plot import load_verification_data, verification_status
+from software.plots.time_axis import apply_clock_ticks
 
 
 PLOT_FILENAME = "energy_take_power_water.png"

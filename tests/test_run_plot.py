@@ -8,7 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.run_plot import (
+from software.plots.run_plot import (
     Phase,
     Sample,
     _duck_curve_display_start,
@@ -18,7 +18,7 @@ from software.run_plot import (
     load_run_plot_data,
     plot_run,
 )
-from software.energy_take_change_plot import plot_energy_take_change
+from software.plots.energy_take_change_plot import plot_energy_take_change
 
 
 def write_csv(path, columns, rows):

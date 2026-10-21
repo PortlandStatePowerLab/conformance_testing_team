@@ -12,10 +12,10 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from .equipment_metadata import equipment_title_line
+from software.equipment_metadata import equipment_title_line
 
-from .run_plot import Sample, _without_startup_spikes, load_run_plot_data
-from .state_verification_plot import ExpectedPhase, StateReport, load_verification_data
+from software.plots.run_plot import Sample, _without_startup_spikes, load_run_plot_data
+from software.plots.state_verification_plot import ExpectedPhase, StateReport, load_verification_data
 
 
 PLOT_FILENAME = "phase_summary.png"

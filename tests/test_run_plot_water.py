@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
-from software.run_plot_water import (
+from software.plots.run_plot_water import (
     MINIMUM_POWER_AXIS_MAX_KW,
     _legend_entries,
     _upper_with_headroom,

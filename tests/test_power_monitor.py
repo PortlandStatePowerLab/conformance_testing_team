@@ -2,7 +2,7 @@ import argparse
 import unittest
 from datetime import datetime, timezone
 
-from software.wh_power_monitor import (
+from software.monitoring.wh_power_monitor import (
     _measurement_row,
     heartbeat_interval,
     measurement_change_reasons,

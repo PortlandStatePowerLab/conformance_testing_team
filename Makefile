@@ -42,7 +42,7 @@ schedule-gui:
 report:
 	@test -n "$(RUN_DIRECTORY)" || (echo "RUN_DIRECTORY is required"; exit 2)
 	@test -d "$(RUN_DIRECTORY)" || (echo "Run directory not found: $(RUN_DIRECTORY)"; exit 2)
-	$(PYTHON) -m software.conformance_report "$(RUN_DIRECTORY)"
+	$(PYTHON) -m software.reporting.conformance_report "$(RUN_DIRECTORY)"
 
 check-heartbeat:
 	@test "$(HEARTBEAT)" = "true" -o "$(HEARTBEAT)" = "false" || (echo "HEARTBEAT must be true or false"; exit 2)
@@ -70,13 +70,13 @@ run-water-calibrated:
 	@$(MAKE) run-water-configured SENSOR_CONFIGURATION="$(SENSOR_CALIBRATION)"
 
 verify_plot:
-	$(PYTHON) -m software.state_verification_plot $(FOLDER)
+	$(PYTHON) -m software.plots.state_verification_plot $(FOLDER)
 
 all_plots:
-	$(PYTHON) -m software.state_verification_plot $(FOLDER)
-	$(PYTHON) -m software.phase_summary_plot $(FOLDER)
-	$(PYTHON) -m software.run_plot_water $(FOLDER)
-	$(PYTHON) -m software.event_timeline $(FOLDER)
+	$(PYTHON) -m software.plots.state_verification_plot $(FOLDER)
+	$(PYTHON) -m software.plots.phase_summary_plot $(FOLDER)
+	$(PYTHON) -m software.plots.run_plot_water $(FOLDER)
+	$(PYTHON) -m software.reporting.event_timeline $(FOLDER)
 
 build_cta:
 	$(MAKE) -C $(CTA_DCS_DIR) controller

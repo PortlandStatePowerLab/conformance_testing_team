@@ -7,7 +7,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.phase_summary_plot import plot_phase_summary, summarize_run_phases
+from software.plots.phase_summary_plot import plot_phase_summary, summarize_run_phases
 
 
 def write_csv(path, columns, rows):

@@ -35,7 +35,7 @@ subsystem dependencies without constructing them or becoming their hardware driv
 Use `run_controlled_water_draw()` for a manually requested commissioning draw.
 Operators normally invoke the workflow through `bin/wh-draw`.
 
-Scheduled conformance-test water draws use `software.water_draw_monitor`; they do
+Scheduled conformance-test water draws use `software.monitoring.water_draw_monitor`; they do
 not run through this manual commissioning workflow.
 
 ## Safety notes

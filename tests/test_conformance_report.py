@@ -5,7 +5,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
-from software.conformance_report import (
+from software.reporting.conformance_report import (
     REPORT_FILENAME,
     SPREADSHEET_NS,
     build_commodity_summary,

@@ -12,10 +12,10 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from .equipment_metadata import equipment_title_line
-from .time_axis import apply_clock_ticks
+from software.equipment_metadata import equipment_title_line
+from software.plots.time_axis import apply_clock_ticks
 
-from .run_plot import (
+from software.plots.run_plot import (
     _command_phases,
     _duck_curve_display_start,
     _phase_name,

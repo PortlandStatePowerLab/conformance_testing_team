@@ -24,7 +24,7 @@ if __package__ in (None, ""):
 
 try:
     from .cta_operational_states import CUT_IN_STATES_BY_ACTION
-    from .conformance_report import generate_conformance_report
+    from software.reporting.conformance_report import generate_conformance_report
     from .scheduling.schedule_compiler import compile_cta_schedule
     from .scheduling.schedule_parser import (
         CUT_IN_RECOVERY_TIMEOUT_SECONDS,
@@ -37,7 +37,7 @@ try:
     from .scheduling.xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
     from cta_operational_states import CUT_IN_STATES_BY_ACTION
-    from conformance_report import generate_conformance_report
+    from software.reporting.conformance_report import generate_conformance_report
     from software.scheduling.schedule_compiler import compile_cta_schedule
     from software.scheduling.schedule_parser import (
         CUT_IN_RECOVERY_TIMEOUT_SECONDS,
@@ -262,7 +262,7 @@ def publish_run_results(
 
 
 def _generate_energy_take_plot(run_directory: Path) -> Path | None:
-    from software.run_plot import plot_run
+    from software.plots.run_plot import plot_run
 
     return plot_run(
         run_directory,
@@ -271,7 +271,7 @@ def _generate_energy_take_plot(run_directory: Path) -> Path | None:
 
 
 def _generate_energy_take_water_plot(run_directory: Path) -> Path | None:
-    from software.run_plot_water import plot_run_with_water
+    from software.plots.run_plot_water import plot_run_with_water
 
     return plot_run_with_water(
         run_directory,
@@ -280,7 +280,7 @@ def _generate_energy_take_water_plot(run_directory: Path) -> Path | None:
 
 
 def _generate_state_verification_plot(run_directory: Path) -> Path | None:
-    from software.state_verification_plot import plot_state_verification
+    from software.plots.state_verification_plot import plot_state_verification
 
     return plot_state_verification(
         run_directory,
@@ -289,7 +289,7 @@ def _generate_state_verification_plot(run_directory: Path) -> Path | None:
 
 
 def _generate_phase_summary(run_directory: Path) -> Path | None:
-    from software.phase_summary_plot import plot_phase_summary
+    from software.plots.phase_summary_plot import plot_phase_summary
 
     return plot_phase_summary(
         run_directory,
@@ -298,7 +298,7 @@ def _generate_phase_summary(run_directory: Path) -> Path | None:
 
 
 def _generate_event_timeline(run_directory: Path) -> Path | None:
-    from software.event_timeline import plot_event_timeline
+    from software.reporting.event_timeline import plot_event_timeline
 
     return plot_event_timeline(
         run_directory,
@@ -848,7 +848,7 @@ def _launch_water_draw(
     command = [
         sys.executable,
         "-m",
-        "software.water_draw_monitor",
+        "software.monitoring.water_draw_monitor",
         "--event-id",
         event.event_id,
         "--draw-type",
@@ -980,7 +980,7 @@ def run_hardware_test(
             "power_monitor",
             [
                 sys.executable,
-                str(SOFTWARE_DIRECTORY / "wh_power_monitor.py"),
+                str(SOFTWARE_DIRECTORY / "monitoring" / "wh_power_monitor.py"),
                 "--output-csv",
                 str(power_csv),
                 "--heartbeat-seconds",

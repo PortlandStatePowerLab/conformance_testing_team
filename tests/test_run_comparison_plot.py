@@ -8,7 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.run_comparison_plot import (
+from software.plots.run_comparison_plot import (
     comparison_names,
     default_named_output,
     load_named_comparison,

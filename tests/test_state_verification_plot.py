@@ -8,7 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.state_verification_plot import (
+from software.plots.state_verification_plot import (
     StateReport,
     load_verification_data,
     plot_state_verification,

@@ -16,7 +16,7 @@ from typing import Any
 
 # Preserve direct-script execution in addition to the scheduler's module launch.
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from software.cold_water.client import DEFAULT_SOCKET_PATH
 from software.cold_water.station_sensor_source import (
@@ -93,7 +93,7 @@ def nonnegative_float(value: str) -> float:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--event-id", required=True)
     parser.add_argument(

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from .run_plot import plot_run
+from software.plots.run_plot import plot_run
 
 
 PLOT_FILENAME = "energy_take_change_power.png"

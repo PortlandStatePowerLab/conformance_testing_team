@@ -15,20 +15,20 @@ from pathlib import Path
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
-from .equipment_metadata import equipment_title_line
-from .phase_summary_plot import summarize_run_phases
-from .run_plot import (
+from software.equipment_metadata import equipment_title_line
+from software.plots.phase_summary_plot import summarize_run_phases
+from software.plots.run_plot import (
     RunPlotData,
     _duck_curve_display_start,
     _shift,
     _without_startup_spikes,
     load_run_plot_data,
 )
-from .state_verification_plot import ExpectedPhase, load_verification_data
+from software.plots.state_verification_plot import ExpectedPhase, load_verification_data
 
 
 PLOT_FILENAME = "energy_take_comparison.png"
-DEFAULT_COMPARISON_FILE = Path(__file__).resolve().parents[1] / "saved_data" / "comparisons.json"
+DEFAULT_COMPARISON_FILE = Path(__file__).resolve().parents[2] / "saved_data" / "comparisons.json"
 COMPARISON_PLOT_DIRECTORY = "comparison_plots"
 
 

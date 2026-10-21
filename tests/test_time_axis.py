@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta
 
-from software.time_axis import apply_even_clock_ticks, time_tick_interval_minutes
+from software.plots.time_axis import apply_even_clock_ticks, time_tick_interval_minutes
 
 
 class TimeAxisTests(unittest.TestCase):

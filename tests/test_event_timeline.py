@@ -8,7 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from software.event_timeline import (
+from software.reporting.event_timeline import (
     _mode,
     _power_points,
     _water_draw_start_observation,

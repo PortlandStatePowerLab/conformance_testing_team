@@ -13,9 +13,9 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from .equipment_metadata import equipment_title_line
-from .run_plot import _read_csv, _timestamp, load_run_plot_data
-from .state_verification_plot import load_verification_data
+from software.equipment_metadata import equipment_title_line
+from software.plots.run_plot import _read_csv, _timestamp, load_run_plot_data
+from software.plots.state_verification_plot import load_verification_data
 
 
 CSV_FILENAME = "event_timeline.csv"

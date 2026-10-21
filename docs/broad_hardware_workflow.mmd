@@ -10,10 +10,10 @@ flowchart LR
     sensorReader["software/sensors/sensor_reader.py"]
     valveBuilder["software/valve/gpio_valve_builder.py"]
     preflight["software/hardware_preflight.py"]
-    waterMonitor["software/water_draw_monitor.py"]
+    waterMonitor["software/monitoring/water_draw_monitor.py"]
     diagnostics["diagnostics/*"]
     legacySensors["software/helpers/water_sensor_reader.py"]
-    powerMonitor["software/wh_power_monitor.py"]
+    powerMonitor["software/monitoring/wh_power_monitor.py"]
 
     adcDriver["software/adc/max1238_driver.py<br/>Max1238 implementation"]
     adcDuplicate["software/adc/max1238.py<br/>Duplicate Max1238 implementation"]

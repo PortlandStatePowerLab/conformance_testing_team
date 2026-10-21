@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from software.pacific_time import (
     PACIFIC_TIMEZONE,
@@ -119,7 +119,7 @@ def measurement_change_reasons(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     output_directory = repository_root / "saved_data"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-csv", type=Path)
@@ -173,7 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _default_output_path() -> Path:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[2]
     filename = f"power_data_{pacific_filename_timestamp()}.csv"
     return repository_root / "saved_data" / filename
 
@@ -208,8 +208,8 @@ def run_monitor(args: argparse.Namespace, stop_event: threading.Event) -> int:
     # Hardware imports are intentionally deferred so parsing and unit tests work on Windows.
     from smbus2 import SMBus
 
-    from helpers.hardware_map import I2C_BUS
-    from helpers.helper_power_functions import (
+    from software.helpers.hardware_map import I2C_BUS
+    from software.helpers.helper_power_functions import (
         calibrate,
         get_calibration_from_JSON,
         read_measurement_values,
