@@ -9,26 +9,43 @@ HEARTBEAT_FLAG = $(if $(filter false,$(HEARTBEAT)),--disable-outside-communicati
 PREFLIGHT_SCHEDULE_FLAG = $(if $(SCHEDULE),--schedule "$(SCHEDULE)",)
 RUNNER_SCHEDULE_FLAG = $(if $(SCHEDULE),--master-schedule "$(SCHEDULE)",)
 
-.PHONY: help test validate schedule-gui report check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean
+.PHONY: help test validate schedule-gui report check-heartbeat preflight preflight-water run run-water run-water-configured run-water-calibrated build_cta schedule_cta run_cta test_cta clean_cta clean verify_plot all_plots
 
 help:
 	@echo "Water-heater conformance test commands:"
+	@echo ""
+	@echo "Test workflow:"
 	@echo "  make test       Run the hardware-independent automated tests"
 	@echo "  make validate   Import and validate the XLSX schedule without hardware"
-	@echo "  make schedule-gui  Start the local schedule editor on 127.0.0.1:5000"
 	@echo "  make preflight  Check CTA, power, I2C, schedule, and station prerequisites"
-	@echo "  make preflight-water  Also initialize GPIO17 LOW and require a water draw"
 	@echo "  make run        Run the hardware test without scheduled valve output"
+	@echo ""
+	@echo "Water-enabled test workflow:"
+	@echo "  make preflight-water  Also initialize GPIO17 LOW and require a water draw"
 	@echo "  make run-water  Run the hardware test with scheduled valve output enabled"
+	@echo "  make run-water-configured SENSOR_CONFIGURATION=<file>  Run with water output and sensor configuration"
+	@echo "  make run-water-calibrated SENSOR_CALIBRATION=<file>  Compatibility alias for run-water-configured"
+	@echo ""
+	@echo "Schedule editor and workflow options:"
+	@echo "  make schedule-gui  Start the local schedule editor on 127.0.0.1:5000"
 	@echo "  SCHEDULE=<csv>  Use a canonical CSV instead of the default XLSX schedule"
 	@echo "  HEARTBEAT=false  Disable recurring outside-communication refreshes"
+	@echo "  make check-heartbeat  Check that HEARTBEAT is true or false"
+	@echo ""
+	@echo "Reports and plots:"
 	@echo "  make report RUN_DIRECTORY=<run-folder>  Regenerate the final report workbook"
-	@echo "  make run-water-configured SENSOR_CONFIGURATION=<file>  Run with water output and sensor configuration"
+	@echo "  make verify_plot FOLDER=<run-folder>  Generate the state verification plot"
+	@echo "  make all_plots FOLDER=<run-folder>  Generate verification, phase summary, water/power plots, and event timeline"
+	@echo ""
+	@echo "Standalone CTA-2045 controller:"
 	@echo "  make build_cta  Build the CTA-2045 controller"
 	@echo "  make schedule_cta  Create the controller's standalone test schedule"
 	@echo "  make run_cta    Build and run the CTA-2045 controller"
 	@echo "  make test_cta   Build and run the controller's standalone test"
 	@echo "  make clean_cta  Remove the CTA-2045 controller build directory"
+	@echo ""
+	@echo "Help:"
+	@echo "  make help       Show this command menu"
 
 test:
 	$(PYTHON) -m unittest discover -s tests -v
