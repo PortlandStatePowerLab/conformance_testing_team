@@ -12,7 +12,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from software.equipment_metadata import equipment_title_line
+from software.station.equipment_metadata import equipment_title_line
 from software.plots.time_axis import apply_clock_ticks
 
 from software.plots.run_plot import (

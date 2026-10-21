@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import ModuleType
 
-from software.exception_notes import add_exception_note
+from software.helpers.exception_notes import add_exception_note
 
 
 class GpioValveDriver:

@@ -15,7 +15,7 @@ from pathlib import Path
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
-from software.equipment_metadata import equipment_title_line
+from software.station.equipment_metadata import equipment_title_line
 from software.plots.phase_summary_plot import summarize_run_phases
 from software.plots.run_plot import (
     RunPlotData,

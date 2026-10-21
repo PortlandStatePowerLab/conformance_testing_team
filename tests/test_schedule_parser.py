@@ -13,7 +13,7 @@ from software.scheduling.schedule_parser import (
     generate_cta_events,
     load_schedule,
 )
-from software.cta_operational_states import (
+from software.cta.cta_operational_states import (
     EXPECTED_STATES_BY_ACTION,
     operational_state_name,
 )

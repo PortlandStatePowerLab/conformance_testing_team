@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from software import hardware_preflight
+from software.station import hardware_preflight
 
 
 class HardwarePreflightTest(unittest.TestCase):
@@ -44,7 +44,7 @@ class HardwarePreflightTest(unittest.TestCase):
                 encoding="utf-8",
             )
             with patch(
-                "software.hardware_preflight.socket.gethostname",
+                "software.station.hardware_preflight.socket.gethostname",
                 return_value="WH-station3",
             ):
                 with self.assertRaisesRegex(ValueError, "recalibrate power"):
@@ -85,11 +85,11 @@ class HardwarePreflightTest(unittest.TestCase):
         )
         with (
             patch(
-                "software.hardware_preflight.shutil.which",
+                "software.station.hardware_preflight.shutil.which",
                 return_value="/usr/sbin/i2cdetect",
             ),
             patch(
-                "software.hardware_preflight.subprocess.run",
+                "software.station.hardware_preflight.subprocess.run",
                 return_value=completed,
             ) as run,
         ):
@@ -106,11 +106,11 @@ class HardwarePreflightTest(unittest.TestCase):
         )
         with (
             patch(
-                "software.hardware_preflight.shutil.which",
+                "software.station.hardware_preflight.shutil.which",
                 return_value="/usr/sbin/i2cdetect",
             ),
             patch(
-                "software.hardware_preflight.subprocess.run",
+                "software.station.hardware_preflight.subprocess.run",
                 return_value=completed,
             ),
         ):
@@ -124,7 +124,7 @@ class HardwarePreflightTest(unittest.TestCase):
         gpio.LOW = 0
         gpio.input.return_value = gpio.LOW
         with patch(
-            "software.hardware_preflight.importlib.import_module",
+            "software.station.hardware_preflight.importlib.import_module",
             return_value=gpio,
         ):
             hardware_preflight._gpio_low_details()
@@ -150,7 +150,7 @@ class HardwarePreflightTest(unittest.TestCase):
         output = io.StringIO()
         with (
             patch(
-                "software.hardware_preflight.run_preflight",
+                "software.station.hardware_preflight.run_preflight",
                 side_effect=fake_run_preflight,
             ),
             redirect_stdout(output),
@@ -165,7 +165,7 @@ class HardwarePreflightTest(unittest.TestCase):
         args = hardware_preflight.build_parser().parse_args([])
         completed = []
         with patch(
-            "software.hardware_preflight._check",
+            "software.station.hardware_preflight._check",
             side_effect=lambda name, action: hardware_preflight.PreflightCheck(
                 name, True, "ok"
             ),

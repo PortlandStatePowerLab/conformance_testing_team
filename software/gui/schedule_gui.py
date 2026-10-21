@@ -31,7 +31,7 @@ if __package__ in (None, ""):
 
 
 try:
-    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.cta.cta_operational_states import EXPECTED_STATES_BY_ACTION
     from software.scheduling.schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
@@ -41,14 +41,14 @@ try:
         ScheduleValidationError,
         load_schedule,
     )
-    from software.hardware_preflight import (
+    from software.station.hardware_preflight import (
         PreflightCheck,
         build_parser as build_preflight_parser,
         run_preflight,
     )
-    from software.wh_information import read_wh_information
+    from software.cta.wh_information import read_wh_information
 except ImportError:
-    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.cta.cta_operational_states import EXPECTED_STATES_BY_ACTION
     from software.scheduling.schedule_parser import (
         ADVANCED_UNIT_CODES,
         CTA_ACTION_CODES,
@@ -58,12 +58,12 @@ except ImportError:
         ScheduleValidationError,
         load_schedule,
     )
-    from software.hardware_preflight import (
+    from software.station.hardware_preflight import (
         PreflightCheck,
         build_parser as build_preflight_parser,
         run_preflight,
     )
-    from software.wh_information import read_wh_information
+    from software.cta.wh_information import read_wh_information
 
 
 GUI_DIRECTORY = Path(__file__).resolve().parent

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from software.equipment_metadata import equipment_title_line
+from software.station.equipment_metadata import equipment_title_line
 
 from software.plots.run_plot import Sample, _without_startup_spikes, load_run_plot_data
 from software.plots.state_verification_plot import ExpectedPhase, StateReport, load_verification_data

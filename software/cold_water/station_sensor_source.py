@@ -16,7 +16,7 @@ from software.cold_water.client import (
     SnapshotClient,
     SshSnapshotClient,
 )
-from software.exception_notes import add_exception_note
+from software.helpers.exception_notes import add_exception_note
 from software.sensors import SensorReader, SensorSnapshot
 from software.sensors.water_temp_calibration_loader import station_calibration_path
 from software.station.station_identity import station_number

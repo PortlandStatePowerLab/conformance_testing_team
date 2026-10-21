@@ -20,9 +20,9 @@ if __package__ in (None, ""):
 
 
 try:
-    from software.cta_operational_states import CUT_IN_STATES_BY_ACTION
+    from software.cta.cta_operational_states import CUT_IN_STATES_BY_ACTION
 except ImportError:
-    from software.cta_operational_states import CUT_IN_STATES_BY_ACTION
+    from software.cta.cta_operational_states import CUT_IN_STATES_BY_ACTION
 
 CUT_IN_RECOVERY_TIMEOUT_SECONDS = 12 * 60 * 60
 

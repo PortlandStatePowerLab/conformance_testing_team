@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from typing import Protocol
 
-from software.exception_notes import add_exception_note
+from software.helpers.exception_notes import add_exception_note
 from software.sensors import SensorSnapshot
 from software.valve import Valve
 

@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from software.cold_water.station_sensor_source import (
     build_station_sensor_session,
 )
-from software.exception_notes import add_exception_note
+from software.helpers.exception_notes import add_exception_note
 from software.runtime import run_controlled_water_draw
 from software.valve import build_gpio_valve
 

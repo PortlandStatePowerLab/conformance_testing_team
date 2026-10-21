@@ -23,7 +23,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
-    from .cta_operational_states import CUT_IN_STATES_BY_ACTION
+    from software.cta.cta_operational_states import CUT_IN_STATES_BY_ACTION
     from software.reporting.conformance_report import generate_conformance_report
     from .scheduling.schedule_compiler import compile_cta_schedule
     from .scheduling.schedule_parser import (
@@ -36,7 +36,7 @@ try:
     )
     from .scheduling.xlsx_schedule_importer import import_xlsx_schedule
 except ImportError:
-    from cta_operational_states import CUT_IN_STATES_BY_ACTION
+    from software.cta.cta_operational_states import CUT_IN_STATES_BY_ACTION
     from software.reporting.conformance_report import generate_conformance_report
     from software.scheduling.schedule_compiler import compile_cta_schedule
     from software.scheduling.schedule_parser import (
@@ -47,7 +47,7 @@ except ImportError:
     from sensors.sensor_configuration_loader import load_sensor_configuration
     from software.scheduling.xlsx_schedule_importer import import_xlsx_schedule
 
-from software.pacific_time import pacific_filename_timestamp, pacific_timestamp
+from software.helpers.pacific_time import pacific_filename_timestamp, pacific_timestamp
 from software.station.station_identity import station_results_directory
 
 

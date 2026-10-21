@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from software.wh_information import (
+from software.cta.wh_information import (
     decode_capabilities,
     decode_customer_override,
     read_wh_information,
@@ -80,7 +80,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
                     )
                 return subprocess.CompletedProcess(command, 0, "", "")
 
-            with patch("software.wh_information.subprocess.run", side_effect=fake_run):
+            with patch("software.cta.wh_information.subprocess.run", side_effect=fake_run):
                 result = read_wh_information(
                     cta_binary=binary,
                     cta_directory=root,
@@ -98,7 +98,7 @@ class WaterHeaterInformationTests(unittest.TestCase):
             binary = root / "cta2045_controller"
             binary.touch()
             with patch(
-                "software.wh_information.subprocess.run",
+                "software.cta.wh_information.subprocess.run",
                 side_effect=subprocess.TimeoutExpired("controller", 20),
             ):
                 with self.assertRaisesRegex(RuntimeError, "timed out"):

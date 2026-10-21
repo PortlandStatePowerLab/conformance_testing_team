@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from unittest.mock import patch
 
-from software.hardware_preflight import PreflightCheck
+from software.station.hardware_preflight import PreflightCheck
 from software.gui.schedule_gui import (
     DEFAULT_IDLE_TIMEOUT_HOURS,
     current_run,

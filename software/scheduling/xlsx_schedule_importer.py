@@ -19,10 +19,10 @@ if __package__ in (None, ""):
 from xml.etree import ElementTree
 
 try:
-    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.cta.cta_operational_states import EXPECTED_STATES_BY_ACTION
     from .schedule_parser import SCHEDULE_COLUMNS, load_schedule
 except ImportError:
-    from software.cta_operational_states import EXPECTED_STATES_BY_ACTION
+    from software.cta.cta_operational_states import EXPECTED_STATES_BY_ACTION
     from schedule_parser import SCHEDULE_COLUMNS, load_schedule
 
 

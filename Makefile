@@ -48,10 +48,10 @@ check-heartbeat:
 	@test "$(HEARTBEAT)" = "true" -o "$(HEARTBEAT)" = "false" || (echo "HEARTBEAT must be true or false"; exit 2)
 
 preflight: check-heartbeat
-	$(PYTHON) -m software.hardware_preflight $(PREFLIGHT_SCHEDULE_FLAG) $(HEARTBEAT_FLAG)
+	$(PYTHON) -m software.station.hardware_preflight $(PREFLIGHT_SCHEDULE_FLAG) $(HEARTBEAT_FLAG)
 
 preflight-water: check-heartbeat
-	$(PYTHON) -m software.hardware_preflight --water $(PREFLIGHT_SCHEDULE_FLAG) $(HEARTBEAT_FLAG) $(if $(SENSOR_CONFIGURATION),--sensor-configuration "$(SENSOR_CONFIGURATION)")
+	$(PYTHON) -m software.station.hardware_preflight --water $(PREFLIGHT_SCHEDULE_FLAG) $(HEARTBEAT_FLAG) $(if $(SENSOR_CONFIGURATION),--sensor-configuration "$(SENSOR_CONFIGURATION)")
 
 run: preflight
 	$(PYTHON) software/conformance_test_runner.py --run-hardware $(RUNNER_SCHEDULE_FLAG) $(HEARTBEAT_FLAG)

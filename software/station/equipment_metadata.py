@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-EQUIPMENT_DIRECTORY = Path(__file__).resolve().parents[1] / "saved_data" / "equipment"
+EQUIPMENT_DIRECTORY = Path(__file__).resolve().parents[2] / "saved_data" / "equipment"
 SNAPSHOT_FILENAME = "equipment.json"
 STATION_FOLDER = re.compile(r"^WH[-_](\d+)$", re.IGNORECASE)
 

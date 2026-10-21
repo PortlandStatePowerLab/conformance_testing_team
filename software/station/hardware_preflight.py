@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable, Sequence
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from software.conformance_test_runner import (
     DEFAULT_CANONICAL_SCHEDULE,
@@ -220,7 +220,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--power-configuration-dir",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "saved_data" / "calibration",
+        default=Path(__file__).resolve().parents[2] / "saved_data" / "calibration",
     )
     return parser
 

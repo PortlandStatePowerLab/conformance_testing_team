@@ -17,10 +17,10 @@ if __package__ in (None, ""):
 
 
 try:
-    from software.pacific_time import pacific_datetime
+    from software.helpers.pacific_time import pacific_datetime
     from .schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 except ImportError:
-    from software.pacific_time import pacific_datetime
+    from software.helpers.pacific_time import pacific_datetime
     from schedule_parser import GeneratedCtaEvent, generate_cta_events, load_schedule
 
 

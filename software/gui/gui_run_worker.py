@@ -22,7 +22,7 @@ if __package__ in (None, ""):
 
 
 from software.scheduling.schedule_parser import load_schedule
-from software.pacific_time import pacific_filename_timestamp
+from software.helpers.pacific_time import pacific_filename_timestamp
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
 

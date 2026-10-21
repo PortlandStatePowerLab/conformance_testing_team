@@ -9,9 +9,9 @@ import tempfile
 from pathlib import Path
 
 try:
-    from .conformance_test_runner import DEFAULT_CTA_BINARY, DEFAULT_CTA_DIRECTORY
+    from software.conformance_test_runner import DEFAULT_CTA_BINARY, DEFAULT_CTA_DIRECTORY
 except ImportError:
-    from conformance_test_runner import DEFAULT_CTA_BINARY, DEFAULT_CTA_DIRECTORY
+    from software.conformance_test_runner import DEFAULT_CTA_BINARY, DEFAULT_CTA_DIRECTORY
 
 
 CAPABILITY_NAMES = {

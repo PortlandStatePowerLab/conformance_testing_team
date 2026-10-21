@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from software.equipment_metadata import equipment_title_line, load_run_equipment
+from software.station.equipment_metadata import equipment_title_line, load_run_equipment
 
 
 class EquipmentMetadataTests(unittest.TestCase):
@@ -37,7 +37,7 @@ class EquipmentMetadataTests(unittest.TestCase):
                 }),
                 encoding="utf-8",
             )
-            with patch("software.equipment_metadata.EQUIPMENT_DIRECTORY", equipment):
+            with patch("software.station.equipment_metadata.EQUIPMENT_DIRECTORY", equipment):
                 number, value = load_run_equipment(run)
             self.assertEqual(number, 4)
             self.assertEqual(value["model_number"], "NOW-4")
