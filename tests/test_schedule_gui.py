@@ -120,6 +120,8 @@ class ScheduleGuiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "WH-station1.json"
             equipment = {
+                "equipment_id": "wh_test1",
+                "display_name": "HPWH-1",
                 "manufacturer": "AO Smith",
                 "model_number": "HP10-50H",
                 "year": 2017,

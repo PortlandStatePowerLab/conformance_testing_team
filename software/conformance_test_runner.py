@@ -81,7 +81,7 @@ def _archive_station_equipment(
     hostname: str | None = None,
     equipment_directory: Path = DEFAULT_EQUIPMENT_DIRECTORY,
 ) -> Path | None:
-    """Copy the active station equipment identity into a new run."""
+    """Save only the public equipment fields in a new run."""
     active_hostname = hostname or socket.gethostname()
     try:
         from software.station.station_identity import station_number
@@ -92,8 +92,13 @@ def _archive_station_equipment(
     source = equipment_directory / f"WH-station{number}.json"
     if not source.is_file():
         return None
+    equipment = json.loads(source.read_text(encoding="utf-8"))
+    fields = ("equipment_id", "display_name", "date_added", "capacity_gallons")
+    if any(field not in equipment for field in fields):
+        raise ValueError(f"Equipment configuration {source} requires {', '.join(fields)}")
+    snapshot = {field: equipment[field] for field in fields}
     destination = run_directory / "equipment.json"
-    shutil.copy2(source, destination)
+    destination.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
     return destination
 
 
@@ -103,7 +108,7 @@ def _archive_station_calibration(
     hostname: str | None = None,
     calibration_directory: Path = DEFAULT_CALIBRATION_DIRECTORY,
 ) -> Path | None:
-    """Copy the active station calibration into a new run."""
+    """Save public calibration values while keeping the local record private."""
     active_hostname = hostname or socket.gethostname()
     try:
         from software.station.station_identity import station_number
@@ -114,8 +119,19 @@ def _archive_station_calibration(
     source = calibration_directory / f"WH-station{number}.json"
     if not source.is_file():
         return None
+    from software.station.calibration_metadata import public_calibration_snapshot
+
+    calibration = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(calibration, dict):
+        raise ValueError("station calibration JSON must contain an object")
+    equipment_path = run_directory / "equipment.json"
+    equipment = (
+        json.loads(equipment_path.read_text(encoding="utf-8"))
+        if equipment_path.is_file() else None
+    )
+    snapshot = public_calibration_snapshot(calibration, equipment)
     destination = run_directory / "station_calibration.json"
-    shutil.copy2(source, destination)
+    destination.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
     return destination
 
 
@@ -865,7 +881,7 @@ def _launch_water_draw(
     ]
     if getattr(event, "draw_type", "volume") == "temp drop":
         if equipment_configuration is None:
-            raise RuntimeError("Temp Drop draw requires archived station equipment")
+            raise RuntimeError("Temp Drop draw requires station equipment configuration")
         equipment = json.loads(equipment_configuration.read_text(encoding="utf-8"))
         setpoint = equipment.get("temperature_setpoint_f")
         if isinstance(setpoint, bool) or not isinstance(setpoint, (int, float)) or not math.isfinite(float(setpoint)):
@@ -933,13 +949,19 @@ def run_hardware_test(
         result_directory=str(run_directory),
     )
     archived_equipment = _archive_station_equipment(run_directory)
+    from software.station.station_identity import station_number
+
+    equipment_configuration = (
+        DEFAULT_EQUIPMENT_DIRECTORY / f"WH-station{station_number(socket.gethostname())}.json"
+        if archived_equipment is not None else None
+    )
     archived_station_calibration = _archive_station_calibration(run_directory)
     if archived_equipment is None:
         print("EQUIPMENT_SNAPSHOT_WARNING station equipment not available", file=sys.stderr)
     if any(event.draw_type == "temp drop" for event in events):
         if archived_equipment is None:
             raise RuntimeError("Temp Drop schedule requires station equipment configuration")
-        equipment = json.loads(archived_equipment.read_text(encoding="utf-8"))
+        equipment = json.loads(equipment_configuration.read_text(encoding="utf-8"))
         setpoint = equipment.get("temperature_setpoint_f")
         if isinstance(setpoint, bool) or not isinstance(setpoint, (int, float)) or not math.isfinite(float(setpoint)):
             raise RuntimeError("Temp Drop schedule requires finite temperature_setpoint_f")
@@ -1178,7 +1200,7 @@ def run_hardware_test(
                         enable_output=args.enable_water_output,
                         sensor_configuration=archived_sensor_configuration,
                         station_calibration=archived_station_calibration,
-                        equipment_configuration=archived_equipment,
+                        equipment_configuration=equipment_configuration,
                     )
                     cut_in_deadline = (
                         time.monotonic() + cut_in_event.max_draw_minutes * 60.0
@@ -1385,7 +1407,7 @@ def run_hardware_test(
                     enable_output=args.enable_water_output,
                     sensor_configuration=archived_sensor_configuration,
                     station_calibration=archived_station_calibration,
-                    equipment_configuration=archived_equipment,
+                    equipment_configuration=equipment_configuration,
                 )
                 logger.record(
                     "water_draw_started",

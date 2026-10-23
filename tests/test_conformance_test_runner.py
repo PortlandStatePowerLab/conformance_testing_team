@@ -1,3 +1,4 @@
+import json
 import argparse
 import io
 import tempfile
@@ -147,12 +148,22 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             run.mkdir()
             equipment.mkdir()
             source = equipment / "WH-station3.json"
-            source.write_text('{"manufacturer":"Example","model_number":"M3"}', encoding="utf-8")
+            public = {"equipment_id": "wh_test3", "display_name": "HPWH-3",
+                      "date_added": "2026-08-20", "capacity_gallons": 50}
+            source.write_text(json.dumps(dict(public, manufacturer="Example", model_number="M3",
+                                             temperature_setpoint_f=125, future_private_field="secret")),
+                              encoding="utf-8")
             archived = _archive_station_equipment(
                 run, hostname="WH-station3", equipment_directory=equipment
             )
             self.assertEqual(archived, run / "equipment.json")
-            self.assertEqual((run / "equipment.json").read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+            self.assertEqual(json.loads(archived.read_text(encoding="utf-8")), public)
+            self.assertEqual(json.loads(source.read_text())["temperature_setpoint_f"], 125)
+            second_run = root / "second_run"
+            second_run.mkdir()
+            second = _archive_station_equipment(second_run, hostname="WH-station3",
+                                                equipment_directory=equipment)
+            self.assertEqual(json.loads(second.read_text()), public)
 
     def test_archives_station_calibration_for_recording_reproducibility(self):
         from software.conformance_test_runner import _archive_station_calibration
@@ -175,7 +186,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             )
 
             self.assertEqual(archived, run / "station_calibration.json")
-            self.assertEqual(archived.read_bytes(), source.read_bytes())
+            self.assertEqual(json.loads(archived.read_text()), json.loads(source.read_text()))
 
     def test_test_end_stops_active_water_draw_as_hard_boundary(self):
         active_draw = SimpleNamespace(event_id="water_draw_1")

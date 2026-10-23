@@ -87,6 +87,7 @@ TERMINAL_RUN_STATES = {"completed", "failed", "stopped"}
 EQUIPMENT_FIELDS = {
     "manufacturer": str, "model_number": str, "year": int, "voltage": str,
     "capacity_gallons": int, "station_id": str, "date_added": str,
+    "equipment_id": str, "display_name": str,
 }
 
 

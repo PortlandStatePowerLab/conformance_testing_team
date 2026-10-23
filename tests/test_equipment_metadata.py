@@ -14,13 +14,12 @@ class EquipmentMetadataTests(unittest.TestCase):
             run.mkdir(parents=True)
             (run / "equipment.json").write_text(
                 json.dumps({
-                    "station_id": "WH-station3",
-                    "manufacturer": "Archived Make",
-                    "model_number": "OLD-3",
+                    "display_name": "HPWH-3",
+                    "equipment_id": "wh_archived3",
                 }),
                 encoding="utf-8",
             )
-            self.assertEqual(equipment_title_line(run), "WH-3 — Archived Make OLD-3")
+            self.assertEqual(equipment_title_line(run), "HPWH-3")
 
     def test_falls_back_to_station_file_for_older_run(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -39,6 +38,7 @@ class EquipmentMetadataTests(unittest.TestCase):
             )
             with patch("software.station.equipment_metadata.EQUIPMENT_DIRECTORY", equipment):
                 number, value = load_run_equipment(run)
+                self.assertEqual(equipment_title_line(run), "HPWH-4")
             self.assertEqual(number, 4)
             self.assertEqual(value["model_number"], "NOW-4")
 

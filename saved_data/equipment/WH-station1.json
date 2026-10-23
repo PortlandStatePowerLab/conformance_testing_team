@@ -6,5 +6,7 @@
   "capacity_gallons": 50,
   "station_id": "WH-station1",
   "date_added": "2026-08-20",
-  "temperature_setpoint_f": 125.6
+  "temperature_setpoint_f": 125.6,
+  "display_name": "HPWH-1",
+  "equipment_id": "wh_f9c836a88da94ee28fc7c7e882537e6b"
 }
