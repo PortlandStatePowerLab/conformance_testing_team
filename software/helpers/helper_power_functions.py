@@ -267,8 +267,9 @@ def get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER):
 def set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     """Persist calibration settings to disk for the current Pi.
 
-    Writes the calibration dictionary to a per-host file in the calibration
-    directory. Each Pi maintains its own <hostname>.json file.
+    Merge updated power coefficients into the per-host record, retaining sensor
+    metadata, other sections, and unrelated top-level fields. Legacy water-heater
+    identity fields are still removed from the public record.
     """
     del OUTPUT_FOLDER
     os.makedirs(CALIBRATION_DIR, exist_ok=True)
@@ -279,28 +280,38 @@ def set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
         document = json.loads(calibration_file.read_text(encoding="utf-8"))
         if not isinstance(document, dict):
             raise ValueError("station calibration JSON must contain an object")
-        backup_timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S_%f")
-        backup = calibration_file.with_name(
-            f"{calibration_file.stem}_{backup_timestamp}.json.save"
-        )
-        replace_station_backup(calibration_file, backup)
-
-    power = {
+    if "power" in document and not isinstance(document["power"], dict):
+        raise ValueError("power calibration must contain an object")
+    # Start with the saved section: rebuilding it from the coefficient allowlist
+    # would discard sensor details and metadata added by other tools.
+    power = dict(_power_section(document) or {})
+    power.update({
         key: calibration[key]
-        for key in POWER_CALIBRATION_KEYS
+        for key in POWER_CALIBRATION_KEYS - {"equipment_id"}
         if key in calibration
-    }
+    })
+    if calibration.get("equipment_id"):
+        power["equipment_id"] = calibration["equipment_id"]
     identity = _equipment_identity(CALIBRATION_DIR, host_name)
     if identity is not None:
         power["equipment_id"] = identity
         document["equipment_id"] = identity
 
-    for key in POWER_CALIBRATION_KEYS | {"manufacturer", "model_number", "year", "serial_number"}:
-        document.pop(key, None)
+    # Migrate only legacy top-level coefficients; keep the document-level ID.
+    if "power" not in document:
+        for key in POWER_CALIBRATION_KEYS - {"equipment_id"}:
+            document.pop(key, None)
     document["power"] = power
     from software.station.calibration_metadata import sanitize_station_calibration
 
     document = sanitize_station_calibration(document)
+
+    if calibration_file.is_file():
+        backup_timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S_%f")
+        backup = calibration_file.with_name(
+            f"{calibration_file.stem}_{backup_timestamp}.json.save"
+        )
+        replace_station_backup(calibration_file, backup)
 
     temporary_path = None
     try:

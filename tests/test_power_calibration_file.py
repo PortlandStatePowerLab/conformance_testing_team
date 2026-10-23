@@ -94,6 +94,7 @@ class PowerCalibrationFileTests(unittest.TestCase):
             self.assertEqual(updated["hot_water_temp"], hot)
             self.assertEqual(updated["power"]["vrms_scale"], 0.02)
             self.assertEqual(updated["power"]["equipment_id"], "wh_equipment4")
+            self.assertEqual(updated["equipment_id"], "wh_equipment4")
             self.assertNotIn("manufacturer", updated["power"])
             self.assertNotIn("model_number", updated["power"])
             backups = list(calibration_dir.glob("WH-station4_*.json.save"))
@@ -102,6 +103,67 @@ class PowerCalibrationFileTests(unittest.TestCase):
                 json.loads(backups[0].read_text(encoding="utf-8"))["hot_water_temp"],
                 hot,
             )
+
+    def test_partial_power_update_preserves_all_sensor_and_unrelated_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "WH-station1.json"
+            sensor = {"manufacturer": "Sensor Make", "model_number": "Sensor Model",
+                      "serial_number": "sensor-123", "range": [0, 30]}
+            original = {
+                "equipment_id": "wh_existing", "display_name": "HPWH-1",
+                "notes": {"station": "keep me"}, "last_cal_time": "station-level date",
+                "power": dict(POWER, sensor=sensor, sensor_manufacturer="Power Sensor Make",
+                              sensor_model_number="Power Sensor Model", custom_field={"keep": True}),
+                "hot_water_temp": {"manufacturer": "Thermometer Make", "correction_offset_f": 1.5},
+                "cold_water_temp": {"correction_offset_f": -1},
+                "flow_rate": {"model_number": "Flow Sensor Model", "scale_gpm_per_count": .005},
+            }
+            path.write_text(json.dumps(original), encoding="utf-8")
+            set_calibration({"vrms_scale": .025, "last_cal_time": "new power date"},
+                            directory, directory, hostname="WH-station1")
+            actual = json.loads(path.read_text())
+            expected = json.loads(json.dumps(original))
+            expected["power"].update(vrms_scale=.025, last_cal_time="new power date")
+            self.assertEqual(actual, expected)
+            backup = next(Path(directory).glob("WH-station1_*.json.save"))
+            self.assertEqual(json.loads(backup.read_text()), original)
+            self.assertEqual(list(Path(directory).glob("*.tmp")), [])
+
+    def test_legacy_flat_record_migrates_coefficients_but_keeps_metadata_and_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "WH-station2.json"
+            original = dict(POWER, notes="keep", sensor={"manufacturer": "Sensor Make"})
+            path.write_text(json.dumps(original))
+            set_calibration({"vrms_scale": .025}, directory, directory, hostname="WH-station2")
+            actual = json.loads(path.read_text())
+            self.assertEqual(actual["equipment_id"], original["equipment_id"])
+            self.assertEqual(actual["notes"], "keep")
+            self.assertEqual(actual["sensor"], original["sensor"])
+            self.assertNotIn("vrms_scale", actual)
+            self.assertEqual(actual["power"], dict(POWER, vrms_scale=.025))
+
+    def test_legacy_heater_identity_is_removed_but_sensor_identity_remains(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "WH-station3.json"
+            original = {"manufacturer": "Heater Make", "model_number": "Heater Model",
+                        "power": dict(POWER, manufacturer="Heater Make", model_number="Heater Model",
+                                      sensor={"manufacturer": "Sensor Make", "model_number": "Sensor Model"})}
+            path.write_text(json.dumps(original))
+            set_calibration({"irms_scale": .003}, directory, directory, hostname="WH-station3")
+            actual = json.loads(path.read_text())
+            self.assertNotIn("manufacturer", actual)
+            self.assertNotIn("model_number", actual["power"])
+            self.assertEqual(actual["power"]["sensor"], original["power"]["sensor"])
+
+    def test_malformed_power_section_is_rejected_without_changing_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "WH-station1.json"
+            original = '{"power": "invalid", "notes": "keep"}'
+            path.write_text(original)
+            with self.assertRaisesRegex(ValueError, "power calibration"):
+                set_calibration(POWER, directory, directory, hostname="WH-station1")
+            self.assertEqual(path.read_text(), original)
+            self.assertEqual(list(Path(directory).glob("*.save")), [])
 
 
 if __name__ == "__main__":
