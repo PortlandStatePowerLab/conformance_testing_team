@@ -123,6 +123,28 @@ class ConformanceReportTests(unittest.TestCase):
         ]
         self.assertEqual(names, ["Event Timeline", "Device Information", "Master Schedule", "Commodity Summary"])
 
+    def test_device_information_report_filters_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.create_run(directory)
+            private_fields = ["vendor_id_hex", "manufacturer_id", "model_number",
+                              "model_number_supported", "serial_number_redacted",
+                              "serial_number_supported", "device_revision_hex", "firmware_year_raw",
+                              "firmware_month_raw", "firmware_day_raw", "firmware_date",
+                              "firmware_major", "firmware_minor"]
+            write_csv(directory / "cta_device_information.csv",
+                      ["equipment_id", "device_type_name", "capability_bitmap_hex"] + private_fields,
+                      [["wh_public123", "Water Heater - Heat Pump", "000001C0"]
+                       + ["sensitive-value"] * len(private_fields)])
+            report = generate_conformance_report(directory)
+            with zipfile.ZipFile(report) as archive:
+                sheet = archive.read("xl/worksheets/sheet2.xml").decode("utf-8")
+            for value in ("wh_public123", "Water Heater - Heat Pump", "000001C0"):
+                self.assertIn(value, sheet)
+            self.assertNotIn("sensitive-value", sheet)
+            for field in private_fields:
+                self.assertNotIn(field, sheet)
+
 
 if __name__ == "__main__":
     unittest.main()

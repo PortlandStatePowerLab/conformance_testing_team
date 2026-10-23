@@ -64,3 +64,20 @@ but verify its equipment_id and coefficients belong to the installed setup;
 anonymous public equipment records cannot reconstruct the heater's private details.
 
 This change does not rewrite Git history or sanitize previously saved runs/plots.
+
+## CTA device-information output
+
+Rebuild the CTA controller when deploying this change. The public
+cta_device_information.csv contains equipment_id plus protocol response,
+CTA version, device type, and capability fields. Vendor, device revision,
+model/serial fields (including support flags), and all firmware fields are omitted.
+The Excel Device Information sheet applies the same allowlist to older CSVs too.
+
+The runner passes CTA_EQUIPMENT_ID from the archived equipment record and sets
+CTA_PRIVATE_DEVICE_INFO_LOG_PATH under saved_data/private/cta_information/.
+That ignored file retains the previous diagnostic columns (serial remains redacted).
+A standalone controller launch leaves equipment_id blank unless CTA_EQUIPMENT_ID
+is supplied, and writes no private diagnostic CSV unless its path is supplied.
+
+This filtering covers device-information CSVs and their report sheet. Raw CTA
+message logs require a separate review before claiming all run artifacts are anonymous.
