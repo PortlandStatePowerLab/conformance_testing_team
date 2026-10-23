@@ -449,6 +449,30 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     the sensor at 0V and 0A, then asks for known true values so it can
     compute the VRMS and IRMS scale factors.
     """
+    host_name = hostname or socket.gethostname()
+    current_id = _equipment_identity(CALIBRATION_DIR, host_name)
+    calibration_path = Path(CALIBRATION_DIR) / f"{host_name}.json"
+    if current_id is not None and calibration_path.is_file():
+        document = json.loads(calibration_path.read_text(encoding="utf-8"))
+        if not isinstance(document, dict):
+            raise ValueError("station calibration JSON must contain an object")
+        old_power = _power_section(document)
+        if old_power is not None:
+            previous_id = old_power.get("equipment_id") or document.get("equipment_id")
+            if previous_id != current_id:
+                print("WARNING: Existing power calibration is associated with "
+                      "a different heater or has no equipment ID.")
+                print(f"Existing power equipment ID: {previous_id or 'not recorded'}")
+                print(f"Currently configured heater ID: {current_id}")
+                proceed = input(
+                    "Continue recalibrating for the currently configured heater? [y/N]: "
+                ).strip().lower()
+                if proceed not in {"y", "yes"}:
+                    print("Calibration cancelled; the saved calibration was not changed.")
+                    return False
+    # Work on a copy so cancellation or a failed measurement cannot change the
+    # caller's active calibration before the operator confirms saving.
+    calibration = dict(calibration)
     print("\n=== Calibration (system-noise offset) ===")
     print("NOTE: Your chip is powered by separate supply.")
     print("We will capture TWO baselines:")
@@ -462,7 +486,7 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
-        return
+        return False
     calibration["vrms_offset"] = int(values["voltage_rms_raw"])
     if calibration.get("vrms_scale") is not None:
         calibration["vrms_offset_volts"] = float(calibration["vrms_offset"]) * float(calibration["vrms_scale"])
@@ -478,7 +502,7 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
-        return
+        return False
     calibration["irms_offset"] = int(values["current_rms_raw"])
     if calibration.get("irms_scale") is not None:
         calibration["irms_offset_amps"] = float(calibration["irms_offset"]) * float(calibration["irms_scale"])
@@ -493,12 +517,12 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
-        return
+        return False
     raw_voltage_rms = int(values["voltage_rms_raw"])
     voltage_difference = float(raw_voltage_rms - calibration["vrms_offset"])
     if abs(voltage_difference) < 10:
         print("VRMS_raw - vrms_offset is too small. Is mains really ON? Is VINP driven?")
-        return
+        return False
     calibration["vrms_scale"] = true_line_voltage / voltage_difference
     calibration["line_vrms_used"] = true_line_voltage
     calibration["vrms_offset_volts"] = float(calibration["vrms_offset"]) * float(calibration["vrms_scale"])
@@ -511,12 +535,12 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     values = read_raw_measurement_values(bus)
     if values is None:
         print("I2C read failed. Check wiring/address.")
-        return
+        return False
     raw_current_rms = int(values["current_rms_raw"])
     current_difference = float(raw_current_rms - calibration["irms_offset"])
     if abs(current_difference) < 10:
         print("IRMS_raw - irms_offset is too small. Increase load and try again.")
-        return
+        return False
     calibration["irms_scale"] = true_load_current / current_difference
     calibration["clamp_irms_used"] = true_load_current
     calibration["irms_offset_amps"] = float(calibration["irms_offset"]) * float(calibration["irms_scale"])
@@ -530,11 +554,12 @@ def calibrate(bus, calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
         ).strip().lower()
         if overwrite not in {"y", "yes"}:
             print("Calibration was not saved.")
-            return
+            return False
 
     set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=hostname)
-    host_name = hostname or socket.gethostname()
     print(f"\nSaved calibration to: {os.path.join(CALIBRATION_DIR, f'{host_name}.json')}\n")
+    return True
+
 
 def get_power_data(bus, calibration):
     """Read the current power data from the ACS37800 sensor.

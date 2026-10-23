@@ -111,12 +111,14 @@ def run(calibration_directory: Path) -> int:
     print("Starting full power calibration.")
     print(f"Calibration directory: {resolved_directory}")
     with SMBus(I2C_BUS) as bus:
-        calibrate(
+        saved = calibrate(
             bus,
             calibration,
             str(resolved_directory),
             str(output_directory),
         )
+        if not saved:
+            return 0
         calibration = get_calibration_from_JSON(
             str(resolved_directory),
             str(output_directory),

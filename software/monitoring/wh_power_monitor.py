@@ -236,12 +236,14 @@ def run_monitor(args: argparse.Namespace, stop_event: threading.Event) -> int:
         handle.flush()
 
         if args.calibrate:
-            calibrate(
+            saved = calibrate(
                 bus,
                 calibration,
                 str(calibration_directory),
                 str(output_path.parent),
             )
+            if not saved:
+                return 0
             calibration = get_calibration_from_JSON(
                 str(calibration_directory), str(output_path.parent)
             )

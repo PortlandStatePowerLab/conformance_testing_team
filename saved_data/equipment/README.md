@@ -81,3 +81,15 @@ is supplied, and writes no private diagnostic CSV unless its path is supplied.
 
 This filtering covers device-information CSVs and their report sheet. Raw CTA
 message logs require a separate review before claiming all run artifacts are anonymous.
+
+## Power recalibration identity confirmation
+
+Before taking measurements, power recalibration compares the saved power
+calibration ID with the currently configured heater ID (private equipment takes
+precedence). A mismatch or missing saved ID warns and asks whether to continue;
+Enter cancels. Choosing Yes permits a new calibration, with the usual final save
+confirmation. Cancellation or measurement failure leaves the saved file intact.
+A successful save uses the current heater ID, backs up the previous record, and
+preserves sensor metadata and temperature/flow sections. The calibration tool
+and monitor exit when calibration is cancelled or fails instead of starting
+post-calibration monitoring with old coefficients.
