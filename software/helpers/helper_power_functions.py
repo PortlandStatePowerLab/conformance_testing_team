@@ -184,8 +184,7 @@ def read_raw_measurement_values(bus):
 
 def _get_default_calibration():
     return {
-        "manufacturer": None,
-        "model_number": None,
+        "equipment_id": None,
         # scales convert (raw - offset) -> engineering units
         "vrms_scale": None,     # V per code
         "irms_scale": None,     # A per code
@@ -224,17 +223,18 @@ def _power_section(document):
 
 
 def _equipment_identity(calibration_directory, hostname):
-    equipment_path = Path(calibration_directory).parent / "equipment" / f"{hostname}.json"
+    saved_data = Path(calibration_directory).parent
+    equipment_path = saved_data / "private" / "equipment" / f"{hostname}.json"
+    if not equipment_path.is_file():
+        equipment_path = saved_data / "equipment" / f"{hostname}.json"
     if not equipment_path.is_file():
         return None
     equipment = json.loads(equipment_path.read_text(encoding="utf-8"))
     if not isinstance(equipment, dict):
         return None
-    manufacturer = equipment.get("manufacturer")
-    model_number = equipment.get("model_number")
-    if not isinstance(manufacturer, str) or not isinstance(model_number, str):
-        return None
-    return manufacturer, model_number
+    identity = equipment.get("equipment_id")
+    return identity if isinstance(identity, str) and identity.strip() else None
+
 
 def get_calibration_from_JSON(CALIBRATION_DIR, OUTPUT_FOLDER):
     """Load calibration settings for the current Pi from disk.
@@ -292,11 +292,15 @@ def set_calibration(calibration, CALIBRATION_DIR, OUTPUT_FOLDER, hostname=None):
     }
     identity = _equipment_identity(CALIBRATION_DIR, host_name)
     if identity is not None:
-        power["manufacturer"], power["model_number"] = identity
+        power["equipment_id"] = identity
+        document["equipment_id"] = identity
 
-    for key in POWER_CALIBRATION_KEYS:
+    for key in POWER_CALIBRATION_KEYS | {"manufacturer", "model_number", "year", "serial_number"}:
         document.pop(key, None)
     document["power"] = power
+    from software.station.calibration_metadata import sanitize_station_calibration
+
+    document = sanitize_station_calibration(document)
 
     temporary_path = None
     try:

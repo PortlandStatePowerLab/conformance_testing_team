@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import json
 import re
+import math
 from pathlib import Path
 from typing import Any
 
 
 EQUIPMENT_DIRECTORY = Path(__file__).resolve().parents[2] / "saved_data" / "equipment"
+PRIVATE_EQUIPMENT_DIRECTORY = EQUIPMENT_DIRECTORY.parent / "private" / "equipment"
+PUBLIC_EQUIPMENT_FIELDS = (
+    "equipment_id", "display_name", "date_added", "capacity_gallons", "temperature_setpoint_f",
+)
 SNAPSHOT_FILENAME = "equipment.json"
 STATION_FOLDER = re.compile(r"^WH[-_](\d+)$", re.IGNORECASE)
 
@@ -60,3 +65,66 @@ def equipment_title_line(run_directory: Path | str) -> str | None:
         if name:
             return name
     return f"HPWH-{number}" if number is not None else None
+
+
+def public_equipment_record(equipment: dict[str, Any]) -> dict[str, Any]:
+    """Select the anonymous fields from the private source of truth."""
+    missing = set(PUBLIC_EQUIPMENT_FIELDS).difference(equipment)
+    if missing:
+        raise ValueError(f"Equipment configuration missing fields: {', '.join(sorted(missing))}")
+    for field in ("equipment_id", "display_name", "date_added"):
+        if not isinstance(equipment[field], str) or not equipment[field].strip():
+            raise ValueError(f"Equipment {field} must be a nonempty string")
+    for field in ("capacity_gallons", "temperature_setpoint_f"):
+        value = equipment[field]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError(f"Equipment {field} must be a finite number")
+    if equipment["capacity_gallons"] <= 0:
+        raise ValueError("Equipment capacity_gallons must be positive")
+    return {field: equipment[field] for field in PUBLIC_EQUIPMENT_FIELDS}
+
+
+def generate_public_equipment(
+    private_path: Path, public_directory: Path = EQUIPMENT_DIRECTORY,
+) -> dict[str, Any]:
+    """Refresh a public record from its private source without changing its ID."""
+    equipment = json.loads(private_path.read_text(encoding="utf-8"))
+    snapshot = public_equipment_record(equipment)
+    public_directory.mkdir(parents=True, exist_ok=True)
+    destination = public_directory / private_path.name
+    # Avoid partially written JSON if the GUI and runner refresh concurrently.
+    import os
+    import tempfile
+
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=public_directory,
+                                         prefix=".equipment-", suffix=".tmp", delete=False) as output:
+            temporary_path = Path(output.name)
+            json.dump(snapshot, output, indent=2)
+            output.write("\n")
+        os.replace(temporary_path, destination)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return snapshot
+
+
+def main() -> None:
+    """Regenerate public equipment records after editing private station data."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("--private-directory", type=Path, default=PRIVATE_EQUIPMENT_DIRECTORY)
+    parser.add_argument("--public-directory", type=Path, default=EQUIPMENT_DIRECTORY)
+    args = parser.parse_args()
+    paths = sorted(args.private_directory.glob("WH-station*.json"))
+    if not paths:
+        parser.error(f"No private equipment records found in {args.private_directory}")
+    for path in paths:
+        generate_public_equipment(path, args.public_directory)
+        print(f"Generated {path.name}")
+
+
+if __name__ == "__main__":
+    main()

@@ -57,7 +57,7 @@ ROOT_DIRECTORY = CONFORMANCE_REPOSITORY.parent
 DEFAULT_MASTER_SCHEDULE = SOFTWARE_DIRECTORY / "schedules" / "conformance_test_schedule_main.xlsx"
 DEFAULT_CANONICAL_SCHEDULE = SOFTWARE_DIRECTORY / "schedules" / "conformance_test_schedule.csv"
 DEFAULT_RESULTS_ROOT = CONFORMANCE_REPOSITORY / "saved_data" / "conformance_runs"
-DEFAULT_EQUIPMENT_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "equipment"
+DEFAULT_EQUIPMENT_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "private" / "equipment"
 DEFAULT_CALIBRATION_DIRECTORY = CONFORMANCE_REPOSITORY / "saved_data" / "calibration"
 DEFAULT_CTA_DIRECTORY = ROOT_DIRECTORY / "cta_2045_controller" / "dcs" / "controller"
 DEFAULT_CTA_BINARY = (
@@ -92,11 +92,14 @@ def _archive_station_equipment(
     source = equipment_directory / f"WH-station{number}.json"
     if not source.is_file():
         return None
-    equipment = json.loads(source.read_text(encoding="utf-8"))
-    fields = ("equipment_id", "display_name", "date_added", "capacity_gallons")
-    if any(field not in equipment for field in fields):
-        raise ValueError(f"Equipment configuration {source} requires {', '.join(fields)}")
-    snapshot = {field: equipment[field] for field in fields}
+    from software.station.equipment_metadata import generate_public_equipment
+
+    public_directory = (
+        equipment_directory.parent.parent / "equipment"
+        if equipment_directory.parent.name == "private"
+        else equipment_directory.parent / "public_equipment"
+    )
+    snapshot = generate_public_equipment(source, public_directory)
     destination = run_directory / "equipment.json"
     destination.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
     return destination
@@ -1031,10 +1034,23 @@ def run_hardware_test(
         )
         shutil.copy2(args.cta_schedule, run_directory / "cta_schedule_generated.csv")
 
+        private_cta_directory = (
+            CONFORMANCE_REPOSITORY / "saved_data" / "private" / "cta_information"
+            / run_directory.parent.name / run_directory.name
+        )
+        private_cta_directory.mkdir(parents=True, exist_ok=True)
+        equipment_id = (
+            json.loads(archived_equipment.read_text(encoding="utf-8"))["equipment_id"]
+            if archived_equipment is not None else ""
+        )
         controller_environment = os.environ.copy()
         controller_environment.update(
             {
                 "TZ": "America/Los_Angeles",
+                "CTA_EQUIPMENT_ID": equipment_id,
+                "CTA_PRIVATE_DEVICE_INFO_LOG_PATH": str(
+                    private_cta_directory / "cta_device_information.csv"
+                ),
                 "CTA_EVENT_LOG_PATH": str(run_directory / "cta_events.csv"),
                 "CTA_RAW_MESSAGE_LOG_PATH": str(
                     run_directory / "cta_raw_messages.csv"

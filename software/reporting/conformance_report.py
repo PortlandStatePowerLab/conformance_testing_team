@@ -426,6 +426,15 @@ def generate_conformance_report(
     device_headers, device_rows = _table_from_csv(
         directory / "cta_device_information.csv"
     )
+    public_device_columns = {
+        "timestamp_pacific", "equipment_id", "opcode1", "opcode2", "response_code",
+        "response_name", "payload_length", "cta2045_version_raw_hex", "cta2045_version",
+        "cta2045_b_version_valid", "device_type_hex", "device_type_name", "capability_bitmap_hex",
+    }
+    public_indices = [index for index, name in enumerate(device_headers)
+                      if name in public_device_columns]
+    device_headers = [device_headers[index] for index in public_indices]
+    device_rows = [[row[index] for index in public_indices] for row in device_rows]
     schedule_headers, schedule_rows = _table_from_csv(
         directory / "master_schedule.csv"
     )

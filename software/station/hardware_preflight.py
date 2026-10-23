@@ -131,15 +131,18 @@ def _power_configuration_details(calibration_directory: Path) -> str:
     missing = sorted(required.difference(power))
     if missing:
         raise ValueError(f"missing power configuration fields: {missing}")
-    equipment_path = calibration_directory.parent / "equipment" / path.name
+    equipment_path = calibration_directory.parent / "private" / "equipment" / path.name
+    if not equipment_path.is_file():
+        equipment_path = calibration_directory.parent / "equipment" / path.name
     if equipment_path.is_file():
         equipment = json.loads(equipment_path.read_text(encoding="utf-8"))
-        for field in ("manufacturer", "model_number"):
-            if power.get(field) != equipment.get(field):
-                raise ValueError(
-                    f"power calibration {field} does not match installed equipment; "
-                    "recalibrate power"
-                )
+        expected_id = equipment.get("equipment_id")
+        calibrated_id = power.get("equipment_id", data.get("equipment_id"))
+        if not expected_id or calibrated_id != expected_id:
+            raise ValueError(
+                "power calibration equipment_id does not match installed equipment; "
+                "recalibrate power"
+            )
     return str(path.resolve())
 
 

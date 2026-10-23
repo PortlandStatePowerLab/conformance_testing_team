@@ -146,6 +146,9 @@ def save_hot_water_calibration(
         backup_path = _backup_path(calibration_path, timestamp)
         replace_station_backup(calibration_path, backup_path)
 
+    from software.station.calibration_metadata import sanitize_station_calibration
+
+    document = sanitize_station_calibration(document)
     document["hot_water_temp"] = section
     calibration_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None

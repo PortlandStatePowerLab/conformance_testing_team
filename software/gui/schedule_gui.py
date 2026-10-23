@@ -75,7 +75,7 @@ STATION_HOSTNAME = re.compile(r"WH[-_]?station[-_]?(\d+)\Z", re.IGNORECASE)
 MAX_REQUEST_BYTES = 1_000_000
 DEFAULT_IDLE_TIMEOUT_HOURS = 48.0
 DEFAULT_RUN_DIRECTORY = SOFTWARE_DIRECTORY.parent / "runtime_logs" / "gui_runs"
-DEFAULT_EQUIPMENT_DIRECTORY = SOFTWARE_DIRECTORY.parent / "saved_data" / "equipment"
+DEFAULT_EQUIPMENT_DIRECTORY = SOFTWARE_DIRECTORY.parent / "saved_data" / "private" / "equipment"
 PACIFIC = ZoneInfo("America/Los_Angeles")
 PREFLIGHT_MAX_AGE_SECONDS = 300
 ACTIVE_RUN_STATES = {
@@ -129,6 +129,14 @@ def load_station_equipment(
         or not math.isfinite(float(value["temperature_setpoint_f"]))
     ):
         raise ValueError("equipment temperature_setpoint_f must be finite")
+    from software.station.equipment_metadata import generate_public_equipment
+
+    public_directory = (
+        directory.parent.parent / "equipment"
+        if directory.parent.name == "private"
+        else directory.parent / "public_equipment"
+    )
+    generate_public_equipment(directory / f"{hostname}.json", public_directory)
     return value
 
 

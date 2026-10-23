@@ -141,6 +141,9 @@ def save_cold_water_calibration(
         )
         replace_station_backup(calibration_path, backup_path)
 
+    from software.station.calibration_metadata import sanitize_station_calibration
+
+    document = sanitize_station_calibration(document)
     document["cold_water_temp"] = section
     calibration_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None

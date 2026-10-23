@@ -122,13 +122,14 @@ class ScheduleGuiTests(unittest.TestCase):
             equipment = {
                 "equipment_id": "wh_test1",
                 "display_name": "HPWH-1",
-                "manufacturer": "AO Smith",
-                "model_number": "HP10-50H",
-                "year": 2017,
+                "manufacturer": "Example Make",
+                "model_number": "Example Model 1",
+                "year": 2000,
                 "voltage": "240 VAC",
                 "capacity_gallons": 50,
                 "station_id": "WH-station1",
                 "date_added": "2026-08-20",
+                "temperature_setpoint_f": 125.0,
             }
             path.write_text(json.dumps(equipment), encoding="utf-8")
             self.assertEqual(

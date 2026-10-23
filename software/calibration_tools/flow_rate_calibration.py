@@ -197,6 +197,9 @@ def save_flow_calibration(
             f"{calibration_path.stem}_{suffix}.json.save"
         )
         replace_station_backup(calibration_path, backup_path)
+    from software.station.calibration_metadata import sanitize_station_calibration
+
+    document = sanitize_station_calibration(document)
     document["flow_rate"] = section
     calibration_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None

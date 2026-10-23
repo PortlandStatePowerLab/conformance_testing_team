@@ -153,3 +153,9 @@ generated_results/*
 # =========================
 .github/copilot-instructions.md
 .github/instructions/
+
+# Private station identity, calibration, and backups
+/saved_data/private/
+/saved_data/equipment/*.json.save
+/saved_data/equipment/*.tmp
+*.swp

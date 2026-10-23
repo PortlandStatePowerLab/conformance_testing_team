@@ -26,8 +26,7 @@ class HardwarePreflightTest(unittest.TestCase):
                 json.dumps(
                     {
                         "power": {
-                            "manufacturer": "Old Brand",
-                            "model_number": "Old Model",
+                            "equipment_id": "wh_old",
                             "vrms_scale": 0.01,
                             "irms_scale": 0.002,
                             "vrms_offset": 10,
@@ -39,7 +38,7 @@ class HardwarePreflightTest(unittest.TestCase):
             )
             (equipment / "WH-station3.json").write_text(
                 json.dumps(
-                    {"manufacturer": "New Brand", "model_number": "New Model"}
+                    {"equipment_id": "wh_new"}
                 ),
                 encoding="utf-8",
             )
@@ -49,6 +48,28 @@ class HardwarePreflightTest(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(ValueError, "recalibrate power"):
                     hardware_preflight._power_configuration_details(calibration)
+
+    def test_preflight_checks_private_equipment_id_instead_of_stale_public_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            calibration = root / "calibration"
+            public = root / "equipment"
+            private = root / "private" / "equipment"
+            for path in (calibration, public, private):
+                path.mkdir(parents=True)
+            path = calibration / "WH-station3.json"
+            document = {"power": {"equipment_id": "wh_old", "vrms_scale": .01,
+                                  "irms_scale": .002, "vrms_offset": 10, "irms_offset": 20}}
+            path.write_text(json.dumps(document))
+            (public / path.name).write_text(json.dumps({"equipment_id": "wh_old"}))
+            (private / path.name).write_text(json.dumps({"equipment_id": "wh_new"}))
+            with patch.object(hardware_preflight.socket, "gethostname", return_value="WH-station3"):
+                with self.assertRaisesRegex(ValueError, "equipment_id"):
+                    hardware_preflight._power_configuration_details(calibration)
+                document["power"]["equipment_id"] = "wh_new"
+                path.write_text(json.dumps(document))
+                self.assertEqual(hardware_preflight._power_configuration_details(calibration),
+                                 str(path.resolve()))
 
     def test_schedule_requires_water_draw_only_in_water_mode(self):
         schedule = Path("schedule.csv")

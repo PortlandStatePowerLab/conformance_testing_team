@@ -11,8 +11,7 @@ from software.helpers.helper_power_functions import (
 
 
 POWER = {
-    "manufacturer": "Example",
-    "model_number": "Model A",
+    "equipment_id": "wh_example",
     "vrms_scale": 0.01,
     "irms_scale": 0.002,
     "vrms_offset": 10,
@@ -77,8 +76,7 @@ class PowerCalibrationFileTests(unittest.TestCase):
             (equipment_dir / "WH-station4.json").write_text(
                 json.dumps(
                     {
-                        "manufacturer": "American Standard",
-                        "model_number": "ASHPWH-50",
+                        "equipment_id": "wh_equipment4",
                     }
                 ),
                 encoding="utf-8",
@@ -95,8 +93,9 @@ class PowerCalibrationFileTests(unittest.TestCase):
             updated = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(updated["hot_water_temp"], hot)
             self.assertEqual(updated["power"]["vrms_scale"], 0.02)
-            self.assertEqual(updated["power"]["manufacturer"], "American Standard")
-            self.assertEqual(updated["power"]["model_number"], "ASHPWH-50")
+            self.assertEqual(updated["power"]["equipment_id"], "wh_equipment4")
+            self.assertNotIn("manufacturer", updated["power"])
+            self.assertNotIn("model_number", updated["power"])
             backups = list(calibration_dir.glob("WH-station4_*.json.save"))
             self.assertEqual(len(backups), 1)
             self.assertEqual(

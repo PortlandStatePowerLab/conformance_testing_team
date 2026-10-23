@@ -1,16 +1,15 @@
 {
   "power": {
-    "model_number": "HP10-50H",
     "vrms_scale": 0.0052465851592868465,
     "last_cal_time": "2026-09-03T11:41:23",
     "irms_offset": 31,
     "irms_scale": 0.0017369838420107722,
     "vrms_offset_volts": 48.02724054811179,
-    "manufacturer": "AO Smith",
     "clamp_irms_used": 19.35,
     "irms_offset_amps": 0.05384649910233394,
     "vrms_offset": 9154,
-    "line_vrms_used": 241.6
+    "line_vrms_used": 241.6,
+    "equipment_id": "wh_f9c836a88da94ee28fc7c7e882537e6b"
   },
   "hot_water_temp": {
     "method": "three_reading_average_offset",
@@ -132,5 +131,6 @@
     ],
     "reference_device": "McMaster-Carr SBN234",
     "last_cal_time": "2026-09-03T11:27:51-07:00"
-  }
+  },
+  "equipment_id": "wh_f9c836a88da94ee28fc7c7e882537e6b"
 }

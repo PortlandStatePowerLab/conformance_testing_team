@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from software.conformance_test_runner import _archive_station_calibration
-from software.station.calibration_metadata import public_calibration_snapshot
+from software.station.calibration_metadata import public_calibration_snapshot, sanitize_station_calibration
 from software.sensors.water_temp_calibration_loader import (
     load_hot_water_offset_f, load_cold_water_offset_f, load_flow_calibration,
 )
@@ -60,3 +60,23 @@ class CalibrationMetadataTests(unittest.TestCase):
     def test_malformed_calibration_section_is_rejected(self):
         with self.assertRaises(ValueError):
             public_calibration_snapshot({"power": "invalid"})
+
+    def test_sensor_identity_is_preserved_while_heater_identity_is_removed(self):
+        sensor = {"manufacturer": "Sensor Make", "model_number": "Sensor Model",
+                  "serial_number": "sensor-123", "year": 2020}
+        calibration = {
+            "manufacturer": "Heater Make", "model_number": "Heater Model",
+            "power": {"manufacturer": "Heater Make", "model_number": "Heater Model",
+                      "equipment_id": "wh_test", "sensor": sensor},
+            "hot_water_temp": dict(sensor, correction_offset_f=1.5),
+            "flow_rate": dict(sensor, scale_gpm_per_count=0.005, offset_gpm=-2),
+        }
+        sanitized = sanitize_station_calibration(calibration)
+        self.assertNotIn("manufacturer", sanitized)
+        self.assertNotIn("model_number", sanitized["power"])
+        self.assertEqual(sanitized["power"]["equipment_id"], "wh_test")
+        self.assertEqual(sanitized["power"]["sensor"], sensor)
+        for section in ("hot_water_temp", "flow_rate"):
+            self.assertEqual(sanitized[section], calibration[section])
+        exported = public_calibration_snapshot(sanitized)
+        self.assertEqual(exported, sanitized)

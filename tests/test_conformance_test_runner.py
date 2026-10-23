@@ -149,9 +149,10 @@ class ConformanceTestRunnerTests(unittest.TestCase):
             equipment.mkdir()
             source = equipment / "WH-station3.json"
             public = {"equipment_id": "wh_test3", "display_name": "HPWH-3",
-                      "date_added": "2026-08-20", "capacity_gallons": 50}
+                      "date_added": "2026-08-20", "capacity_gallons": 50,
+                      "temperature_setpoint_f": 125}
             source.write_text(json.dumps(dict(public, manufacturer="Example", model_number="M3",
-                                             temperature_setpoint_f=125, future_private_field="secret")),
+                                             future_private_field="secret")),
                               encoding="utf-8")
             archived = _archive_station_equipment(
                 run, hostname="WH-station3", equipment_directory=equipment
