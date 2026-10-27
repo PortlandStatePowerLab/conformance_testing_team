@@ -417,7 +417,11 @@ def plot_event_timeline(
     csv_destination = write_event_timeline_csv(
         events, csv_output_path or directory / CSV_FILENAME
     )
-    height = min(24.0, max(6.0, 1.8 + len(events) * 0.31))
+    # Reserve fixed physical space for the title and footnote, so short and
+    # long timelines both start directly below the title.
+    title_height = 0.95
+    footer_height = 0.45
+    height = title_height + footer_height + (len(events) + 1) * 0.27
     if show:
         import matplotlib.pyplot as plt
         figure = plt.figure(figsize=(16, height))
@@ -440,11 +444,10 @@ def plot_event_timeline(
         cellLoc="left",
         colLoc="center",
         colWidths=[0.11, 0.09, 0.10, 0.27, 0.43],
-        loc="center",
+        bbox=[0, 0, 1, 1],
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(8.5)
-    table.scale(1, 1.35)
+    table.set_fontsize(9.5)
     for (row, column), cell in table.get_celld().items():
         cell.set_edgecolor("#777777")
         cell.set_linewidth(0.6)
@@ -466,7 +469,10 @@ def plot_event_timeline(
         "Operational state and commodity milestones are first observed at polling time. Component operation is inferred from aggregate current and power.",
         ha="center", fontsize=8, color="#555555",
     )
-    figure.subplots_adjust(left=0.02, right=0.98, top=0.90, bottom=0.05)
+    figure.subplots_adjust(
+        left=0.02, right=0.98,
+        top=1 - title_height / height, bottom=footer_height / height,
+    )
     destination = None
     if output_path is not None:
         destination = Path(output_path).resolve()

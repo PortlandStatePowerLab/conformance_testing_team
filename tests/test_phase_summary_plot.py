@@ -2,12 +2,14 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import datetime, timedelta
 
 import matplotlib
 
 matplotlib.use("Agg")
 
-from software.plots.phase_summary_plot import plot_phase_summary, summarize_run_phases
+from software.plots.phase_summary_plot import _state_statistics, plot_phase_summary, summarize_run_phases
+from software.plots.state_verification_plot import ExpectedPhase, StateReport
 
 
 def write_csv(path, columns, rows):
@@ -18,6 +20,20 @@ def write_csv(path, columns, rows):
 
 
 class PhaseSummaryPlotTests(unittest.TestCase):
+    def test_state_durations_exclude_grace_and_count_contiguous_mismatches(self):
+        start = datetime(2026, 8, 26, 15, 0)
+        phase = ExpectedPhase(start, "Load Up", frozenset({3, 6}))
+        reports = tuple(
+            StateReport(start + timedelta(seconds=seconds), code, str(code))
+            for seconds, code in [(10, 5), (30, 3), (90, 5), (105, 5), (120, 3), (180, 5), (210, 3), (300, 5)]
+        )
+        count, seconds, percent = _state_statistics(
+            phase, start + timedelta(seconds=300), reports, grace_seconds=60,
+        )
+        self.assertEqual(count, 2)
+        self.assertEqual(seconds, 60)
+        self.assertEqual(percent, 75)
+
     def create_run(self, directory):
         write_csv(
             directory / "master_schedule.csv",

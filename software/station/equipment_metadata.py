@@ -64,6 +64,16 @@ def equipment_title_line(run_directory: Path | str) -> str | None:
         name = str(equipment.get("display_name", "")).strip()
         if name:
             return name
+    if number is not None:
+        current = _load(EQUIPMENT_DIRECTORY / f"WH-station{number}.json")
+        # Legacy snapshots predate display_name. Use the configured name unless
+        # their permanent ID proves that the station now holds another heater.
+        if current is not None:
+            archived_id = (equipment or {}).get("equipment_id")
+            current_id = current.get("equipment_id")
+            name = str(current.get("display_name", "")).strip()
+            if name and (not archived_id or archived_id == current_id):
+                return name
     return f"HPWH-{number}" if number is not None else None
 
 

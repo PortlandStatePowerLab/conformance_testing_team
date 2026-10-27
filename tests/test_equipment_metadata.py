@@ -45,6 +45,25 @@ class EquipmentMetadataTests(unittest.TestCase):
             self.assertEqual(value["model_number"], "NOW-4")
 
 
+    def test_legacy_snapshot_uses_configured_display_name_without_rewriting_record(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run = root / "WH-1" / "example"
+            equipment = root / "equipment"
+            run.mkdir(parents=True)
+            equipment.mkdir()
+            snapshot = run / "equipment.json"
+            original = json.dumps({"station_id": "WH-station1", "manufacturer": "Old Make"})
+            snapshot.write_text(original)
+            (equipment / "WH-station1.json").write_text(json.dumps({
+                "equipment_id": "wh_current", "display_name": "HPWH-D"}))
+            with patch("software.station.equipment_metadata.EQUIPMENT_DIRECTORY", equipment):
+                self.assertEqual(equipment_title_line(run), "HPWH-D")
+                snapshot.write_text(json.dumps({"equipment_id": "wh_other"}))
+                self.assertEqual(equipment_title_line(run), "HPWH-1")
+                snapshot.write_text(original)
+            self.assertEqual(snapshot.read_text(), original)
+
     def test_public_record_refreshes_from_private_without_changing_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

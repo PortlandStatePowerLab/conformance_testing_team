@@ -34,6 +34,38 @@ class PhaseSummary:
     maximum_power_kw: float | None
     energized_percent: float | None
     state_result: str
+    state_mismatch_count: int
+    state_mismatch_seconds: float
+    expected_state_percent: float | None
+
+
+def _state_statistics(phase, end, reports, *, grace_seconds):
+    """Estimate state durations by holding each report until the next poll."""
+    start = phase.timestamp + timedelta(seconds=grace_seconds)
+    relevant = [r for r in reports if phase.timestamp <= r.timestamp < end]
+    mismatch_count = 0
+    mismatch_seconds = 0.0
+    covered_seconds = 0.0
+    previous_mismatch = False
+    for index, report in enumerate(relevant):
+        next_time = relevant[index + 1].timestamp if index + 1 < len(relevant) else end
+        interval_start = max(start, report.timestamp)
+        interval_end = min(end, next_time)
+        if interval_end <= interval_start:
+            continue
+        seconds = (interval_end - interval_start).total_seconds()
+        mismatch = report.code not in phase.expected_states
+        if mismatch:
+            mismatch_seconds += seconds
+            if not previous_mismatch:
+                mismatch_count += 1
+        previous_mismatch = mismatch
+        covered_seconds += seconds
+    percent = (
+        100 * (covered_seconds - mismatch_seconds) / covered_seconds
+        if covered_seconds else None
+    )
+    return mismatch_count, mismatch_seconds, percent
 
 
 def _nearest(samples: tuple[Sample, ...], timestamp: datetime) -> Sample:
@@ -151,6 +183,9 @@ def summarize_run_phases(
             end,
             energized_threshold_w=energized_threshold_w,
         )
+        mismatch_count, mismatch_seconds, expected_percent = _state_statistics(
+            phase, end, verification.reports, grace_seconds=grace_seconds,
+        )
         result.append(
             PhaseSummary(
                 phase=name,
@@ -170,6 +205,9 @@ def summarize_run_phases(
                     grace_seconds=grace_seconds,
                     inclusive_end=index + 1 == len(verification.phases),
                 ),
+                state_mismatch_count=mismatch_count,
+                state_mismatch_seconds=mismatch_seconds,
+                expected_state_percent=expected_percent,
             )
         )
     return tuple(result)
@@ -183,6 +221,19 @@ def _duration(seconds: float) -> str:
 
 def _optional(value: float | None, suffix: str = "") -> str:
     return "—" if value is None else f"{value:.2f}{suffix}"
+
+
+def _state_label(item: PhaseSummary) -> str:
+    if item.expected_state_percent is None:
+        return item.state_result
+    seconds = round(item.state_mismatch_seconds)
+    minutes, seconds = divmod(seconds, 60)
+    count = item.state_mismatch_count
+    return (
+        f"{item.state_result} — {count} mismatch{'es' if count != 1 else ''}\n"
+        f"~{minutes} min {seconds:02d} sec total\n"
+        f"{item.expected_state_percent:.1f}% in expected states"
+    )
 
 
 def plot_phase_summary(
@@ -206,11 +257,11 @@ def plot_phase_summary(
     if show:
         import matplotlib.pyplot as plt
 
-        figure = plt.figure(figsize=(13, 6.5))
+        figure = plt.figure(figsize=(16, 7))
     else:
         from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-        figure = Figure(figsize=(13, 6.5))
+        figure = Figure(figsize=(16, 7))
         FigureCanvasAgg(figure)
     grid = figure.add_gridspec(2, 1, height_ratios=(1.1, 1.5), hspace=0.28)
     bar_axis = figure.add_subplot(grid[0])
@@ -225,9 +276,11 @@ def plot_phase_summary(
     bar_axis.set_yticks(positions)
     bar_axis.set_yticklabels([summary.phase for summary in summaries])
     bar_axis.invert_yaxis()
-    bar_axis.set_xlabel("Net EnergyTake Change (kWh)")
+    bar_axis.set_xlabel("Reported Net EnergyTake Change (kWh)")
     bar_axis.grid(axis="x", alpha=0.3)
     margin = max(max(abs(value) for value in changes) * 0.03, 0.03)
+    bar_axis.set_xlim(min(0, min(changes)) - 4 * margin,
+                      max(0, max(changes)) + 4 * margin)
     for bar, value in zip(bars, changes):
         bar_axis.text(
             value + (margin if value >= 0 else -margin),
@@ -252,15 +305,21 @@ def plot_phase_summary(
             _optional(item.average_power_kw),
             _optional(item.maximum_power_kw),
             _optional(item.energized_percent, "%"),
-            item.state_result,
+            _state_label(item),
         ]
         for item in summaries
     ]
     table_axis.axis("off")
-    table = table_axis.table(cellText=rows, colLabels=columns, cellLoc="center", loc="center")
+    table = table_axis.table(
+        cellText=rows, colLabels=columns, cellLoc="center", loc="center",
+        colWidths=[0.077] * 10 + [0.23],
+    )
     table.auto_set_font_size(False)
     table.set_fontsize(8)
     table.scale(1, 1.65)
+    for row_index in range(1, len(rows) + 1):
+        for column in range(len(columns)):
+            table[(row_index, column)].set_height(0.25)
     for column in range(len(columns)):
         table[(0, column)].set_facecolor("#d9e3f0")
         table[(0, column)].set_text_props(fontweight="bold")
@@ -279,13 +338,16 @@ def plot_phase_summary(
     figure.text(
         0.99,
         0.015,
-        f"EnergyTake boundaries use nearest samples. Power is time-weighted; energized ≥ {energized_threshold_w:g} W. State grace: {grace_seconds:g} s.",
+        "EnergyTake is reported via CTA-2045; change = end − start (nearest samples).\n"
+        "Positive = increased energy needed; negative = decreased energy needed.\n"
+        f"Power is time-weighted; energized ≥ {energized_threshold_w:g} W. State durations are estimated between polls.\n"
+        f"State percentages exclude the {grace_seconds:g} s grace period and uncovered time.",
         ha="right",
         va="bottom",
-        fontsize=7,
+        fontsize=10,
         color="#555555",
     )
-    figure.subplots_adjust(left=0.1, right=0.97, bottom=0.08, top=0.86)
+    figure.subplots_adjust(left=0.1, right=0.97, bottom=0.18, top=0.86)
 
     destination: Path | None = None
     if output_path is not None:

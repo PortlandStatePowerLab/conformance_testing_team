@@ -1,5 +1,7 @@
 """Build public calibration snapshots without private equipment identity."""
 
+from __future__ import annotations
+
 from typing import Any
 
 SENSOR_FIELDS = frozenset({

@@ -124,7 +124,23 @@ def run(args: argparse.Namespace) -> int:
             stop_sent and return_code in {0, -signal.SIGINT, 128 + signal.SIGINT}
         )
         status.update(final_stage)
+        failed = return_code != 0 and not stopped
         final_message = final_stage.get("message")
+        if failed:
+            # A crash may leave the last active stage on disk. Do not present
+            # its running/publishing message as the terminal failure message.
+            final_message = (
+                final_message if final_stage.get("state") == "failed" else None
+            )
+            if not status.get("error"):
+                diagnostic = None
+                with log_path.open(encoding="utf-8", errors="replace") as log:
+                    for line in log:
+                        if line.startswith("CONFORMANCE_TEST_ERROR "):
+                            diagnostic = line.removeprefix("CONFORMANCE_TEST_ERROR ").strip()
+                status["error"] = diagnostic or (
+                    f"Runner exited with code {return_code}; see {log_path}"
+                )
         status.update(
             state="stopped" if stopped else "completed" if return_code == 0 else "failed",
             finished_at=datetime.now(PACIFIC).isoformat(), return_code=return_code,
