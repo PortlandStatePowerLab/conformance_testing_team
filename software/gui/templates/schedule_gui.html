@@ -565,7 +565,6 @@ document.querySelector("#load").onclick = async () => {
     status.className = "status valid";
     resetPreflightDisplay();
     preflightLines.textContent = "Loaded schedule is already saved and validated. Run preflight when ready.";
-    await dismissTerminalRun();
     updateWorkflowState();
   } catch (error) { show(error, false); }
 };
@@ -682,15 +681,10 @@ function renderRun(run) {
   updateWorkflowState();
 }
 
-async function refreshRunStatus({dismissTerminal = false} = {}) {
+async function refreshRunStatus() {
   try {
     const response = await fetch("/api/runs/current", {cache:"no-store"});
     const result = await response.json();
-    if (dismissTerminal && result.run && ["completed", "failed"].includes(result.run.state)) {
-      activeRun = result.run;
-      await dismissTerminalRun();
-      return;
-    }
     renderRun(result.run);
   } catch (_) {
     if (activeRun) runHeading.textContent = "CONNECTION LOST — TEST CONTINUES ON STATION";
@@ -839,7 +833,7 @@ async function initialize() {
   addCta({enabled:"TRUE", time_after_start:"00:00:00", phase:"pre_event", action:"load_up", event_duration_minutes:"max"});
   updateView();
   await refreshSchedules();
-  await refreshRunStatus({dismissTerminal:true});
+  await refreshRunStatus();
   setInterval(refreshRunStatus, 15000);
   setInterval(() => { if (activeRun) renderRun(activeRun); }, 1000);
 }
