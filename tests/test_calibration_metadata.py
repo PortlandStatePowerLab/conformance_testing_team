@@ -11,6 +11,11 @@ from software.sensors.water_temp_calibration_loader import (
 
 
 class CalibrationMetadataTests(unittest.TestCase):
+    def test_annotations_are_deferred_for_python39_station_imports(self):
+        self.assertIsInstance(
+            public_calibration_snapshot.__annotations__["equipment"], str
+        )
+
     def test_export_preserves_corrections_and_local_record_without_leaking_identity(self):
         calibration = {
             "manufacturer": "Private heater make", "serial_number": "private-serial",
