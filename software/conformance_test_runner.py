@@ -994,8 +994,10 @@ def run_hardware_test(
             details={
                 "run_directory": str(run_directory),
                 "water_output_enabled": args.enable_water_output,
+                "automatic_outside_communication": all(event.automatic_outside_communication for event in events),
                 "outside_communication_heartbeat_enabled": (
-                    not args.disable_outside_communication_heartbeat
+                    all(event.automatic_outside_communication for event in events)
+                    and not args.disable_outside_communication_heartbeat
                 ),
             },
         )
@@ -1093,7 +1095,7 @@ def run_hardware_test(
 
         draws = [event for event in events if event.event_type == "water_draw"]
         first_cta = min(
-            (event for event in events if event.event_type == "cta"),
+            (event for event in events if event.event_type == "cta" and event.action != "outside_communication"),
             key=lambda event: event.source_row,
             default=None,
         )
@@ -1562,7 +1564,9 @@ def main() -> int:
         print(
             "OUTSIDE_COMMUNICATION_HEARTBEAT "
             + (
-                "disabled (15-second command prerequisites remain enabled)"
+                "manual (no automatic prerequisites or heartbeats)"
+                if not all(event.automatic_outside_communication for event in events)
+                else "disabled (15-second command prerequisites remain enabled)"
                 if args.disable_outside_communication_heartbeat
                 else "enabled (refresh interval 13 minutes 30 seconds)"
             )

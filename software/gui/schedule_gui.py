@@ -273,6 +273,7 @@ def launch_run(run_directory: Path, schedule: Path, *, water: bool) -> dict[str,
         "run_id": run_id, "state": "launching", "schedule": schedule.name,
         "result_name": result_name,
         "schedule_snapshot": str(snapshot), "water_output_enabled": water,
+        "automatic_outside_communication": all(event.automatic_outside_communication for event in events),
         "requested_at": now.isoformat(), "duration_seconds": duration,
         "dependent_end": test_end.dependent_end,
         "duration_estimated": test_end.dependent_end,
@@ -355,7 +356,7 @@ def editor_metadata(hostname: str | None = None) -> dict[str, Any]:
                         "advanced_efficiency",
                     ]
                     if action == "advanced_load_up"
-                    else ["event_duration_minutes"]
+                    else [] if action == "outside_communication" else ["event_duration_minutes"]
                 ),
             }
         )
@@ -421,6 +422,9 @@ def normalize_schedule_name(value: str) -> str:
     return f"{name}.csv"
 
 
+GUI_SCHEDULE_COLUMNS = DRAW_EXTENDED_SCHEDULE_COLUMNS + ("automatic_outside_communication",)
+
+
 def _canonical_rows(value: Any) -> list[dict[str, str]]:
     if not isinstance(value, list) or not value:
         raise ValueError("schedule must contain at least one row")
@@ -428,13 +432,13 @@ def _canonical_rows(value: Any) -> list[dict[str, str]]:
     for index, source in enumerate(value, start=1):
         if not isinstance(source, dict):
             raise ValueError(f"row {index} must be an object")
-        unexpected = sorted(set(source).difference(DRAW_EXTENDED_SCHEDULE_COLUMNS))
+        unexpected = sorted(set(source).difference(GUI_SCHEDULE_COLUMNS))
         if unexpected:
             raise ValueError(f"row {index} contains unknown fields: {unexpected}")
         rows.append(
             {
                 column: "" if source.get(column) is None else str(source.get(column, ""))
-                for column in DRAW_EXTENDED_SCHEDULE_COLUMNS
+                for column in GUI_SCHEDULE_COLUMNS
             }
         )
     return rows
@@ -467,7 +471,7 @@ def derive_rows(value: Any) -> list[dict[str, str]]:
 def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=DRAW_EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+            handle, fieldnames=GUI_SCHEDULE_COLUMNS, lineterminator="\n"
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -476,6 +480,7 @@ def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
 def _schedule_summary(events: list[ScheduleEvent]) -> dict[str, Any]:
     test_end = next(event for event in events if event.event_type == "test")
     return {
+        "automatic_outside_communication": all(event.automatic_outside_communication for event in events),
         "enabled_events": len(events),
         "cta_events": sum(event.event_type == "cta" for event in events),
         "water_draws": sum(event.event_type == "water_draw" for event in events),
@@ -495,7 +500,7 @@ def validate_rows(value: Any) -> tuple[list[dict[str, str]], dict[str, Any]]:
         ) as handle:
             temporary_path = Path(handle.name)
             writer = csv.DictWriter(
-                handle, fieldnames=DRAW_EXTENDED_SCHEDULE_COLUMNS, lineterminator="\n"
+                handle, fieldnames=GUI_SCHEDULE_COLUMNS, lineterminator="\n"
             )
             writer.writeheader()
             writer.writerows(rows)

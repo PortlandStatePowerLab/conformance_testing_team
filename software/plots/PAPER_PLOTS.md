@@ -6,9 +6,18 @@ Run from `conformance_testing_team`:
 python -m software.plots.paper_run_plot PATH_TO_RUN
 python -m software.plots.paper_run_plot_flow PATH_TO_RUN
 python -m software.plots.paper_run_plot_water PATH_TO_RUN
+python -m software.plots.paper_temperature_power_water PATH_TO_RUN
+python -m software.plots.paper_temperature_power PATH_TO_RUN
+python -m software.plots.paper_flow_power PATH_TO_RUN
 python -m software.plots.paper_phase_summary_plot PATH_TO_RUN
 python -m software.plots.paper_state_verification_plot PATH_TO_RUN
 ```
+
+`paper_temperature_power_water` uses the combined overlay layout with green
+hot-water temperature (°F), red power, blue flow, and command/state bands.
+It saves `paper_temperature_power_water_overlay.pdf` and `.png`. Temperature
+comes from `hot_temp_f` in the water-draw CSV files; gaps between draws remain
+unconnected. It accepts the same sizing and output-directory options.
 
 The preferred pair is `paper_run_plot` (EnergyTake + red filled power) and
 `paper_run_plot_flow` (EnergyTake + blue filled water flow). These save
@@ -50,3 +59,8 @@ Caption information to include where relevant:
 
 The phase-summary metrics table and event timeline are intentionally excluded
 from these figures; typeset selected metrics and milestones in LaTeX tables.
+
+The two-series alternatives `paper_temperature_power` and `paper_flow_power`
+export hot-water temperature + power and water draw + power, respectively,
+as matching PDF/PNG pairs with command and operational-state bands.
+`paper_temperature_power_water_stacked` matches the three-panel energy/power/water figure, replacing EnergyTake with hot-water temperature. It exports `paper_temperature_power_water.pdf` and `.png`, retaining command and Op State bands and the same sizing, start-time and output-directory options.

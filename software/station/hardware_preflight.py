@@ -256,7 +256,9 @@ def run_preflight(
         (
             "outside communication heartbeat",
             lambda: (
-                "disabled; 15-second command prerequisites remain enabled"
+                "manual; no automatic prerequisites or heartbeats"
+                if not all(event.automatic_outside_communication for event in load_schedule(args.schedule))
+                else "disabled; 15-second command prerequisites remain enabled"
                 if args.disable_outside_communication_heartbeat
                 else "enabled; refresh interval 13 minutes 30 seconds"
             ),

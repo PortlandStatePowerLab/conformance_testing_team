@@ -9,6 +9,7 @@ import statistics
 from datetime import time, timedelta
 from pathlib import Path
 
+from software.plots.measurement_time_range import measurement_end_timestamp
 from software.plots.run_plot import (
     _duck_curve_display_start,
     _shift,
@@ -212,7 +213,7 @@ def plot_run_with_water(
     directory = Path(run_directory).resolve()
     data = load_run_plot_data(directory)
     actual_start = min(data.energy[0].timestamp, data.power[0].timestamp)
-    actual_end = max(data.energy[-1].timestamp, data.power[-1].timestamp)
+    actual_end = measurement_end_timestamp(directory, data.energy[-1].timestamp, data.power[-1].timestamp)
     display_start = scenario_start or _duck_curve_display_start(actual_start, data.phases)
     water = load_water_flow(directory)
 
@@ -221,6 +222,7 @@ def plot_run_with_water(
         scenario_start=scenario_start,
         suppress_startup_spikes=suppress_startup_spikes,
         annotate_heater_transitions=False,
+        end_timestamp=actual_end,
     )
     figure.set_size_inches(13.5, 6.75)
     energy_axis = figure.axes[1]

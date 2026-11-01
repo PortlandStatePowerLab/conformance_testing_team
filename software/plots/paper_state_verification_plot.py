@@ -8,6 +8,7 @@ from software.plots.run_plot import _duck_curve_display_start, _shift
 from software.plots.state_verification_plot import load_verification_data, verification_status, _segments, StateReport
 from software.plots.run_plot_water import STATUS_COLORS
 from software.plots.time_axis import apply_even_clock_ticks
+from software.plots.paper_style import draw_state_change_dividers
 
 
 def plot_paper_state_verification(run_directory, *, width=3.5, height=3.2):
@@ -45,6 +46,7 @@ def plot_paper_state_verification(run_directory, *, width=3.5, height=3.2):
         axis.tick_params(axis="x", labelsize=8, labelbottom=axis is axes[-1])
         for spine in axis.spines.values():
             spine.set_linewidth(.5)
+    draw_state_change_dividers(axes[2], reports, shifted)
     axes[-1].set_xlim(display, shifted(end))
     apply_even_clock_ticks(axes[-1], display, shifted(end), count=3)
     compact_clock_labels(axes[-1])

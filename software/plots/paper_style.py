@@ -19,6 +19,14 @@ def compact_clock_labels(axis):
         labels[-1].set_ha("right")
 
 
+def draw_state_change_dividers(axis, reports, shift):
+    """Mark reported state changes without splitting verification labels."""
+    for previous, current in zip(reports, reports[1:]):
+        if current.code != previous.code:
+            axis.axvline(shift(current.timestamp), color="0.4", linewidth=.5,
+                         zorder=2)
+
+
 def paper_figure(width, height):
     if width <= 0 or height <= 0:
         raise ValueError("figure dimensions must be positive")

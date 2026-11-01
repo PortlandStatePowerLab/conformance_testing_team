@@ -4,21 +4,24 @@ import argparse
 from pathlib import Path
 from matplotlib.ticker import MaxNLocator
 
+from software.plots.measurement_time_range import measurement_end_timestamp
 from software.plots.paper_style import paper_figure, equipment_name, style_axis, compact_clock_labels, save_paper
 from software.plots.run_plot import load_run_plot_data, _without_startup_spikes, _duck_curve_display_start, _shift
 from software.plots.run_plot_water import load_water_flow, STATUS_COLORS, _is_wh4
 from software.plots.state_verification_plot import load_verification_data, verification_status, _segments, StateReport
 from software.plots.time_axis import apply_even_clock_ticks
+from software.plots.generate_temperature_power_water_plot import load_hot_temperature
+from software.plots.paper_style import draw_state_change_dividers
 
 
 def plot_paper_overlay(run_directory, *, series="power", width=3.5, height=2.8):
-    if series not in {"power", "flow", "power_water"}:
-        raise ValueError("series must be power, flow or power_water")
+    if series not in {"power", "flow", "power_water", "temperature_power_water", "temperature_power", "flow_power"}:
+        raise ValueError("unknown overlay series")
     directory = Path(run_directory)
     data = load_run_plot_data(directory)
     verification = load_verification_data(directory)
     start = min(data.energy[0].timestamp, data.power[0].timestamp)
-    end = max(data.energy[-1].timestamp, data.power[-1].timestamp)
+    end = measurement_end_timestamp(directory, data.energy[-1].timestamp, data.power[-1].timestamp)
     display = _duck_curve_display_start(start, data.phases)
     shift = lambda timestamp: _shift(timestamp, start, display)
     figure = paper_figure(width, height)
@@ -38,9 +41,32 @@ def plot_paper_overlay(run_directory, *, series="power", width=3.5, height=2.8):
         command.text(shift(begin + (finish - begin) / 2), .5,
                      phase.name if phase.accepted else phase.name + " (rejected)",
                      ha="center", va="center", fontsize=8, clip_on=True)
-    energy.plot([shift(s.timestamp) for s in data.energy], [s.value / 1000 for s in data.energy],
-                color="green", linewidth=.9, zorder=3)
-    if series in {"power", "power_water"}:
+    temperature_values = []
+    primary_label, primary_color = "EnergyTake (kWh)", "green"
+    primary_values = [s.value / 1000 for s in data.energy]
+    if series in {"temperature_power_water", "temperature_power"}:
+        temperatures = load_hot_temperature(directory)
+        if not temperatures:
+            raise ValueError("no valid hot-water temperature samples found")
+        for samples in temperatures:
+            energy.plot([shift(t) for t, _ in samples], [v for _, v in samples],
+                        color="green", linewidth=.9, zorder=3)
+            temperature_values.extend(v for _, v in samples)
+        primary_label = "Hot Water Temp. (°F)"
+    elif series == "flow_power":
+        water = load_water_flow(directory)
+        primary_values = [v for _, v in water]
+        primary_label, primary_color = "Flow (gal/min)", "#1677b8"
+        times = [shift(t) for t, _ in water]
+        energy.plot(times, primary_values, color=primary_color, linewidth=.7, alpha=.8)
+        energy.fill_between(times, primary_values, color=primary_color, alpha=.09)
+        if not water:
+            energy.text(.5, .95, "No water-draw data", transform=energy.transAxes,
+                        ha="center", va="top", fontsize=8)
+    else:
+        energy.plot([shift(s.timestamp) for s in data.energy], [s.value / 1000 for s in data.energy],
+                    color="green", linewidth=.9, zorder=3)
+    if series in {"power", "power_water", "temperature_power_water", "temperature_power", "flow_power"}:
         samples = _without_startup_spikes(data.power)
         times = [shift(s.timestamp) for s in samples]
         values = [s.value / 1000 for s in samples]
@@ -55,19 +81,22 @@ def plot_paper_overlay(run_directory, *, series="power", width=3.5, height=2.8):
                        ha="center", va="top", fontsize=8)
     other.plot(times, values, color=color, linewidth=.7, alpha=.8)
     other.fill_between(times, values, color=color, alpha=alpha)
-    for axis, text, tint in [(energy, "EnergyTake (kWh)", "green"), (other, label, color)]:
+    for axis, text, tint in [(energy, primary_label, primary_color), (other, label, color)]:
         axis.set_ylabel(text, color=tint, fontsize=9)
         style_axis(axis)
         axis.yaxis.set_major_locator(MaxNLocator(nbins=4, min_n_ticks=4))
         axis.tick_params(axis="y", colors=tint)
-    energy.set_ylim(0, max(.1, max(s.value / 1000 for s in data.energy) * 1.12))
+    energy.set_ylim(0, max(.1, max(primary_values, default=0) * 1.12))
+    if temperature_values:
+        margin = max(2, (max(temperature_values) - min(temperature_values)) * .12)
+        energy.set_ylim(min(temperature_values) - margin, max(temperature_values) + margin)
     other.set_ylim(0, max(.1, max(values, default=0) * 1.12))
     for axis in (energy, other):
         lower, upper = axis.get_ylim()
         axis.set_yticks([tick for tick in axis.get_yticks()
                          if lower < tick <= upper])
     other.grid(False)
-    if series == "power_water":
+    if series in {"power_water", "temperature_power_water"}:
         flow_axis = energy.twinx()
         flow_axis.spines["right"].set_position(("outward", 38))
         water = load_water_flow(directory)
@@ -99,6 +128,7 @@ def plot_paper_overlay(run_directory, *, series="power", width=3.5, height=2.8):
     statuses = tuple(StateReport(r.timestamp, r.code,
                                 verification_status(r, verification.phases)) for r in reports)
     verification_end = min(end, verification.verification_end or end)
+    draw_state_change_dividers(state, reports, shift)
     for begin, finish, report in _segments(statuses, lambda r: r.name, verification_end):
         if (finish - begin).total_seconds() >= (end - start).total_seconds() * .15:
             state.text(shift(begin + (finish - begin) / 2), .5, report.name,
@@ -134,6 +164,9 @@ def main(series):
     args = parser.parse_args()
     figure = plot_paper_overlay(args.run_directory, series=series, width=args.width, height=args.height)
     stem = {"power": "paper_energy_take_power", "flow": "paper_energy_take_flow",
-            "power_water": "paper_energy_take_power_water_overlay"}[series]
+            "power_water": "paper_energy_take_power_water_overlay",
+            "temperature_power": "paper_temperature_power",
+            "flow_power": "paper_flow_power",
+            "temperature_power_water": "paper_temperature_power_water_overlay"}[series]
     for path in save_paper(figure, args.run_directory, stem, args.output_directory):
         print(path)

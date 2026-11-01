@@ -13,6 +13,7 @@ from typing import Iterable
 from matplotlib.figure import Figure
 
 from software.station.equipment_metadata import equipment_title_line
+from software.plots.measurement_time_range import measurement_end_timestamp
 from software.plots.time_axis import apply_even_clock_ticks
 
 
@@ -275,12 +276,15 @@ def plot_run(
     suppress_startup_spikes: bool = True,
     energy_change_from_start: bool = False,
     annotate_heater_transitions: bool = True,
+    end_timestamp: datetime | None = None,
 ) -> tuple[Figure, Path | None]:
     """Create a third-example-style run plot and optionally save/display it."""
     directory = Path(run_directory).resolve()
     data = load_run_plot_data(directory)
     actual_start = min(data.energy[0].timestamp, data.power[0].timestamp)
-    actual_end = max(data.energy[-1].timestamp, data.power[-1].timestamp)
+    actual_end = measurement_end_timestamp(directory, data.energy[-1].timestamp, data.power[-1].timestamp)
+    if end_timestamp is not None:
+        actual_end = max(actual_end, end_timestamp)
     display_start = _duck_curve_display_start(
         actual_start, data.phases, scenario_start=scenario_start
     )

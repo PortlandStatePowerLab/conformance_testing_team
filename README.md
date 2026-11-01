@@ -51,6 +51,23 @@ generated refreshes do not repeat or extend user commands; all user-entered CTA
 commands and their 15-second outside-communication prerequisites retain their
 scheduled times.
 
+In the GUI, **Automatic Outside Communication** is checked by default. Uncheck
+it to schedule Outside Communication as an ordinary CTA event at any chosen
+time. Manual mode disables every automatic prerequisite and heartbeat, including
+the initial message. State and commodity polling continue normally. Outside
+Communication rows have no duration or advanced arguments. Remove manual rows
+before switching back to automatic mode; rows are never silently deleted.
+The choice is saved in the CSV's optional `automatic_outside_communication`
+column and copied into each run. Existing schedules default to automatic mode.
+Normal shutdown still sends Run Normal and reports outside communication
+disconnected after the experiment.
+
+The shared schedule list includes `Manual-OutsideComm-LU-Repeat`,
+`Manual-OutsideComm-Shed`, and `Manual-OutsideComm-Restore`. The first two send
+Outside Communication at 0:00, Load Up at 0:15, then Load Up or Shed at 13:00,
+ending at 30:00. Restore sends only Outside Communication at 31:15 and ends at
+41:15. Load Up and Shed durations are requested as 60 minutes.
+
 Water Draw `Time (min)` is represented by `max_draw_minutes` and appears in
 the browser editor as **Max time (min)**. A `Cut-in` draw uses `TBD` for its
 start and requires only Max time. It waits for the first CTA command's fresh

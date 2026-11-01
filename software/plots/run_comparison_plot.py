@@ -16,6 +16,7 @@ import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 
 from software.station.equipment_metadata import equipment_title_line
+from software.plots.measurement_time_range import measurement_end_timestamp
 from software.plots.phase_summary_plot import summarize_run_phases
 from software.plots.run_plot import (
     RunPlotData,
@@ -184,7 +185,7 @@ def plot_run_comparison(
 
     aligned_ends = []
     for run in runs:
-        actual_end = max(run.plot_data.energy[-1].timestamp, run.plot_data.power[-1].timestamp)
+        actual_end = measurement_end_timestamp(run.directory, run.plot_data.energy[-1].timestamp, run.plot_data.power[-1].timestamp)
         aligned_ends.append(_shift(actual_end, run.phases[0].timestamp, display_start))
     display_end = max(aligned_ends)
 

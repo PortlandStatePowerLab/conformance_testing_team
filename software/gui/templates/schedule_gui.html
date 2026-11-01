@@ -136,6 +136,8 @@
           <tbody id="cta-rows"></tbody>
         </table>
       </div>
+      <label><input type="checkbox" id="automatic-outside-communication" checked> Automatic Outside Communication</label>
+      <p class="muted" id="outside-communication-help">Automatic messages before CTA commands and periodic heartbeats. Uncheck to schedule every Outside Communication message manually. Test termination sends Run Normal.</p>
       <div id="cta-empty" class="empty" hidden>No CTA commands scheduled.</div>
     </section>
 
@@ -304,7 +306,7 @@ function addCta(source = {}) {
   cell(row, selectControl(["TRUE", "FALSE"], source.enabled || "TRUE"), "enabled");
   const time = cell(row, inputControl(source.time_after_start || "00:00:00", {placeholder:"HH:MM:SS", pattern:"[0-9]+:[0-5][0-9]:[0-5][0-9]"}), "time_after_start");
   cell(row, selectControl(phases, phases.includes(source.phase) ? source.phase : "pre_event"), "phase");
-  const command = cell(row, selectControl(actionDefinitions.filter(item => item.event_type === "cta").map(item => item.action), source.action || "load_up"), "action");
+  const command = cell(row, selectControl(actionDefinitions.filter(item => item.event_type === "cta" && (item.action !== "outside_communication" || !document.querySelector("#automatic-outside-communication").checked)).map(item => item.action), source.action || "load_up"), "action");
   cell(row, inputControl(source.event_duration_minutes || "max", {placeholder:"1-2150 or max"}), "event_duration_minutes");
   cell(row, inputControl(source.advanced_value || "", {type:"number", min:"1", max:"65534", step:"1"}), "advanced_value");
   cell(row, selectControl(["", ...units], source.advanced_units || ""), "advanced_units");
@@ -363,7 +365,7 @@ function scheduleRows() {
     rows.push({...blankCanonicalRow(), enabled:rowValue(row,"enabled"), time_after_start:rowValue(row,"time_after_start"), phase:rowValue(row,"phase"), draw_type:rowValue(row,"draw_type"), event_type:"water_draw", action:"water_draw", target_volume_gal:rowValue(row,"target_volume_gal"), expected_flow_gpm:rowValue(row,"expected_flow_gpm"), temp_drop_f:rowValue(row,"temp_drop_f"), max_draw_minutes:rowValue(row,"max_draw_minutes"), notes:rowValue(row,"notes")});
   }
   rows.push({...blankCanonicalRow(), enabled:"TRUE", time_after_start:document.querySelector("#end-time").value, phase:document.querySelector("#end-phase").value, event_type:"test", action:"end", notes:document.querySelector("#end-notes").value});
-  return rows;
+  return rows.map(row => ({...row, automatic_outside_communication:document.querySelector("#automatic-outside-communication").checked ? "TRUE" : "FALSE"}));
 }
 
 function draftSignature() {
@@ -396,9 +398,15 @@ function formatDuration(seconds) {
 }
 
 function updateView() {
+  document.querySelector("#outside-communication-help").textContent = document.querySelector("#automatic-outside-communication").checked
+    ? "Automatic messages before CTA commands and periodic heartbeats. Uncheck to schedule every Outside Communication message manually."
+    : "Manual mode: only your scheduled Outside Communication messages are sent during the test. State and commodity polling continue. Test termination sends Run Normal and reports outside communication disconnected.";
   for (const row of ctaBody.rows) {
     const action = rowValue(row, "action");
     const advanced = action === "advanced_load_up";
+    const durationCell = row.querySelector('[data-field="event_duration_minutes"]');
+    durationCell.classList.toggle("irrelevant", action === "outside_communication");
+    durationCell.firstElementChild.disabled = action === "outside_communication";
     for (const field of ["advanced_value", "advanced_units", "advanced_efficiency"]) {
       const td = row.querySelector(`[data-field="${field}"]`);
       td.classList.toggle("irrelevant", !advanced);
@@ -444,6 +452,7 @@ function updateView() {
       else if (row.draw_type === "Cut-in") details = `cut-in; valve-open max ${row.max_draw_minutes || "?"} min; 12 h recovery watchdog`;
       else details = `${row.target_volume_gal || "?"} gal at ${row.expected_flow_gpm || "?"} GPM`;
     }
+    else if (row.action === "outside_communication") details = "Outside Communication only";
     else if (row.event_type === "cta") {
       const duration = row.event_duration_minutes || "?";
       details = `duration ${duration}${duration.toLowerCase() === "max" ? "" : " min"}${row.action === "advanced_load_up" ? `; value ${row.advanced_value || "?"} ${row.advanced_units || ""}; efficiency ${row.advanced_efficiency === "" ? "not included" : row.advanced_efficiency}` : ""}`;
@@ -471,7 +480,7 @@ function show(result, valid) {
   status.className = `status ${valid ? "valid" : "invalid"}`;
   if (result.summary) {
     const duration = result.summary.duration_estimated ? `${result.summary.duration_seconds} seconds estimated maximum` : `${result.summary.duration_seconds} seconds`;
-    messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${duration}.`;
+    messages.textContent = `Valid: ${result.summary.enabled_events} enabled events, ${result.summary.cta_events} CTA events, ${result.summary.water_draws} water draws, ${duration}. Outside Communication: ${result.summary.automatic_outside_communication === false ? "manual" : "automatic"}.`;
   }
   else messages.textContent = (result.errors || [result.error || "Unknown error"]).join("\n");
 }
@@ -494,6 +503,7 @@ async function refreshSchedules(selected = "") {
 }
 
 function loadRows(rows) {
+  document.querySelector("#automatic-outside-communication").checked = !rows.some(row => String(row.automatic_outside_communication).toUpperCase() === "FALSE");
   ctaBody.replaceChildren();
   waterBody.replaceChildren();
   let end = null;
@@ -509,6 +519,19 @@ function loadRows(rows) {
   }
   updateView();
 }
+
+document.querySelector("#automatic-outside-communication").onchange = function () {
+  const rows = scheduleRows().filter(row => row.event_type === "cta");
+  if (this.checked && rows.some(row => row.action === "outside_communication")) {
+    this.checked = false;
+    messages.textContent = "Remove manual Outside Communication rows before enabling automatic messages.";
+    updateView();
+    return;
+  }
+  ctaBody.replaceChildren();
+  for (const row of rows) addCta(row);
+  updateView();
+};
 
 document.querySelector("#add-cta").onclick = () => addCta();
 document.querySelector("#add-water").onclick = () => addWater();

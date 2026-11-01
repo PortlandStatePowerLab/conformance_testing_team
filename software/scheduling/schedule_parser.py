@@ -52,6 +52,7 @@ DRAW_SCHEDULE_COLUMNS = (
 DRAW_EXTENDED_SCHEDULE_COLUMNS = DRAW_SCHEDULE_COLUMNS + ("advanced_efficiency",)
 
 CTA_ACTION_CODES = {
+    "outside_communication": "o",
     "advanced_load_up": "a",
     "load_up": "l",
     "run_normal": "e",
@@ -114,6 +115,7 @@ class ScheduleEvent:
     max_draw_minutes: float | None
     notes: str
     source_row: int
+    automatic_outside_communication: bool = True
 
     @property
     def expected_draw_seconds(self) -> float | None:
@@ -261,7 +263,10 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         if action not in CTA_ACTION_CODES:
             raise ValueError(f"unsupported CTA action '{action}'")
         expected_states = _parse_expected_states(expected_states_text)
-        if action == "advanced_load_up":
+        if action == "outside_communication":
+            if duration_text or advanced_value_text or advanced_units_text or advanced_efficiency_text or expected_states_text:
+                raise ValueError("Outside Communication cannot contain duration, advanced values, or expected states")
+        elif action == "advanced_load_up":
             if not duration_text or not advanced_value_text or not advanced_units_text:
                 raise ValueError(
                     "advanced_load_up requires event_duration_minutes, advanced_value, and advanced_units"
@@ -359,6 +364,9 @@ def _parse_row(row: dict[str, str], row_number: int) -> ScheduleEvent:
         max_draw_minutes=max_draw_minutes,
         notes=row["notes"].strip(),
         source_row=row_number,
+        automatic_outside_communication=_parse_bool(
+            (row.get("automatic_outside_communication") or "TRUE").strip()
+        ),
     )
 
 
@@ -375,19 +383,20 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
         while normalized_columns and not normalized_columns[-1].strip():
             normalized_columns.pop()
         accepted_columns = (SCHEDULE_COLUMNS, EXTENDED_SCHEDULE_COLUMNS, DRAW_SCHEDULE_COLUMNS, DRAW_EXTENDED_SCHEDULE_COLUMNS)
+        accepted_columns += tuple(columns + ("automatic_outside_communication",) for columns in accepted_columns)
         if tuple(normalized_columns) not in accepted_columns:
             raise ScheduleValidationError(
                 [
                     "CSV columns must exactly match: "
                     + ",".join(DRAW_SCHEDULE_COLUMNS)
-                    + " optionally followed by advanced_efficiency",
+                    + " optionally followed by advanced_efficiency and/or automatic_outside_communication",
                     "found: " + ",".join(actual_columns),
                 ]
             )
         for row_number, row in enumerate(reader, start=2):
             unexpected_values: list[str] = []
             for column, value in row.items():
-                if column in set(DRAW_EXTENDED_SCHEDULE_COLUMNS) | set(EXTENDED_SCHEDULE_COLUMNS):
+                if column in set(DRAW_EXTENDED_SCHEDULE_COLUMNS) | set(EXTENDED_SCHEDULE_COLUMNS) | {"automatic_outside_communication"}:
                     continue
                 if isinstance(value, list):
                     unexpected_values.extend(
@@ -417,8 +426,13 @@ def load_schedule(path: Path | str) -> list[ScheduleEvent]:
             seen_ids[event.event_id] = event.source_row
 
     enabled_in_source_order = [event for event in events if event.enabled]
+    modes = {event.automatic_outside_communication for event in events}
+    if len(modes) > 1:
+        errors.append("automatic_outside_communication must be the same on every schedule row")
+    if True in modes and any(event.action == "outside_communication" for event in enabled_in_source_order):
+        errors.append("Manual Outside Communication events require automatic_outside_communication=FALSE")
     first_cta = next(
-        (event for event in enabled_in_source_order if event.event_type == "cta"),
+        (event for event in enabled_in_source_order if event.event_type == "cta" and event.action != "outside_communication"),
         None,
     )
     previous_draw: ScheduleEvent | None = None
@@ -541,6 +555,7 @@ def generate_cta_events(
         raise ValueError("outside communication refresh must be positive")
 
     scheduled_events = list(events)
+    automatic = all(event.automatic_outside_communication for event in scheduled_events)
     cta_events = [event for event in scheduled_events if event.event_type == "cta"]
     test_end = next(
         (
@@ -557,24 +572,25 @@ def generate_cta_events(
             event.offset_seconds - outside_communication_lead_seconds
         )
         outside_communication_offsets.add(prerequisite_offset)
-        generated.append(
-            GeneratedCtaEvent(
-                event_id=f"auto_outside_comm_for_{event.event_id}",
-                offset_seconds=prerequisite_offset,
-                action="outside_communication",
-                command_code="o",
-                duration_byte=None,
-                advanced_duration_minutes=None,
-                advanced_value=None,
-                advanced_units=None,
-                advanced_efficiency=None,
-                expected_operational_states=(),
-                requested_duration_seconds=None,
-                represented_duration_seconds=None,
-                generated=True,
-                prerequisite_for=event.event_id,
+        if automatic and event.action != "outside_communication":
+            generated.append(
+                GeneratedCtaEvent(
+                    event_id=f"auto_outside_comm_for_{event.event_id}",
+                    offset_seconds=prerequisite_offset,
+                    action="outside_communication",
+                    command_code="o",
+                    duration_byte=None,
+                    advanced_duration_minutes=None,
+                    advanced_value=None,
+                    advanced_units=None,
+                    advanced_efficiency=None,
+                    expected_operational_states=(),
+                    requested_duration_seconds=None,
+                    represented_duration_seconds=None,
+                    generated=True,
+                    prerequisite_for=event.event_id,
+                )
             )
-        )
         generated.append(
             GeneratedCtaEvent(
                 event_id=event.event_id,
@@ -605,6 +621,7 @@ def generate_cta_events(
 
     if (
         outside_communication_heartbeat_enabled
+        and automatic
         and cta_events
         and test_end is not None
     ):

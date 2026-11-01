@@ -5,20 +5,24 @@ from datetime import time
 from pathlib import Path
 from matplotlib.ticker import MaxNLocator
 
+from software.plots.measurement_time_range import measurement_end_timestamp
 from software.plots.paper_style import equipment_name, paper_figure, save_paper, style_axis, compact_clock_labels
 from software.plots.run_plot import load_run_plot_data, _without_startup_spikes, _duck_curve_display_start, _shift
 from software.plots.run_plot_water import load_water_flow, STATUS_COLORS, _is_wh4
 from software.plots.state_verification_plot import load_verification_data, verification_status, _segments, StateReport
 from software.plots.time_axis import apply_even_clock_ticks
+from software.plots.generate_temperature_power_water_plot import load_hot_temperature
 
 
 def plot_paper_run(run_directory, *, width=3.5, height=5.5, scenario_start=None,
-                   include_isolated_state5=False):
+                   include_isolated_state5=False, primary="energy"):
+    if primary not in {"energy", "temperature"}:
+        raise ValueError("primary must be energy or temperature")
     directory = Path(run_directory)
     data = load_run_plot_data(directory)
     verification = load_verification_data(directory)
     start = min(data.energy[0].timestamp, data.power[0].timestamp)
-    end = max(data.energy[-1].timestamp, data.power[-1].timestamp)
+    end = measurement_end_timestamp(directory, data.energy[-1].timestamp, data.power[-1].timestamp)
     display = _duck_curve_display_start(start, data.phases, scenario_start=scenario_start)
     shifted = lambda timestamp: _shift(timestamp, start, display)
     figure = paper_figure(width, height)
@@ -39,8 +43,18 @@ def plot_paper_run(run_directory, *, width=3.5, height=5.5, scenario_start=None,
         phase_axis.text(shifted(begin + (finish - begin) / 2), .5,
                         phase.name + ("\nRejected" if not phase.accepted else ""),
                         ha="center", va="center", fontsize=8)
-    energy_axis.step([shifted(s.timestamp) for s in data.energy],
-                     [s.value / 1000 for s in data.energy], where="post", color="green", linewidth=.8)
+    temperature_values = []
+    if primary == "temperature":
+        temperatures = load_hot_temperature(directory)
+        if not temperatures:
+            raise ValueError("no valid hot-water temperature samples found")
+        for samples in temperatures:
+            energy_axis.plot([shifted(t) for t, _ in samples], [v for _, v in samples],
+                             color="green", linewidth=.8)
+            temperature_values.extend(v for _, v in samples)
+    else:
+        energy_axis.step([shifted(s.timestamp) for s in data.energy],
+                         [s.value / 1000 for s in data.energy], where="post", color="green", linewidth=.8)
     power = _without_startup_spikes(data.power)
     power_axis.step([shifted(s.timestamp) for s in power], [s.value / 1000 for s in power],
                     where="post", color="red", linewidth=.7)
@@ -69,6 +83,11 @@ def plot_paper_run(run_directory, *, width=3.5, height=5.5, scenario_start=None,
         positive = [tick for tick in ticks if tick > 0][:3]
         axis.set_ylim(0, max(upper, positive[-1]))
         axis.set_yticks(positive)
+    if temperature_values:
+        energy_axis.set_ylabel("Hot Water Temp.\n(°F)", fontsize=9)
+        margin = max(2, (max(temperature_values) - min(temperature_values)) * .10)
+        energy_axis.set_ylim(min(temperature_values) - margin, max(temperature_values) + margin)
+        energy_axis.yaxis.set_major_locator(MaxNLocator(nbins=3))
     reports = [r for r in verification.reports if start <= r.timestamp < end
                and (verification.verification_end is None or r.timestamp < verification.verification_end)]
     if not include_isolated_state5 and not _is_wh4(directory):
