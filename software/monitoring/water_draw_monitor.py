@@ -33,7 +33,7 @@ DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.5
 DEFAULT_MAX_RUN_MINUTES = 10.0
 DEFAULT_LOW_FLOW_GPM = 0.05
 DEFAULT_LOW_FLOW_TIMEOUT_SECONDS = 20.0
-TEMP_ARM_FRACTION_OF_DROP = 2.0 / 3.0
+TEMP_ARM_MARGIN_F = 0.1
 TEMP_CONFIRMATION_SAMPLES = 20
 MAX_INVALID_TEMP_SAMPLES = 20
 TEMPERATURE_COMPARISON_EPSILON_F = 1e-6
@@ -181,7 +181,7 @@ def integrate_volume_gallons(flow_gpm: float, elapsed_seconds: float) -> float:
 
 def temperature_arm_threshold_f(temp_set_f: float, temp_drop_f: float) -> float:
     """Return the unrounded temperature that arms Temp Drop shutdown logic."""
-    return temp_set_f - temp_drop_f * TEMP_ARM_FRACTION_OF_DROP
+    return temp_set_f - temp_drop_f + TEMP_ARM_MARGIN_F
 
 
 def _row(

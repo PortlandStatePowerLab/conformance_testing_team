@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import statistics
 from datetime import time, timedelta
 from pathlib import Path
@@ -97,7 +98,7 @@ def add_operational_state_band(
     energy_axis = figure.axes[1]
     phase_axis = figure.axes[0]
     power_axis = figure.axes[2]
-    water_axis = figure.axes[3]
+    overlay_axes = figure.axes[3:]
 
     phase_position = phase_axis.get_position()
     main_position = energy_axis.get_position()
@@ -113,7 +114,8 @@ def add_operational_state_band(
     ]
     energy_axis.set_position(new_main_position)
     power_axis.set_position(new_main_position)
-    water_axis.set_position(new_main_position)
+    for axis in overlay_axes:
+        axis.set_position(new_main_position)
     state_axis = figure.add_axes(
         [main_position.x0, band_bottom, main_position.width, band_height],
         sharex=energy_axis,
@@ -227,34 +229,24 @@ def plot_run_with_water(
     figure.set_size_inches(13.5, 6.75)
     energy_axis = figure.axes[1]
     power_axis = figure.axes[2]
-    water_axis = energy_axis.twinx()
-    water_axis.spines["right"].set_position(("outward", 62))
-    times = [_shift(timestamp, actual_start, display_start) for timestamp, _ in water]
-    flow = [value for _, value in water]
-    water_line, = water_axis.plot(
-        times,
-        flow,
-        color=WATER_COLOR,
-        linewidth=1.1,
-        alpha=0.62,
-        label="Water Draw",
-        zorder=4,
-    )
-    water_axis.fill_between(times, flow, color=WATER_COLOR, alpha=0.09, zorder=3)
-    water_axis.set_ylim(bottom=0)
-    water_axis.set_ylabel("Water Flow (GPM)", color=WATER_COLOR)
-    water_axis.tick_params(axis="y", colors=WATER_COLOR)
-    if not water:
-        water_axis.text(
-            0.99,
-            0.03,
-            "No water-draw data",
-            transform=water_axis.transAxes,
-            ha="right",
-            va="bottom",
-            fontsize=8,
-            color=WATER_COLOR,
+    has_water_flow = any(math.isfinite(value) and value > 0 for _, value in water)
+    water_handles = []
+    water_labels = []
+    if has_water_flow:
+        water_axis = energy_axis.twinx()
+        water_axis.spines["right"].set_position(("outward", 62))
+        times = [_shift(timestamp, actual_start, display_start) for timestamp, _ in water]
+        flow = [value for _, value in water]
+        water_line, = water_axis.plot(
+            times, flow, color=WATER_COLOR, linewidth=1.1, alpha=0.62,
+            label="Water Draw", zorder=4,
         )
+        water_axis.fill_between(times, flow, color=WATER_COLOR, alpha=0.09, zorder=3)
+        water_axis.set_ylim(0, _upper_with_headroom(flow, minimum=1.0))
+        water_axis.set_ylabel("Water Flow (GPM)", color=WATER_COLOR)
+        water_axis.tick_params(axis="y", colors=WATER_COLOR)
+        water_handles = [water_line]
+        water_labels = ["Water Draw"]
 
     # Use the long-standing Axes API rather than version-specific Legend
     # attributes (legend_handles is unavailable on older station Matplotlib).
@@ -268,17 +260,16 @@ def plot_run_with_water(
             minimum=MINIMUM_POWER_AXIS_MAX_KW,
         ),
     )
-    water_axis.set_ylim(0, _upper_with_headroom(flow, minimum=1.0))
 
     handles, labels = _legend_entries(energy_axis)
     power_handles, power_labels = _legend_entries(power_axis)
     energy_axis.legend(
-        handles + power_handles + [water_line],
-        labels + power_labels + ["Water Draw"],
+        handles + power_handles + water_handles,
+        labels + power_labels + water_labels,
         loc="upper center",
         ncol=3,
     )
-    figure.subplots_adjust(left=0.09, right=0.845, bottom=0.19, top=0.86)
+    figure.subplots_adjust(left=0.09, right=0.845 if has_water_flow else 0.91, bottom=0.19, top=0.86)
     add_operational_state_band(
         figure, directory, actual_start, actual_end, display_start
     )

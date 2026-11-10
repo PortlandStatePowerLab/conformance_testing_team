@@ -38,7 +38,7 @@ class WaterDrawTests(unittest.TestCase):
                 flow_gpm=1.0,
             )
             temperatures = (
-                [75.0, 115.0]
+                [75.0, 110.0, 110.1]
                 + [109.0] * 19
                 + [111.0]
                 + [110.00000000000006] * 20
@@ -65,10 +65,10 @@ class WaterDrawTests(unittest.TestCase):
     def test_nominal_flow_integration(self):
         self.assertAlmostEqual(integrate_volume_gallons(3.0, 0.5), 0.025)
 
-    def test_arm_temperature_uses_two_thirds_of_selected_drop(self):
-        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 5.0), 121.6666666667)
-        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 10.0), 118.3333333333)
-        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 15.0), 115.0)
+    def test_arm_temperature_is_one_tenth_above_stop_temperature(self):
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 5.0), 120.1)
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 10.0), 115.1)
+        self.assertAlmostEqual(temperature_arm_threshold_f(125.0, 15.0), 110.1)
 
     def test_adc_conversion_uses_4096_code_divisor(self):
         self.assertAlmostEqual(
