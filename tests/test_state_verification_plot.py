@@ -1,7 +1,8 @@
 import csv
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
+from unittest.mock import patch
 from pathlib import Path
 
 import matplotlib
@@ -80,6 +81,29 @@ class StateVerificationPlotTests(unittest.TestCase):
                 verification_status(StateReport(datetime(2026, 8, 17, 13, 0, 30), 0, "Idle Normal"), data.phases),
                 "Fail",
             )
+
+    def test_short_intervals_show_codes_and_results_when_they_fit(self):
+        from software.plots.state_verification_plot import ExpectedPhase, VerificationData
+        start = datetime(2026, 11, 8, 12)
+        data = VerificationData(
+            (ExpectedPhase(start, "Load Up", frozenset({3, 6})),),
+            tuple(StateReport(start + timedelta(seconds=seconds), code, name)
+                  for seconds, code, name in (
+                      (0, 6, "Idle Heightened"),
+                      (90, 5, "SGD Error Condition"),
+                      (120, 6, "Idle Heightened"),
+                      (300, 6, "Idle Heightened"),
+                  )),
+        )
+        with tempfile.TemporaryDirectory() as temporary, patch(
+            "software.plots.state_verification_plot.load_verification_data", return_value=data
+        ):
+            figure, _ = plot_state_verification(temporary)
+        reported = [text.get_text() for text in figure.axes[1].texts if text.get_visible()]
+        results = [text.get_text() for text in figure.axes[2].texts if text.get_visible()]
+        self.assertTrue(any(text.startswith("5") for text in reported))
+        self.assertIn("Fail", results)
+        self.assertIn("Pass", results)
 
     def test_saves_plot(self):
         with tempfile.TemporaryDirectory() as temporary:

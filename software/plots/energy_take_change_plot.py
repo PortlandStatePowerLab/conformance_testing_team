@@ -32,6 +32,7 @@ def plot_energy_take_change(
         show=show,
         suppress_startup_spikes=suppress_startup_spikes,
         energy_change_from_start=True,
+        annotate_heater_transitions=True,
     )
 
 

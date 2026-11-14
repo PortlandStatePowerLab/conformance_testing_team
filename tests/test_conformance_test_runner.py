@@ -455,6 +455,21 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         calibration_index = command.index("--station-calibration")
         self.assertEqual(command[calibration_index + 1], str(calibration))
 
+    def test_energy_plot_selection_uses_positive_recorded_flow(self):
+        from software.conformance_test_runner import _generate_selected_energy_take_plot
+        cases = (None, "", "0\n0", "nan\ninf\n-1\nbad", "0\n0.5")
+        for rows in cases:
+            with self.subTest(rows=rows), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                if rows is not None:
+                    (directory / "water_draw_1.csv").write_text("flow_gpm\n" + rows)
+                with patch("software.conformance_test_runner._generate_energy_take_plot") as dry, patch(
+                    "software.conformance_test_runner._generate_energy_take_water_plot"
+                ) as wet:
+                    _generate_selected_energy_take_plot(directory)
+                self.assertEqual(wet.call_count, int(rows == "0\n0.5"))
+                self.assertEqual(dry.call_count, int(rows != "0\n0.5"))
+
     def test_final_outputs_attempt_every_artifact_independently(self):
         output = io.StringIO()
         errors = io.StringIO()
@@ -465,7 +480,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 return_value=run_directory / "conformance_test_report.xlsx",
             ) as report,
             patch(
-                "software.conformance_test_runner._generate_energy_take_water_plot",
+                "software.conformance_test_runner._generate_selected_energy_take_plot",
                 return_value=run_directory / "energy_take_power_water.png",
             ) as energy_plot,
             patch(
@@ -493,7 +508,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         phase_summary.assert_called_once()
         event_timeline.assert_called_once()
         self.assertIn("CONFORMANCE_REPORT run", output.getvalue())
-        self.assertIn("ENERGY_TAKE_WATER_PLOT run", output.getvalue())
+        self.assertIn("ENERGY_TAKE_PLOT run", output.getvalue())
         self.assertIn("PHASE_SUMMARY run", output.getvalue())
         self.assertIn("STATE_VERIFICATION_PLOT_ERROR ValueError: no states", errors.getvalue())
 

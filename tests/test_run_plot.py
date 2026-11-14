@@ -126,10 +126,16 @@ class RunPlotTests(unittest.TestCase):
         )
 
     def create_run(self, directory):
+        write_csv(directory / "master_schedule.csv",
+                  ["enabled", "action", "expected_operational_states"],
+                  [["TRUE", "advanced_load_up", "3|6"], ["TRUE", "critical_peak", "2|4"],
+                   ["TRUE", "grid_emergency", "2|4"], ["TRUE", "shed", "2|4"],
+                   ["TRUE", "advanced_load_up", "3|6"], ["TRUE", "run_normal", "0|1"]])
         write_csv(
             directory / "cta_events.csv",
-            ["timestamp_pacific", "event", "command", "result"],
+            ["timestamp_pacific", "event", "command", "result", "operational_state", "operational_state_name"],
             [
+                ["2026-08-17T12:59:00-07:00", "operational_state", "query_operational_state", "received", "0", "Idle Normal"],
                 ["2026-08-17T12:59:01-07:00", "command_sent", "advanced_load_up", "pending"],
                 ["2026-08-17T12:59:02-07:00", "link_ack", "advanced_load_up", "ack"],
                 ["2026-08-17T12:59:03-07:00", "intermediate_response", "advanced_load_up", "success"],
@@ -209,7 +215,10 @@ class RunPlotTests(unittest.TestCase):
             self.assertEqual(destination, output.resolve())
             self.assertTrue(output.is_file())
             self.assertGreater(output.stat().st_size, 1000)
-            self.assertEqual(len(figure.axes), 3)
+            self.assertEqual(len(figure.axes), 4)
+            self.assertEqual(figure.axes[-1].get_ylabel(), "Operational\nState")
+            self.assertEqual(figure.axes[2].get_ylim()[0], 0)
+            self.assertEqual(list(figure.get_size_inches()), [13.5, 6.75])
             self.assertEqual(
                 [text.get_text() for text in figure.axes[0].texts],
                 ["ALU", "CP", "GE", "Shed", "ALU", "Normal"],

@@ -190,6 +190,28 @@ def _segments(items, key, end: datetime):
     yield start, end, current
 
 
+def _fit_segment_labels(figure, labels, total_seconds):
+    """Fit labels to rendered segment width rather than an elapsed-time cutoff."""
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    for text, duration, fallback in labels:
+        axis = text.axes
+        available = axis.get_window_extent(renderer).width * duration / total_seconds - 6
+        original = text.get_text()
+        fits = False
+        for candidate in dict.fromkeys((original, fallback)):
+            text.set_text(candidate)
+            for size in (9, 8, 7, 6.5):
+                text.set_fontsize(size)
+                bounds = text.get_window_extent(renderer)
+                if bounds.width <= available and bounds.height <= axis.get_window_extent(renderer).height - 6:
+                    fits = True
+                    break
+            if fits:
+                break
+        text.set_visible(fits)
+
+
 def plot_state_verification(
     run_directory: Path | str,
     *,
@@ -288,11 +310,12 @@ def plot_state_verification(
             fontsize=expected_fontsize, linespacing=0.9, clip_on=True
         )
 
+    segment_labels = []
     state_colors = {0: "#dbe6ef", 1: "#cfe8cf", 2: "#f8d58a", 3: "#b7ddb7", 4: "#efc875", 5: "#dddddd", 6: "#9dcc9d"}
     for start, end, report in _segments(reports, lambda item: (item.code, item.name), display_end):
         report_axis.axvspan(start, end, color=state_colors.get(report.code, "#dddddd"))
         report_axis.axvline(start, color="#777777", linewidth=0.6)
-        if (end - start).total_seconds() >= 8 * 60:
+        if end > start:
             midpoint = start + (end - start) / 2
             segment_fraction = (end - start).total_seconds() / total_seconds
             if segment_fraction < 0.06:
@@ -304,10 +327,11 @@ def plot_state_verification(
             else:
                 state_label = f"{report.code}\n{report.name}"
                 state_fontsize = 9
-            report_axis.text(
+            label = report_axis.text(
                 midpoint, 0.5, state_label, ha="center", va="center",
                 fontsize=state_fontsize, linespacing=0.9, clip_on=True
             )
+            segment_labels.append((label, (end - start).total_seconds(), str(report.code)))
 
     statuses = tuple(
         StateReport(
@@ -320,9 +344,10 @@ def plot_state_verification(
     status_colors = {"Pass": "#9fd39f", "Grace": "#ffe29a", "Fail": "#ee9999", "No expectation": "#dddddd"}
     for start, end, item in _segments(statuses, lambda value: value.name, display_end):
         result_axis.axvspan(start, end, color=status_colors[item.name])
-        if (end - start).total_seconds() >= 8 * 60:
+        if end > start:
             midpoint = start + (end - start) / 2
-            result_axis.text(midpoint, 0.5, item.name, ha="center", va="center", fontweight="bold", fontsize=9)
+            label = result_axis.text(midpoint, 0.5, item.name, ha="center", va="center", fontweight="bold", fontsize=9)
+            segment_labels.append((label, (end - start).total_seconds(), item.name.replace(" ", "\n")))
 
     for axis, label in ((command_axis, "Command"), (report_axis, "Reported"), (result_axis, "Verification")):
         axis.set_ylim(0, 1)
@@ -344,6 +369,8 @@ def plot_state_verification(
     title_lines.append("Operational-State Verification")
     command_axis.set_title("\n".join(title_lines), pad=10)
     figure.subplots_adjust(left=0.12, right=0.98, bottom=0.18, top=0.82, hspace=0.04)
+
+    _fit_segment_labels(figure, segment_labels, total_seconds)
 
     destination: Path | None = None
     if output_path is not None:

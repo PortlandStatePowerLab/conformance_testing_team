@@ -275,8 +275,9 @@ def plot_run(
     show: bool = False,
     suppress_startup_spikes: bool = True,
     energy_change_from_start: bool = False,
-    annotate_heater_transitions: bool = True,
+    annotate_heater_transitions: bool = False,
     end_timestamp: datetime | None = None,
+    _standard_layout: bool = True,
 ) -> tuple[Figure, Path | None]:
     """Create a third-example-style run plot and optionally save/display it."""
     directory = Path(run_directory).resolve()
@@ -432,6 +433,11 @@ def plot_run(
     )
     figure.autofmt_xdate(rotation=45, ha="right")
     figure.tight_layout()
+
+    if _standard_layout and not energy_change_from_start:
+        from software.plots.run_plot_water import apply_run_layout
+
+        apply_run_layout(figure, directory, actual_start, actual_end, display_start)
 
     destination: Path | None = None
     if output_path is not None:

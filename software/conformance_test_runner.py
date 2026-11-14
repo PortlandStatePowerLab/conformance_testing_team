@@ -298,6 +298,26 @@ def _generate_energy_take_water_plot(run_directory: Path) -> Path | None:
     )[1]
 
 
+def _has_recorded_water_flow(run_directory: Path) -> bool:
+    """Select the water plot only when raw draw data records positive flow."""
+    for path in run_directory.glob("water_draw_*.csv"):
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    flow = float(row.get("flow_gpm", ""))
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(flow) and flow > 0:
+                    return True
+    return False
+
+
+def _generate_selected_energy_take_plot(run_directory: Path) -> Path | None:
+    if _has_recorded_water_flow(run_directory):
+        return _generate_energy_take_water_plot(run_directory)
+    return _generate_energy_take_plot(run_directory)
+
+
 def _generate_state_verification_plot(run_directory: Path) -> Path | None:
     from software.plots.state_verification_plot import plot_state_verification
 
@@ -338,8 +358,8 @@ def generate_final_outputs(
     tasks = (
         ("CONFORMANCE_REPORT", lambda: generate_conformance_report(run_directory)),
         (
-            "ENERGY_TAKE_WATER_PLOT",
-            lambda: _generate_energy_take_water_plot(run_directory),
+            "ENERGY_TAKE_PLOT",
+            lambda: _generate_selected_energy_take_plot(run_directory),
         ),
         (
             "STATE_VERIFICATION_PLOT",

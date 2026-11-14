@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import math
 import statistics
 from datetime import time, timedelta
 from pathlib import Path
@@ -203,6 +202,31 @@ def add_operational_state_band(
     return state_axis
 
 
+def apply_run_layout(figure, directory, actual_start, actual_end, display_start,
+                     *, water_axis=None, flow=()):
+    """Apply the same scale, legend, and state band to both standard plots."""
+    figure.set_size_inches(13.5, 6.75)
+    energy_axis, power_axis = figure.axes[1:3]
+    energy_values = [value for line in energy_axis.lines for value in line.get_ydata()]
+    power_values = [value for line in power_axis.lines for value in line.get_ydata()]
+    energy_axis.set_ylim(0, _upper_with_headroom(energy_values, minimum=0.1))
+    power_axis.set_ylim(0, _upper_with_headroom(power_values, minimum=MINIMUM_POWER_AXIS_MAX_KW))
+    handles, labels = _legend_entries(energy_axis)
+    power_handles, power_labels = _legend_entries(power_axis)
+    handles += power_handles
+    labels += power_labels
+    if water_axis is not None:
+        water_axis.set_ylim(0, _upper_with_headroom(flow, minimum=1.0))
+        water_handles, water_labels = _legend_entries(water_axis)
+        handles += water_handles
+        labels += water_labels
+    energy_axis.legend(handles=handles, labels=labels,
+                       loc="upper center", ncol=3 if water_axis is not None else 2)
+    figure.subplots_adjust(left=0.09, right=0.845 if water_axis is not None else 0.91,
+                           bottom=0.19, top=0.86)
+    add_operational_state_band(figure, directory, actual_start, actual_end, display_start)
+
+
 def plot_run_with_water(
     run_directory: Path | str,
     *,
@@ -216,7 +240,7 @@ def plot_run_with_water(
     data = load_run_plot_data(directory)
     actual_start = min(data.energy[0].timestamp, data.power[0].timestamp)
     actual_end = measurement_end_timestamp(directory, data.energy[-1].timestamp, data.power[-1].timestamp)
-    display_start = scenario_start or _duck_curve_display_start(actual_start, data.phases)
+    display_start = _duck_curve_display_start(actual_start, data.phases, scenario_start=scenario_start)
     water = load_water_flow(directory)
 
     figure, _ = plot_run(
@@ -225,54 +249,42 @@ def plot_run_with_water(
         suppress_startup_spikes=suppress_startup_spikes,
         annotate_heater_transitions=False,
         end_timestamp=actual_end,
+        _standard_layout=False,
     )
     figure.set_size_inches(13.5, 6.75)
     energy_axis = figure.axes[1]
     power_axis = figure.axes[2]
-    has_water_flow = any(math.isfinite(value) and value > 0 for _, value in water)
-    water_handles = []
-    water_labels = []
-    if has_water_flow:
-        water_axis = energy_axis.twinx()
-        water_axis.spines["right"].set_position(("outward", 62))
-        times = [_shift(timestamp, actual_start, display_start) for timestamp, _ in water]
-        flow = [value for _, value in water]
-        water_line, = water_axis.plot(
-            times, flow, color=WATER_COLOR, linewidth=1.1, alpha=0.62,
-            label="Water Draw", zorder=4,
+    water_axis = energy_axis.twinx()
+    water_axis.spines["right"].set_position(("outward", 62))
+    times = [_shift(timestamp, actual_start, display_start) for timestamp, _ in water]
+    flow = [value for _, value in water]
+    water_line, = water_axis.plot(
+        times,
+        flow,
+        color=WATER_COLOR,
+        linewidth=1.1,
+        alpha=0.62,
+        label="Water Draw",
+        zorder=4,
+    )
+    water_axis.fill_between(times, flow, color=WATER_COLOR, alpha=0.09, zorder=3)
+    water_axis.set_ylim(bottom=0)
+    water_axis.set_ylabel("Water Flow (GPM)", color=WATER_COLOR)
+    water_axis.tick_params(axis="y", colors=WATER_COLOR)
+    if not water:
+        water_axis.text(
+            0.99,
+            0.03,
+            "No water-draw data",
+            transform=water_axis.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=8,
+            color=WATER_COLOR,
         )
-        water_axis.fill_between(times, flow, color=WATER_COLOR, alpha=0.09, zorder=3)
-        water_axis.set_ylim(0, _upper_with_headroom(flow, minimum=1.0))
-        water_axis.set_ylabel("Water Flow (GPM)", color=WATER_COLOR)
-        water_axis.tick_params(axis="y", colors=WATER_COLOR)
-        water_handles = [water_line]
-        water_labels = ["Water Draw"]
 
-    # Use the long-standing Axes API rather than version-specific Legend
-    # attributes (legend_handles is unavailable on older station Matplotlib).
-    energy_values = [value for line in energy_axis.lines for value in line.get_ydata()]
-    power_values = [value for line in power_axis.lines for value in line.get_ydata()]
-    energy_axis.set_ylim(0, _upper_with_headroom(energy_values, minimum=0.1))
-    power_axis.set_ylim(
-        0,
-        _upper_with_headroom(
-            power_values,
-            minimum=MINIMUM_POWER_AXIS_MAX_KW,
-        ),
-    )
-
-    handles, labels = _legend_entries(energy_axis)
-    power_handles, power_labels = _legend_entries(power_axis)
-    energy_axis.legend(
-        handles + power_handles + water_handles,
-        labels + power_labels + water_labels,
-        loc="upper center",
-        ncol=3,
-    )
-    figure.subplots_adjust(left=0.09, right=0.845 if has_water_flow else 0.91, bottom=0.19, top=0.86)
-    add_operational_state_band(
-        figure, directory, actual_start, actual_end, display_start
-    )
+    apply_run_layout(figure, directory, actual_start, actual_end, display_start,
+                     water_axis=water_axis, flow=flow)
 
     destination = None
     if output_path is not None:
