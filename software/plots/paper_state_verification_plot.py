@@ -21,13 +21,16 @@ def plot_paper_state_verification(run_directory, *, width=3.5, height=3.2):
     reports = tuple(r for r in data.reports if r.timestamp < end)
     figure = paper_figure(width, height)
     axes = figure.subplots(3, 1, sharex=True, gridspec_kw={"hspace": .12})
+    command_labels = []
     for index, phase in enumerate(data.phases):
         finish = data.phases[index + 1].timestamp if index + 1 < len(data.phases) else end
         axes[0].axvspan(shifted(phase.timestamp), shifted(finish), color="#dbe6ef")
         axes[0].axvline(shifted(phase.timestamp), color="0.4", linewidth=.5)
-        axes[0].text(shifted(phase.timestamp + (finish - phase.timestamp) / 2), .5,
-                     phase.name + "\n" + "|".join(str(c) for c in sorted(phase.expected_states)),
-                     ha="center", va="center", fontsize=8)
+        codes = "|".join(str(c) for c in sorted(phase.expected_states))
+        label = axes[0].text(shifted(phase.timestamp + (finish - phase.timestamp) / 2), .5,
+                     phase.name + "\n" + codes,
+                     ha="center", va="center", fontsize=8, clip_on=True)
+        command_labels.append((label, (finish - phase.timestamp).total_seconds(), codes))
     colors = {0: "#dbe6ef", 1: "#cfe8cf", 2: "#f8d58a", 3: "#b7ddb7", 4: "#efc875", 5: "#efaaaa", 6: "#9dcc9d"}
     for a, b, report in _segments(reports, lambda r: r.code, end):
         axes[1].axvspan(shifted(a), shifted(b), color=colors.get(report.code, "#dddddd"), linewidth=0)
@@ -52,7 +55,25 @@ def plot_paper_state_verification(run_directory, *, width=3.5, height=3.2):
     compact_clock_labels(axes[-1])
     figure.suptitle(equipment_name(run_directory), fontsize=10, y=.98)
     figure.subplots_adjust(left=.27, right=.97, top=.89, bottom=.12)
+    figure._command_label_segments = (command_labels, max((end - start).total_seconds(), 1))
     return figure
+
+
+def _fit_command_labels(figure):
+    """Fit command labels after the exporter has established the final margins."""
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    command_labels, total_seconds = figure._command_label_segments
+    for label, seconds, codes in command_labels:
+        available = figure.axes[0].get_window_extent(renderer).width * seconds / total_seconds - 2
+        if label.get_window_extent(renderer).width > available:
+            label.set_text(codes)
+            for size in (8, 7, 6):
+                label.set_fontsize(size)
+                if label.get_window_extent(renderer).width <= available:
+                    break
+            else:
+                label.set_visible(False)
 
 
 def main():
@@ -63,7 +84,8 @@ def main():
     parser.add_argument("--height", type=float, default=3.2)
     args = parser.parse_args()
     figure = plot_paper_state_verification(args.run_directory, width=args.width, height=args.height)
-    for path in save_paper(figure, args.run_directory, "paper_operational_state_verification", args.output_directory):
+    for path in save_paper(figure, args.run_directory, "paper_operational_state_verification", args.output_directory,
+                           finalize_layout=_fit_command_labels):
         print(path)
 
 

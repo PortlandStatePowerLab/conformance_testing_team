@@ -60,7 +60,7 @@ def style_axis(axis):
     axis.grid(axis="y", alpha=0.2, linewidth=0.4)
 
 
-def save_paper(figure, directory, stem, output_directory=None):
+def save_paper(figure, directory, stem, output_directory=None, *, finalize_layout=None):
     """Fit content to the page width with a tiny margin; retain print sizing."""
     # Measure rendered labels rather than reserving generous fixed side margins.
     # Expand the axes, keeping the PDF at its requested physical width.
@@ -72,6 +72,8 @@ def save_paper(figure, directory, stem, output_directory=None):
         right = figure.subplotpars.right + (width - 0.025 - bounds.x1) / width
         if 0 < left < right < 1:
             figure.subplots_adjust(left=left, right=right)
+    if finalize_layout is not None:
+        finalize_layout(figure)
     destination = Path(output_directory or directory).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     paths = []
