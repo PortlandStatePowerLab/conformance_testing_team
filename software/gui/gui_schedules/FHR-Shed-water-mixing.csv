@@ -1,0 +1,6 @@
+enabled,event_id,time_after_start,phase,draw_type,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,temp_drop_f,max_draw_minutes,notes,advanced_efficiency,automatic_outside_communication
+TRUE,shed_1,00:00:00,pre_event,,cta,shed,10,,,2|4,,,,,,,TRUE
+TRUE,run_normal_1,00:50:00,event,,cta,run_normal,20,,,0|1,,,,,,,TRUE
+TRUE,water_draw_1,TBD,event,Cut-in,water_draw,water_draw,,,,,,,,40,,,TRUE
+TRUE,water_draw_2,TBD,event,Temp Drop,water_draw,water_draw,,,,,,,15,60,,,TRUE
+TRUE,test_end,TBD,recovery,,test,end,,,,,,,,,,,TRUE
