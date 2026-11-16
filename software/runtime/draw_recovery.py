@@ -1,5 +1,7 @@
 """Operating-state driven recovery and final observation after a water draw."""
 
+from __future__ import annotations
+
 OBSERVATION_SECONDS = 30 * 60
 RECOVERY_TIMEOUT_SECONDS = 12 * 60 * 60
 STATE_FRESHNESS_SECONDS = 120

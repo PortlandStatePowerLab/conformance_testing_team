@@ -4,6 +4,9 @@ from software.runtime.draw_recovery import DrawRecovery, RECOVERY_TIMEOUT_SECOND
 
 
 class DrawRecoveryTests(unittest.TestCase):
+    def test_annotations_are_deferred_for_python39_station_imports(self):
+        self.assertIsInstance(DrawRecovery.action.__annotations__["return"], str)
+
     def test_idle_final_draw_ends_after_thirty_minutes(self):
         tracker = DrawRecovery(0, final=True)
         tracker.observe(0, 1799)
