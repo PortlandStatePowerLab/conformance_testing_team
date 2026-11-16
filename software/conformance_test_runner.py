@@ -329,6 +329,17 @@ def _generate_state_verification_plot(run_directory: Path) -> Path | None:
     )[1]
 
 
+def _generate_temperature_power_water_plot(run_directory: Path) -> Path | None:
+    if not _has_recorded_water_flow(run_directory):
+        return None
+
+    from software.plots.generate_temperature_power_water_plot import generate, load_hot_temperature
+
+    if not load_hot_temperature(run_directory):
+        return None
+    return generate(run_directory, output_path=run_directory / "temperature_power_water.png")
+
+
 def _generate_phase_summary(run_directory: Path) -> Path | None:
     from software.plots.phase_summary_plot import plot_phase_summary
 
@@ -364,6 +375,10 @@ def generate_final_outputs(
             lambda: _generate_selected_energy_take_plot(run_directory),
         ),
         (
+            "TEMPERATURE_POWER_WATER_PLOT",
+            lambda: _generate_temperature_power_water_plot(run_directory),
+        ),
+        (
             "STATE_VERIFICATION_PLOT",
             lambda: _generate_state_verification_plot(run_directory),
         ),
@@ -379,7 +394,8 @@ def generate_final_outputs(
     for label, generate in tasks:
         try:
             path = generate()
-            print(f"{label} {path}", file=output_stream, flush=True)
+            print(f"{label} {path}" if path is not None else f"{label}_SKIPPED no data",
+                  file=output_stream, flush=True)
         except Exception as artifact_error:
             print(
                 f"{label}_ERROR {type(artifact_error).__name__}: {artifact_error}",

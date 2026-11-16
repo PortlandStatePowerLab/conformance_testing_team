@@ -470,6 +470,41 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 self.assertEqual(wet.call_count, int(rows == "0\n0.5"))
                 self.assertEqual(dry.call_count, int(rows != "0\n0.5"))
 
+    def test_temperature_plot_is_skipped_without_temperature_data(self):
+        from software.conformance_test_runner import _generate_temperature_power_water_plot
+
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "software.plots.generate_temperature_power_water_plot.generate"
+        ) as generate:
+            self.assertIsNone(_generate_temperature_power_water_plot(Path(directory)))
+            generate.assert_not_called()
+
+    def test_temperature_plot_uses_existing_generator_with_recorded_temperature(self):
+        from software.conformance_test_runner import _generate_temperature_power_water_plot
+
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "software.plots.generate_temperature_power_water_plot.generate"
+        ) as generate:
+            run = Path(directory)
+            (run / "water_draw_1.csv").write_text(
+                "timestamp_pacific,hot_temp_f,flow_gpm\n2026-11-16T12:00:00-08:00,125,3\n"
+            )
+            _generate_temperature_power_water_plot(run)
+            generate.assert_called_once_with(run, output_path=run / "temperature_power_water.png")
+
+    def test_temperature_plot_is_skipped_when_draw_records_no_flow(self):
+        from software.conformance_test_runner import _generate_temperature_power_water_plot
+
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "software.plots.generate_temperature_power_water_plot.generate"
+        ) as generate:
+            run = Path(directory)
+            (run / "water_draw_1.csv").write_text(
+                "timestamp_pacific,hot_temp_f,flow_gpm\n2026-11-16T12:00:00-08:00,125,0\n"
+            )
+            self.assertIsNone(_generate_temperature_power_water_plot(run))
+            generate.assert_not_called()
+
     def test_final_outputs_attempt_every_artifact_independently(self):
         output = io.StringIO()
         errors = io.StringIO()
@@ -483,6 +518,10 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 "software.conformance_test_runner._generate_selected_energy_take_plot",
                 return_value=run_directory / "energy_take_power_water.png",
             ) as energy_plot,
+            patch(
+                "software.conformance_test_runner._generate_temperature_power_water_plot",
+                return_value=run_directory / "temperature_power_water.png",
+            ) as temperature_plot,
             patch(
                 "software.conformance_test_runner._generate_state_verification_plot",
                 side_effect=ValueError("no states"),
@@ -504,11 +543,13 @@ class ConformanceTestRunnerTests(unittest.TestCase):
 
         report.assert_called_once_with(run_directory)
         energy_plot.assert_called_once()
+        temperature_plot.assert_called_once_with(run_directory)
         state_plot.assert_called_once()
         phase_summary.assert_called_once()
         event_timeline.assert_called_once()
         self.assertIn("CONFORMANCE_REPORT run", output.getvalue())
         self.assertIn("ENERGY_TAKE_PLOT run", output.getvalue())
+        self.assertIn("TEMPERATURE_POWER_WATER_PLOT run", output.getvalue())
         self.assertIn("PHASE_SUMMARY run", output.getvalue())
         self.assertIn("STATE_VERIFICATION_PLOT_ERROR ValueError: no states", errors.getvalue())
 
