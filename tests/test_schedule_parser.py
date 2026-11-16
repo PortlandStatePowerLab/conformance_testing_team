@@ -75,14 +75,14 @@ class MasterScheduleTests(unittest.TestCase):
         self.assertEqual(CUT_IN_RECOVERY_TIMEOUT_SECONDS, 12 * 60 * 60)
         self.assertEqual(
             temp_drop.offset_seconds,
-            30 * 60 + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+            60 * 60 + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
         )
         self.assertEqual(
             events[-1].offset_seconds,
-            90 * 60 + CUT_IN_RECOVERY_TIMEOUT_SECONDS,
+            180 * 60 + 2 * CUT_IN_RECOVERY_TIMEOUT_SECONDS,
         )
 
-    def test_volume_cannot_follow_state_controlled_draw(self):
+    def test_fixed_volume_cannot_follow_state_controlled_draw(self):
         rows = [
             ["true", "shed_1", "00:00:00", "pre_event", "", "cta", "shed", "max", "", "", "2|4", "", "", "", "", "", ""],
             ["true", "water_draw_1", "TBD", "pre_event", "Cut-in", "water_draw", "water_draw", "", "", "", "", "", "", "", "30", "", ""],
@@ -95,14 +95,14 @@ class MasterScheduleTests(unittest.TestCase):
                 writer = csv.writer(handle)
                 writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
                 writer.writerows(rows)
-            with self.assertRaisesRegex(ScheduleValidationError, "Volume draws cannot follow"):
+            with self.assertRaisesRegex(ScheduleValidationError, "must use TBD"):
                 load_schedule(path)
 
-    def test_tbd_temp_drop_requires_immediately_preceding_cut_in(self):
+    def test_tbd_temp_drop_can_follow_volume(self):
         rows = [
             ["true", "water_draw_1", "00:10:00", "event", "Volume", "water_draw", "water_draw", "", "", "", "", "2", "3", "", "", "", ""],
             ["true", "water_draw_2", "TBD", "event", "Temp Drop", "water_draw", "water_draw", "", "", "", "", "", "", "15", "60", "", ""],
-            ["true", "test_end", "02:00:00", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
+            ["true", "test_end", "TBD", "event", "", "test", "end", "", "", "", "", "", "", "", "", "", ""],
         ]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "schedule.csv"
@@ -110,8 +110,8 @@ class MasterScheduleTests(unittest.TestCase):
                 writer = csv.writer(handle)
                 writer.writerow(DRAW_EXTENDED_SCHEDULE_COLUMNS)
                 writer.writerows(rows)
-            with self.assertRaisesRegex(ScheduleValidationError, "only immediately after Cut-in"):
-                load_schedule(path)
+            events = load_schedule(path)
+            self.assertTrue(events[1].dependent_end)
 
     def test_temp_drop_draw_allows_dependent_tbd_end(self):
         rows = [
@@ -127,7 +127,7 @@ class MasterScheduleTests(unittest.TestCase):
             events = load_schedule(path)
         self.assertEqual(events[0].draw_type, "temp drop")
         self.assertTrue(events[-1].dependent_end)
-        self.assertEqual(events[-1].offset_seconds, 2 * 3600 + 35 * 60)
+        self.assertEqual(events[-1].offset_seconds, 2 * 3600 + 35 * 60 + CUT_IN_RECOVERY_TIMEOUT_SECONDS + 60 * 60)
 
     def test_tbd_end_is_rejected_for_volume_draw(self):
         rows = [

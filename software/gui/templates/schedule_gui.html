@@ -413,10 +413,17 @@ function updateView() {
       td.firstElementChild.disabled = !advanced;
     }
   }
+  let precedingDrawType = null;
   for (const row of waterBody.rows) {
     const isTempDrop = rowValue(row, "draw_type") === "Temp Drop";
     const isCutIn = rowValue(row, "draw_type") === "Cut-in";
     const isVolume = !isTempDrop && !isCutIn;
+    const startControl = row.querySelector('[data-field="time_after_start"] input');
+    const requiresTbd = isCutIn || precedingDrawType === "Cut-in" || precedingDrawType === "Temp Drop" || (isTempDrop && precedingDrawType !== null);
+    startControl.readOnly = requiresTbd;
+    startControl.title = requiresTbd ? "Starts after the preceding draw's heating recovery" : "Time from test start";
+    if (requiresTbd) startControl.value = "TBD";
+    if (rowValue(row, "enabled") === "TRUE") precedingDrawType = rowValue(row, "draw_type");
     for (const field of ["target_volume_gal", "estimate"]) {
       const td = row.querySelector(`[data-field="${field}"]`);
       td.classList.toggle("irrelevant", !isVolume);

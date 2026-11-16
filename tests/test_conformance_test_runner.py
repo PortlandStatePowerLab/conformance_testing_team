@@ -136,7 +136,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         progress = progress_text(events, 60)
 
         self.assertTrue(summary["dependent_end"])
-        self.assertEqual(summary["duration_seconds"], 9300)
+        self.assertEqual(summary["duration_seconds"], 56100)
         self.assertTrue(summary["duration_estimated"])
         self.assertIn("estimated remaining", progress)
 

@@ -75,10 +75,31 @@ cut-out OpState, draws until the
 corresponding cut-in OpState, closes the valve, and waits for the subsequent
 cut-out. Its Max time applies only while the valve is open; after cut-in closes
 the valve, a fixed 12-hour watchdog limits the wait for recovery cut-out. It must
-be immediately followed by a `Temp Drop` draw with a `TBD` start; that draw is
-released by the recovery cut-out. Volume draws cannot follow Cut-in or Temp
-Drop draws. The orchestrator consumes the controller's existing 30-second
+be the first water draw and followed by a Volume or Temp Drop draw with a
+`TBD` start; that draw is released immediately by the recovery cut-out.
+The orchestrator consumes the controller's existing 30-second
 `cta_events.csv` OpState records and does not issue additional CTA reads.
+
+After a Temp Drop, the next Volume or Temp Drop must use `TBD`. Subsequent
+Temp Drop draws also use `TBD` after Volume draws. After the valve closes,
+running OpState followed by idle releases the next draw immediately. If idle,
+the system allows 30 minutes for heating to begin; if it never begins, the test
+ends and remaining draws are logged as skipped. Heating already active at valve
+closure counts. Recovery heating has a 12-hour timeout from its first observation.
+
+Use `TBD` Test End after a final Temp Drop or a final TBD Volume to continue
+recording for 30 minutes after valve closure. If heating is active, or first
+starts during that window, wait for idle and then record another 30 minutes.
+Only that first heating phase extends the timer; later cycles do not reset it.
+A fixed Test End still stops the test at the scheduled time.
+
+OpState controls recovery (running: 1/2/3/7/12/13; idle: 0/4/6/8/11/14).
+Electrical power continues to be recorded in `power.csv` as supporting evidence;
+it does not override OpState. Invalid states, failed reads, and readings older
+than two minutes cannot release a dependent draw or complete observation. If
+fresh states remain unavailable, the wait fails after the observation deadline
+plus 12 hours. Schedule duration previews include recovery allowances and are
+estimates, not the actual start times of TBD draws.
 
 The heartbeat is enabled by default. Disable only the recurring refreshes for
 a controlled comparison while retaining every command prerequisite:

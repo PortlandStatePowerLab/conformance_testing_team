@@ -47,6 +47,8 @@ except ImportError:
     from sensors.sensor_configuration_loader import load_sensor_configuration
     from software.scheduling.xlsx_schedule_importer import import_xlsx_schedule
 
+from software.runtime.draw_recovery import DrawRecovery, STATE_FRESHNESS_SECONDS
+
 from software.helpers.pacific_time import pacific_filename_timestamp, pacific_timestamp
 from software.station.station_identity import station_results_directory
 
@@ -1133,6 +1135,9 @@ def run_hardware_test(
         cut_in_recovery_deadline: float | None = None
         released_draw_ids: set[str] = set()
         next_draw_index = 0
+        recovery: DrawRecovery | None = None
+        latest_state: int | None = None
+        latest_state_at: float | None = None
         test_started_logged = False
 
         while True:
@@ -1195,6 +1200,25 @@ def run_hardware_test(
                     cta_command_results[update.event_id] = update.result
                 elif update.event == "command_exception" and update.event_id:
                     cta_command_results[update.event_id] = "error"
+                if update.event == "operational_state" and update.operational_state is not None:
+                    latest_state = update.operational_state
+                    latest_state_at = time.monotonic()
+                    if recovery is not None:
+                        previous_phase = recovery.phase
+                        recovery.observe(latest_state, latest_state_at)
+                        if recovery.phase != previous_phase:
+                            logger.record("draw_recovery_phase", recovery.phase,
+                                          details={"operational_state": latest_state})
+                            _write_gui_stage("running", "Water draw recovery: " + recovery.phase.replace("_", " "),
+                                             result_directory=str(run_directory))
+                if update.command == "query_operational_state" and (
+                    update.event == "query_exception"
+                    or (update.event == "query_completed" and update.result != "ok")
+                ):
+                    latest_state = None
+                    latest_state_at = None
+                    if recovery is not None:
+                        recovery.observe(5, time.monotonic())
                 if cut_in_tracker is None or cut_in_event is None:
                     continue
                 if (
@@ -1324,7 +1348,6 @@ def run_hardware_test(
                     if (
                         next_draw_index < len(draws)
                         and draws[next_draw_index].dependent_end
-                        and draws[next_draw_index].draw_type == "temp drop"
                     ):
                         released_draw_ids.add(draws[next_draw_index].event_id)
                     _write_gui_stage(
@@ -1402,10 +1425,34 @@ def run_hardware_test(
                             "the valve was open"
                         )
                     raise RuntimeError(f"water draw failed with code {return_code}")
-                if completed_draw_id == dependent_draw_id:
-                    logger.record("dependent_test_end", "triggered", event_id=completed_draw_id)
+                completed_event = next(draw for draw in draws if draw.event_id == completed_draw_id)
+                following_dependent = (
+                    next_draw_index < len(draws) and draws[next_draw_index].dependent_end
+                )
+                if completed_draw_id == dependent_draw_id or (
+                    completed_event.draw_type in {"temp drop", "volume"} and following_dependent
+                ):
+                    recovery = DrawRecovery(time.monotonic(), final=completed_draw_id == dependent_draw_id)
+                    if latest_state_at is not None and time.monotonic() - latest_state_at <= STATE_FRESHNESS_SECONDS:
+                        recovery.observe(latest_state, time.monotonic())
+                    _write_gui_stage("running", "Water draw complete; observing heating recovery.",
+                                     result_directory=str(run_directory))
+                    logger.record("draw_recovery", "waiting", event_id=completed_draw_id,
+                                  details={"final": recovery.final, "phase": recovery.phase})
+
+            if recovery is not None:
+                recovery_action = recovery.action(time.monotonic())
+                if recovery_action == "end_test":
+                    for skipped in draws[next_draw_index:]:
+                        logger.record("water_draw_skipped", "skipped", event_id=skipped.event_id,
+                                      details={"reason": "recovery_heating_not_observed"})
+                    logger.record("dependent_test_end", "triggered")
                     outcome = "completed"
                     break
+                if recovery_action == "next_draw":
+                    released_draw_ids.add(draws[next_draw_index].event_id)
+                    logger.record("draw_recovery", "completed")
+                    recovery = None
 
             if not test_end.dependent_end and elapsed >= test_end.offset_seconds:
                 if active_draw is not None:
@@ -1486,7 +1533,7 @@ def run_hardware_test(
         if progress is not None:
             progress.finish(
                 (
-                    last_elapsed if test_end.dependent_end
+                    last_elapsed if test_end.dependent_end or recovery is not None
                     else test_end.offset_seconds if outcome == "completed"
                     else last_elapsed
                 ),

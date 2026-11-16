@@ -113,7 +113,7 @@ class ScheduleGuiTests(unittest.TestCase):
         _, summary = validate_rows(rows)
 
         self.assertTrue(summary["dependent_end"])
-        self.assertEqual(summary["duration_seconds"], 9300)
+        self.assertEqual(summary["duration_seconds"], 56100)
         self.assertTrue(summary["duration_estimated"])
 
     def test_station_equipment_is_selected_and_validated_by_hostname(self):
