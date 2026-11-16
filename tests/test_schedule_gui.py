@@ -140,8 +140,8 @@ class ScheduleGuiTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "does not match"):
                 load_station_equipment("WH-station1", Path(directory))
 
-    def test_default_idle_timeout_is_48_hours(self):
-        self.assertEqual(DEFAULT_IDLE_TIMEOUT_HOURS, 48.0)
+    def test_default_idle_timeout_is_168_hours(self):
+        self.assertEqual(DEFAULT_IDLE_TIMEOUT_HOURS, 168.0)
 
     def test_idle_timeout_accepts_decimal_hours(self):
         self.assertEqual(positive_hours("0.2"), 0.2)

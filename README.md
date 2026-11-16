@@ -20,7 +20,7 @@ You should now see the conformance test schedule open and ready to use
 * The tmux session is chosen in order to keep the gui running in the background in the event of an SSH connection error or disconnect.
 * The alternative systemctl is not used because this would keep the GUI service active permanently. Starting the testing GUI intentionally is preferred over a constant running process 
 * The specific SSH local-forwarding connection of ssh -L <port number>:127.0.0.1:5000 pi@<Pi IP address> provides access to the GUI without exposing the GUI’s port directly on the network
-* The schedule-gui python script times out after 48 hours of no post or get requests so that the service ends in case someone forgets about the tmux or python script running
+* The schedule-gui python script times out after 168 hours (7 days) of no post or get requests so that the service ends in case someone forgets about the tmux or python script running
 
 
 ## Manually run a start a test schedule
@@ -137,7 +137,7 @@ validating and saving a schedule, the GUI can run the existing hardware
 preflight checks. It automatically selects water preflight when the saved
 schedule contains an enabled water draw.
 
-The GUI exits after 48 hours without a GET or POST request. Decimal-hour
+The GUI exits after 168 hours (7 days) without a GET or POST request. Decimal-hour
 overrides are supported for shorter sessions or testing; for example,
 `python3 -m software.gui.schedule_gui --idle-timeout-hours 0.2` uses a 12-minute
 idle timeout.
