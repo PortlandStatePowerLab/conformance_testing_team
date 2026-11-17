@@ -349,6 +349,14 @@ def _generate_phase_summary(run_directory: Path) -> Path | None:
     )[1]
 
 
+def _generate_water_draw_temperature_plot(run_directory: Path) -> Path | None:
+    from software.plots.water_draw_temperature import generate, load_draws
+
+    if not load_draws(run_directory):
+        return None
+    return generate(run_directory)
+
+
 def _generate_event_timeline(run_directory: Path) -> Path | None:
     from software.reporting.event_timeline import plot_event_timeline
 
@@ -377,6 +385,10 @@ def generate_final_outputs(
         (
             "TEMPERATURE_POWER_WATER_PLOT",
             lambda: _generate_temperature_power_water_plot(run_directory),
+        ),
+        (
+            "WATER_DRAW_TEMPERATURE_PLOT",
+            lambda: _generate_water_draw_temperature_plot(run_directory),
         ),
         (
             "STATE_VERIFICATION_PLOT",

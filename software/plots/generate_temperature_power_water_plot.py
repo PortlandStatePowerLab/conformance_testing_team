@@ -40,7 +40,7 @@ def load_hot_temperature(directory: Path):
     return series
 
 
-def generate(directory: Path, output_path: Path | None = None) -> Path:
+def build_figure(directory: Path):
     directory = directory.resolve()
     data = load_run_plot_data(directory)
     actual_start = min(data.energy[0].timestamp, data.power[0].timestamp)
@@ -100,6 +100,11 @@ def generate(directory: Path, output_path: Path | None = None) -> Path:
         ncol=3,
     )
 
+    return figure
+
+
+def generate(directory: Path, output_path: Path | None = None) -> Path:
+    figure = build_figure(directory)
     destination = (output_path or directory / OUTPUT_NAME).resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(destination, dpi=160, bbox_inches="tight")

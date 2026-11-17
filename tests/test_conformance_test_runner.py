@@ -523,6 +523,10 @@ class ConformanceTestRunnerTests(unittest.TestCase):
                 return_value=run_directory / "temperature_power_water.png",
             ) as temperature_plot,
             patch(
+                "software.conformance_test_runner._generate_water_draw_temperature_plot",
+                return_value=run_directory / "water_draw_temperature.png",
+            ) as draw_temperature_plot,
+            patch(
                 "software.conformance_test_runner._generate_state_verification_plot",
                 side_effect=ValueError("no states"),
             ) as state_plot,
@@ -544,6 +548,7 @@ class ConformanceTestRunnerTests(unittest.TestCase):
         report.assert_called_once_with(run_directory)
         energy_plot.assert_called_once()
         temperature_plot.assert_called_once_with(run_directory)
+        draw_temperature_plot.assert_called_once_with(run_directory)
         state_plot.assert_called_once()
         phase_summary.assert_called_once()
         event_timeline.assert_called_once()

@@ -101,6 +101,17 @@ fresh states remain unavailable, the wait fails after the observation deadline
 plus 12 hours. Schedule duration previews include recovery allowances and are
 estimates, not the actual start times of TBD draws.
 
+Completed tests also generate `water_draw_temperature.png` when draw data
+contains recorded water flow and outlet temperatures. The image has one panel
+per draw, showing temperature and flow against minutes since valve opening,
+with consistent vertical scales, the recorded stop reason, and the temperature
+threshold from the draw log when available. Closing rows that repeat the last
+sensor reading are excluded. Each close-up runs from valve opening to closure,
+with command shading, a blue water-draw region,
+and an operational-state band using the standard plot colors; power is omitted.
+Regenerate it for an existing run with
+`python3 -m software.plots.water_draw_temperature /path/to/run`.
+
 The heartbeat is enabled by default. Disable only the recurring refreshes for
 a controlled comparison while retaining every command prerequisite:
 
