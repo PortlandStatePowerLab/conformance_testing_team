@@ -1,0 +1,4 @@
+enabled,event_id,time_after_start,phase,draw_type,event_type,action,event_duration_minutes,advanced_value,advanced_units,expected_operational_states,target_volume_gal,expected_flow_gpm,temp_drop_f,max_draw_minutes,notes,advanced_efficiency,automatic_outside_communication
+TRUE,load_up_1,00:00:00,pre_event,,cta,load_up,max,,,3|6,,,,,,,TRUE
+TRUE,water_draw_1,00:00:00,event,Volume,water_draw,water_draw,,,,,11,3,,,,,TRUE
+TRUE,test_end,00:07:00,recovery,,test,end,,,,,,,,,,,TRUE
