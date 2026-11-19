@@ -1315,6 +1315,11 @@ def run_hardware_test(
                             "max_draw_minutes": cut_in_event.max_draw_minutes,
                         },
                     )
+                    _write_gui_stage(
+                        "running",
+                        "Cut-in water draw started; waiting for cut-in.",
+                        result_directory=str(run_directory),
+                    )
                     # Later rows in this batch predate the valve action.  The
                     # cut-in phase must be satisfied by a fresh observation.
                     break
@@ -1357,7 +1362,7 @@ def run_hardware_test(
                     )
                     _write_gui_stage(
                         "running",
-                        "Water draw complete; waiting for Cut-in recovery state.",
+                        "Water draw complete; waiting for cut-out.",
                         cut_in_phase="recovery",
                         recovery_deadline_at=recovery_deadline_at,
                         result_directory=str(run_directory),

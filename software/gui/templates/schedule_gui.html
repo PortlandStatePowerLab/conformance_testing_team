@@ -108,9 +108,14 @@
 
   <div id="status" class="status"><div id="messages">Not yet validated.</div></div>
   <div id="preflight-status" class="status" hidden>
-    <strong id="preflight-heading">Hardware preflight not yet run.</strong>
-    <div id="preflight-lines" class="muted"></div>
-    <div id="preflight-failures"></div>
+    <div class="run-status-layout">
+      <div class="run-status-main">
+        <strong id="preflight-heading">Hardware preflight not yet run.</strong>
+        <div id="preflight-lines" class="muted"></div>
+        <div id="preflight-failures"></div>
+      </div>
+      <button id="dismiss-preflight" type="button" hidden>Dismiss</button>
+    </div>
   </div>
   <div id="run-status" class="status" hidden>
     <div class="run-status-layout">
@@ -216,6 +221,7 @@ let temperatureSetpointF = null;
 const phases = ["pre_event", "event", "recovery"];
 const saveButton = document.querySelector("#save");
 const preflightButton = document.querySelector("#preflight");
+const dismissPreflightButton = document.querySelector("#dismiss-preflight");
 const preflightStatus = document.querySelector("#preflight-status");
 const preflightHeading = document.querySelector("#preflight-heading");
 const preflightLines = document.querySelector("#preflight-lines");
@@ -239,6 +245,7 @@ let savedFilename = "";
 let knownScheduleFilenames = new Set();
 let preflightRunning = false;
 let preflightPassed = false;
+let preflightDismissed = false;
 let whInformationRunning = false;
 let countdownTimer = null;
 let activeRun = null;
@@ -496,6 +503,8 @@ function show(result, valid) {
 
 function resetPreflightDisplay() {
   preflightStatus.hidden = false;
+  preflightDismissed = false;
+  dismissPreflightButton.hidden = true;
   preflightPassed = false;
   preflightStatus.className = "status";
   preflightHeading.textContent = "Hardware preflight not yet run.";
@@ -544,9 +553,13 @@ document.querySelector("#automatic-outside-communication").onchange = function (
 
 document.querySelector("#add-cta").onclick = () => addCta();
 document.querySelector("#add-water").onclick = () => addWater();
+dismissPreflightButton.onclick = () => {
+  preflightStatus.hidden = true;
+  preflightDismissed = true;
+};
 for (const id of ["end-time", "end-phase", "end-notes"]) document.querySelector(`#${id}`).oninput = updateView;
 document.querySelector("#validate").onclick = async () => {
-  if (preflightStatus.hidden) resetPreflightDisplay();
+  if (preflightStatus.hidden && !preflightDismissed) resetPreflightDisplay();
   try {
     const result = await request("/api/validate", {rows:scheduleRows()});
     validatedSignature = draftSignature();
@@ -629,6 +642,8 @@ function showPreflightEvent(event, rollingLines, failures) {
 preflightButton.onclick = async () => {
   if (!savedFilename || savedSignature !== draftSignature()) return;
   preflightStatus.hidden = false;
+  preflightDismissed = false;
+  dismissPreflightButton.hidden = true;
   preflightRunning = true;
   preflightPassed = false;
   updateWorkflowState();
@@ -666,6 +681,7 @@ preflightButton.onclick = async () => {
     preflightFailures.textContent = error.error || String(error);
   } finally {
     preflightRunning = false;
+    dismissPreflightButton.hidden = false;
     updateWorkflowState();
   }
 };
@@ -691,11 +707,8 @@ function renderRun(run) {
   if (run.expected_end_at && ["initializing","running"].includes(run.state)) {
     remaining = Math.max(0, (Date.parse(run.expected_end_at) - Date.now()) / 1000);
   }
-  const heartbeat = run.last_heartbeat_at ? new Date(run.last_heartbeat_at).toLocaleString() : "not yet available";
   const lifecycle = run.message ? `${run.message} · ` : "";
   const remainingLabel = run.duration_estimated ? "Estimated remaining" : "Remaining";
-  const finishLabel = run.duration_estimated ? "estimated latest finish" : "expected finish";
-  const finishText = run.expected_end_at ? new Date(run.expected_end_at).toLocaleString() : "calculating";
   const warnings = Array.isArray(run.communication_warnings) && run.communication_warnings.length
     ? ` · Earlier CTA warning${run.communication_warnings.length === 1 ? "" : "s"}: ${run.communication_warnings.join("; ")}`
     : "";
@@ -703,9 +716,9 @@ function renderRun(run) {
     ? Math.max(0, (Date.parse(run.recovery_deadline_at) - Date.now()) / 1000)
     : null;
   const recovery = run.cut_in_phase === "recovery" && recoveryRemaining !== null
-    ? ` · Recovery watchdog remaining ${clockText(recoveryRemaining)}`
+    ? ` · Recovery timeout in ${clockText(recoveryRemaining)}`
     : "";
-  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)}${recovery} · ${finishLabel} ${finishText} · station confirmed ${heartbeat}${run.error ? ` · ${run.error}` : ""}${warnings}`;
+  runDetails.textContent = `${lifecycle}${remainingLabel} ${clockText(remaining)}${recovery}${run.error ? ` · ${run.error}` : ""}${warnings}`;
   const terminal = ["completed", "failed", "stopped"].includes(run.state);
   refreshRunButton.textContent = terminal ? "Dismiss test" : "Refresh status";
   stopTestButton.hidden = !["launching", "initializing", "running"].includes(run.state);

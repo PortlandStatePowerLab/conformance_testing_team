@@ -100,7 +100,7 @@ def load_draws(directory: Path) -> list[Draw]:
     return sorted(draws, key=lambda draw: draw.start)
 
 
-def build_figure(directory: Path) -> Figure:
+def build_figure(directory: Path, *, side_by_side: bool = False) -> Figure:
     from software.plots.generate_temperature_power_water_plot import TEMPERATURE_COLOR
     from software.plots.run_plot import _command_phases
     from software.plots.run_plot_water import WATER_COLOR, STATUS_COLORS
@@ -127,13 +127,17 @@ def build_figure(directory: Path) -> Figure:
     minimum, maximum = min(temperatures), max(temperatures)
     margin = max(2, (maximum - minimum) * .08)
     max_flow = max(flow for draw in draws for _, _, flow in draw.samples if flow is not None)
-    figure = Figure(figsize=(13.5, 5 * len(draws) + .8))
+    figure = Figure(figsize=(9 * len(draws), 6.75) if side_by_side else (13.5, 5 * len(draws) + .8))
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     FigureCanvasAgg(figure)
     equipment = equipment_title_line(directory)
     figure.suptitle(directory.name + (f"\n{equipment}" if equipment else ""), fontsize=13, y=.985)
-    outer = figure.add_gridspec(len(draws), 1, left=.10, right=.90, top=.90,
-                               bottom=.07, hspace=.32)
+    if side_by_side:
+        outer = figure.add_gridspec(1, len(draws), left=.065, right=.95, top=.80,
+                                   bottom=.15, wspace=.30)
+    else:
+        outer = figure.add_gridspec(len(draws), 1, left=.10, right=.90, top=.90,
+                                   bottom=.07, hspace=.32)
     for index, draw in enumerate(draws):
         grid = outer[index].subgridspec(3, 1, height_ratios=(.08, 1, .18), hspace=.025)
         command_axis = figure.add_subplot(grid[0])
@@ -164,7 +168,8 @@ def build_figure(directory: Path) -> Figure:
         command_axis.set_yticks([])
         command_axis.tick_params(axis="x", bottom=False, labelbottom=False)
         command_axis.set_title(f"{draw.event_id}" + (f" ({draw.kind})" if draw.kind else "")
-                               + f" | Stop at {duration:.2f} min: {draw.reason.replace('_', ' ')}",
+                               + ("\n" if side_by_side else " | ")
+                               + f"Stop at {duration:.2f} min: {draw.reason.replace('_', ' ')}",
                                fontsize=10, loc="left", pad=8)
         minutes = [elapsed(timestamp) for timestamp, _, _ in draw.samples]
         temperature, = axis.plot(minutes, [temp if temp is not None else math.nan for _, temp, _ in draw.samples],
@@ -206,7 +211,7 @@ def build_figure(directory: Path) -> Figure:
                 segments[-1][1] = end
             else:
                 segments.append([start, end, key])
-        state_axis.set_facecolor("#eeeeee")
+        state_axis.set_facecolor("white" if side_by_side else "#eeeeee")
         for start, end, (name, status) in segments:
             x1, x2 = elapsed(start), elapsed(end)
             state_axis.axvspan(x1, x2, color=STATUS_COLORS[status])
@@ -228,10 +233,11 @@ def build_figure(directory: Path) -> Figure:
     return figure
 
 
-def generate(directory: Path, output_path: Path | None = None) -> Path:
+def generate(directory: Path, output_path: Path | None = None, *, side_by_side: bool = False) -> Path:
     directory = Path(directory).resolve()
-    figure = build_figure(directory)
-    destination = Path(output_path or directory / OUTPUT_NAME).resolve()
+    figure = build_figure(directory, side_by_side=side_by_side)
+    name = "water_draw_temperature_side_by_side.png" if side_by_side else OUTPUT_NAME
+    destination = Path(output_path or directory / name).resolve()
     try:
         figure.savefig(destination, dpi=160, bbox_inches="tight")
     finally:
@@ -243,8 +249,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--side-by-side", action="store_true", help="Use horizontal panels ending at each draw's stop time")
     args = parser.parse_args()
-    print(generate(args.run_directory, args.output))
+    print(generate(args.run_directory, args.output, side_by_side=args.side_by_side))
     return 0
 
 

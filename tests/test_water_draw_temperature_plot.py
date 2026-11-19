@@ -57,6 +57,27 @@ class WaterDrawTemperaturePlotTests(unittest.TestCase):
             (root / "water_draw_2.log").unlink()
             self.assertIsNone(load_draws(root)[0].threshold)
 
+    def test_horizontal_preview_uses_individual_stop_times_and_separate_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_draw(root, 1)
+            self.write_draw(root, 2)
+            second = root / "water_draw_2.csv"
+            second.write_text(second.read_text().replace("02:01:01", "02:04:01"))
+            figure = build_figure(root, side_by_side=True)
+            try:
+                axes = [axis for axis in figure.axes if axis.get_ylabel().startswith("Hot Water")]
+                self.assertAlmostEqual(axes[0].get_xlim()[1], 1 + 1 / 60)
+                self.assertAlmostEqual(axes[1].get_xlim()[1], 4 + 1 / 60)
+                self.assertEqual(axes[0].get_ylim(), axes[1].get_ylim())
+                self.assertAlmostEqual(axes[0].get_position().y0, axes[1].get_position().y0)
+                self.assertLess(axes[0].get_position().x1, axes[1].get_position().x0)
+            finally:
+                figure.clear()
+            output = generate(root, side_by_side=True)
+            self.assertEqual(output.name, "water_draw_temperature_side_by_side.png")
+            self.assertFalse((root / "water_draw_temperature.png").exists())
+
     def test_command_and_state_bands_carry_into_zoom_window(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -82,6 +103,35 @@ class WaterDrawTemperaturePlotTests(unittest.TestCase):
             finally:
                 figure.clear()
 
+    def test_broken_axis_uses_clock_labels_and_proportional_widths(self):
+        from software.plots.water_draw_temperature_broken_axis import build_figure as broken_figure, generate as broken_generate
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_draw(root, 1)
+            with self.assertRaisesRegex(ValueError, "at least two"):
+                broken_figure(root)
+            self.write_draw(root, 2)
+            second = root / "water_draw_2.csv"
+            second.write_text(second.read_text().replace("02:01:01", "02:04:01"))
+            figure = broken_figure(root)
+            try:
+                first_axis, second_axis = figure.axes[1], figure.axes[5]
+                width_ratio = first_axis.get_position().width / second_axis.get_position().width
+                self.assertAlmostEqual(width_ratio, (1 + 1 / 60) / (4 + 1 / 60))
+                self.assertEqual(first_axis.get_ylim(), second_axis.get_ylim())
+                self.assertEqual(figure.axes[3].xaxis.get_major_formatter()(0), "01:00 AM")
+                self.assertEqual(figure.axes[7].xaxis.get_major_formatter()(0), "02:00 AM")
+                self.assertEqual(second_axis.get_ylabel(), "")
+                self.assertEqual(figure.axes[2].get_ylabel(), "")
+                self.assertTrue(any("omitted" in text.get_text() for text in figure.texts))
+            finally:
+                figure.clear()
+            output = broken_generate(root)
+            self.assertEqual(output.name, "water_draw_temperature_broken_axis.png")
+            self.assertFalse((root / "water_draw_temperature.png").exists())
+            self.assertFalse((root / "water_draw_temperature_side_by_side.png").exists())
+
     def test_cut_in_reason_comes_from_orchestrator(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -91,3 +141,30 @@ class WaterDrawTemperaturePlotTests(unittest.TestCase):
                 writer.writerow(["event", "event_id", "details"])
                 writer.writerow(["water_draw_completed", "water_draw_1", json.dumps(dict(reason="cut_in_observed"))])
             self.assertEqual(load_draws(root)[0].reason, "cut_in_observed")
+
+    def test_continuous_command_header_checks_the_omitted_interval(self):
+        from software.plots.water_draw_temperature_continuous_command import build_figure as continuous_figure
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_draw(root, 1)
+            self.write_draw(root, 2)
+            events = root / "cta_events.csv"
+            with events.open("w", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["timestamp_pacific", "event", "command", "result"])
+                writer.writerow(["2026-11-16T00:50:00-08:00", "application_ack", "shed", "ack"])
+            figure = continuous_figure(root)
+            try:
+                self.assertFalse(figure.axes[0].get_visible())
+                self.assertFalse(figure.axes[4].get_visible())
+                header = figure.axes[-1]
+                self.assertIn("Shed", header.texts[0].get_text())
+                self.assertIn("unchanged", header.texts[0].get_text())
+                self.assertGreater(header.get_position().width, .8)
+            finally:
+                figure.clear()
+            with events.open("a", newline="") as handle:
+                csv.writer(handle).writerow(["2026-11-16T01:30:00-08:00", "application_ack", "run_normal", "ack"])
+            with self.assertRaisesRegex(ValueError, "changes between draws"):
+                continuous_figure(root)
